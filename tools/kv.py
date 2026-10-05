@@ -159,13 +159,54 @@ def scan_vault(vp):
     return notes
 
 # ---------- 検査（プッシュ時、サーバ側） ----------
+# プロパティの予約名（vault設計 5.4 レベル0）。システムが作るノート（開示・コメント・工程など）の項目も含む
+RESERVED = set('''id type title aliases owner project status access created updated summary tags progress next parts
+tool env inputs result_hash promoted_to excalidraw-plugin note
+targets audience purpose requested_by approvers decision reason approved_targets approved_version approved_at report revoked
+about about_label assignee due state file sha256 source checks approved_by
+tasks baselines roadmap items week schedule changes ops lines code needs_approval why remap decided_by decided_at comment gantt'''.split()) | set(REL)
+DATE_KEYS = ('created', 'updated', 'due')
+
+def check_props(fn, fm, r, warns, errs):
+    """プロパティの検査：台帳にない名前（my_ 以外）、型・書き方、顧客名"""
+    reg_props = r.get('properties') or {}
+    for k, v in fm.items():
+        if k.startswith('my_'): continue
+        if k not in RESERVED and k not in reg_props:
+            warns.append(f"{fn}: 台帳にないプロパティ「{k}」（自分用なら my_{k} に。皆で使うなら台帳に登録）")
+        spec = reg_props.get(k)
+        if spec and spec.get('values') and v not in (None, '') and v not in spec['values']:
+            warns.append(f"{fn}: 「{k}」の値「{v}」は台帳の候補 {spec['values']} にない")
+        if spec and spec.get('scope') not in (None, '全社') and fm.get('project') != spec['scope']:
+            warns.append(f"{fn}: 「{k}」は {spec['scope']} の中だけで使うプロパティ")
+    for k in DATE_KEYS:
+        if fm.get(k) not in (None, '') and not re.match(r'^\d{4}-\d{2}-\d{2}$', str(fm[k])):
+            errs.append(f"{fn}: 「{k}」の日付は YYYY-MM-DD で書く（{fm[k]}）")
+    words = r.get('customer_words') or []
+    for k, v in fm.items():
+        if k in ('title', 'aliases', 'about_label', 'file', 'access') or k in REL: continue   # タイトル・ファイル名は鍵の「タイトル非公開」、鍵の名前は台帳で守る
+        if any(w in str(v) for w in words):
+            warns.append(f"{fn}: プロパティ「{k}」に顧客名が入っています。他人に配るスタブに載るので、本文に書いてください")
+
 def check(vp):
     r = reg(); errs, warns = [], []
     notes = scan_vault(vp); byhash = {i.split('-')[1]: n for i, n in notes.items()}
     tags = set(r['tags'])
     ok = {t for n in notes.values() if n['fm'].get('type') == 'grant' and n['fm'].get('decision') == 'approved' for t in n['fm'].get('approved_targets') or []}
+    # IDのないノート（テンプレートを使わずに作った）を見つける。テンプレート置き場と隠しフォルダは除く
+    for p in glob.glob(os.path.join(vp, '**', '*.md'), recursive=True):
+        rel = os.path.relpath(p, vp)
+        if rel.startswith(('90_templates', '_', '.')) or '/.' in rel: continue
+        if not read_note(p)[0].get('id'): errs.append(f"{rel}: id がありません（テンプレートから作り直すか、プラグインで付与）")
+    # 全社で重複するID（他のvaultの索引と比べる）
+    try:
+        con = sqlite3.connect(DB); vname = os.path.basename(vp)
+        for (i,) in con.execute('select id from notes where vault != ?', (vname,)):
+            if i in notes: errs.append(f"{os.path.basename(notes[i]['path'])}: id {i} が他のvaultと重複（振り直す）")
+    except sqlite3.Error: pass
     for nid, n in notes.items():
         fn = os.path.basename(n['path']); fm = n['fm']
+        check_props(fn, fm, r, warns, errs)
         if fn != nfc(fn): errs.append(f"{fn}: NFCでない")
         if not ID_RE.match(nid): errs.append(f"{fn}: id形式不正 {nid}")
         m = FN_RE.match(fn)

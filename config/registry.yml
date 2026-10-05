@@ -79,3 +79,18 @@ holidays:
 - '2027-02-11'
 - '2027-02-23'
 - '2027-03-22'
+properties:
+  test_result:
+    type: text
+    values:
+    - 合格
+    - 不合格
+    - 保留
+    scope: 全社
+    stub: true
+    desc: 試験の判定
+  material:
+    type: text
+    scope: P00001
+    stub: false
+    desc: 評価した材料
