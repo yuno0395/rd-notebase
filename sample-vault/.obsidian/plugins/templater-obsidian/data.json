@@ -5,15 +5,15 @@
  "folder_templates": [
   {
    "folder": "01_daily",
-   "template": "90_templates/デイリー.md"
+   "template": "90_templates/daily.md"
   },
   {
    "folder": "10_notes",
-   "template": "90_templates/メモ.md"
+   "template": "90_templates/memo.md"
   },
   {
    "folder": "01_daily/週",
-   "template": "90_templates/週ノート.md"
+   "template": "90_templates/weekly.md"
   }
  ]
 }

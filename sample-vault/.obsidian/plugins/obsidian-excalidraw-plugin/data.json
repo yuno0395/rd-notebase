@@ -1,1 +1,1 @@
-{ "folder": "10_notes", "compress": false, "embedUseExcalidrawFolder": false }
+{ "folder": "10_notes", "compress": false, "onceOffCompressFlagReset": true, "embedUseExcalidrawFolder": false, "scriptFolderPath": "90_templates/excalidraw-scripts" }
