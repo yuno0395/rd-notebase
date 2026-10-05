@@ -6,3 +6,6 @@ _private/
 .obsidian/workspace*.json
 .obsidian/cache
 .trash/
+.venv/
+venv/
+__pycache__/
