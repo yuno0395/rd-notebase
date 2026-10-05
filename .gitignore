@@ -1,0 +1,9 @@
+# setup_demo.py が作る試作環境（サンプルデータから作り直せる）
+/vault-*/
+/proj-*/
+/server/
+/site/
+/out/
+__pycache__/
+*.pyc
+.DS_Store

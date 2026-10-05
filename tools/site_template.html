@@ -1,0 +1,432 @@
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 製図台の閲覧画面：細いヘッダー＋本文1カラム。IDと版は等幅で、状態は色付きの札で示す */
+:root{
+  --bg:#f2f4f6; --paper:#ffffff; --ink:#1c2631; --sub:#5a6672; --line:#d5dbe1;
+  --accent:#1f6f8b; --accent-weak:#e2eff3;
+  --work:#2f6fd0; --wait:#b7791f; --done:#2f855a; --hold:#7a7f87;
+  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#131a21; --paper:#1b242d; --ink:#e4e9ee; --sub:#9aa6b2; --line:#2c3843;
+  --accent:#5fb3cf; --accent-weak:#1d3540; --work:#7aa7ef; --wait:#e0b25a; --done:#68c08f; --hold:#a3a8af; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131a21; --paper:#1b242d; --ink:#e4e9ee; --sub:#9aa6b2; --line:#2c3843;
+  --accent:#5fb3cf; --accent-weak:#1d3540; --work:#7aa7ef; --wait:#e0b25a; --done:#68c08f; --hold:#a3a8af; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.7}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:2;background:var(--paper);border-bottom:1px solid var(--line)}
+.bar{max-width:920px;margin:0 auto;padding:10px 16px;display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+.bar a.brand{font-weight:700;color:var(--ink);text-decoration:none;letter-spacing:.04em}
+.bar nav{display:flex;gap:14px;overflow-x:auto;max-width:100%;white-space:nowrap;scrollbar-width:none}.bar nav a{flex:none}
+.bar .who{margin-left:auto;color:var(--sub);font-size:12px}
+main{max-width:920px;margin:0 auto;padding-inline:16px;padding-block:20px 48px}
+h1{font-size:1.5rem;line-height:1.35;margin:.2em 0 .4em;text-wrap:balance}
+h2{font-size:1.1rem;margin:1.6em 0 .5em}
+a{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.crumb{color:var(--sub);font-size:12px;margin:0}
+.lead{color:var(--sub);margin-top:0}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.card{display:flex;flex-direction:column;gap:2px;padding:14px 16px;background:var(--paper);border:1px solid var(--line);border-radius:6px;text-decoration:none;color:var(--ink)}
+.card span{color:var(--sub);font-size:12px}
+.btn{display:inline-block;margin-top:14px;padding:8px 14px;border:1px solid var(--accent);border-radius:4px;text-decoration:none}
+.tablewrap{overflow-x:auto;background:var(--paper);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--sub);font-weight:400;letter-spacing:.06em;white-space:nowrap}
+td .sum,.updates .sum{color:var(--sub);font-size:12.5px;line-height:1.5}
+.type{display:inline-block;font-size:11px;padding:1px 6px;border:1px solid var(--line);border-radius:3px;color:var(--sub);margin-right:6px;white-space:nowrap}
+.prog{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;color:var(--paper);white-space:nowrap}
+.p-work{background:var(--work)}.p-wait{background:var(--wait)}.p-done{background:var(--done)}.p-hold{background:var(--hold)}
+.updates{list-style:none;padding:0;display:flex;flex-direction:column;gap:10px}
+.updates li{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:10px 14px}
+.updates .who{color:var(--sub);font-size:12px}
+.updates .nx{font-size:12.5px;margin-top:2px}
+dl.meta{display:flex;flex-wrap:wrap;gap:6px 22px;margin:0 0 12px;font-size:13px}
+dl.meta div{display:flex;gap:6px;align-items:baseline}
+dt{color:var(--sub);font-size:11px;letter-spacing:.08em}
+dd{margin:0}
+.tag{font-size:11.5px;padding:1px 7px;border-radius:3px;background:var(--accent-weak);color:var(--accent);margin-right:4px}
+.summary{background:var(--paper);border-left:3px solid var(--accent);padding:8px 12px;margin:0 0 12px}
+.rel{font-size:13px;display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.rel .k{font-family:var(--f-mono);font-size:11px;color:var(--sub)}
+.chip{display:inline-block;font-family:var(--f-mono);font-size:12px;padding:1px 8px;border:1px solid var(--line);border-radius:999px;text-decoration:none;margin-right:4px}
+.lock{color:var(--sub);font-size:13px}
+article{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:4px 18px 14px;min-width:0}
+article table{font-size:13.5px}
+article img{max-width:100%}
+.slides{display:flex;flex-direction:column;gap:18px;padding-top:14px}
+figure{margin:12px 0}
+.frame-svg{width:100%;height:auto;display:block;border-radius:4px}
+figcaption{font-size:12px;color:var(--sub);margin-top:4px}
+.pin{font-family:var(--f-mono);font-size:11px;color:var(--accent)}
+.stale{font-size:11px;color:var(--paper);background:var(--wait);padding:1px 6px;border-radius:3px}
+tr.parent td{background:var(--accent-weak)}
+tr.parent td a{font-weight:700}
+tr.child td{font-size:13.5px}
+tr.sep td{font-size:12px;color:var(--sub);letter-spacing:.06em;background:var(--bg)}
+.kind{font-size:11px;color:var(--accent);margin-right:6px;white-space:nowrap}
+.badge{display:inline-block;font-size:.7em;vertical-align:middle;padding:2px 8px;margin-right:8px;border-radius:4px;background:var(--accent);color:var(--paper)}
+.family{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin:0 0 12px;font-size:14px}
+.family ul{margin:6px 0 0;padding-left:18px}
+.family.up{border-left:3px solid var(--accent)}
+figure.granted{border:1px dashed var(--accent);border-radius:6px;padding:6px}
+.lockbox{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:12px 0;font-size:13.5px}
+.cnt{display:inline-block;min-width:1.4em;text-align:center;font-size:11px;border-radius:999px;background:var(--wait);color:var(--paper)}
+section.grant{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:4px 16px 14px;margin:14px 0}
+.gitems{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.gitem{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:6px;padding:8px;min-width:0;cursor:pointer}
+.gitem input{align-self:flex-start}
+.gl{font-size:13px}
+.rl{display:block;margin-top:12px;font-size:13px;font-weight:700}
+textarea{width:100%;box-sizing:border-box;font:inherit;padding:8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
+.gbtns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;padding:8px 14px;border-radius:4px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
+button.ok{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+button:disabled{opacity:.5;cursor:default}
+.gmsg{font-size:13px;margin:6px 0 0}
+.gstate{font-size:13px;margin-bottom:4px}
+button.scope{font-size:12px;padding:4px 8px;text-align:left;border-color:var(--accent);color:var(--accent)}
+.b4{font-family:var(--f-mono);text-decoration:line-through;opacity:.75}
+.af{font-family:var(--f-mono);font-weight:700}
+.modal{position:fixed;inset:0;z-index:10;background:rgba(10,20,30,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal[hidden]{display:none!important}
+.mbox{background:var(--paper);color:var(--ink);border-radius:8px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:4px 18px 16px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.mbox li{margin:6px 0}
+.mreason{background:var(--bg);padding:8px;border-radius:4px;font-size:13.5px}
+.gout{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px;font-size:12px;white-space:pre-wrap;overflow-x:auto}
+button.copy{margin-left:8px;font-size:12px;padding:2px 8px}
+.auds{display:flex;gap:14px;flex-wrap:wrap;font-size:14px}
+.scopebar{margin:2px 0 4px}
+.scopebar.head{margin:0 0 12px}
+.scope{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:4px;border:1px solid var(--line)}
+.s-open{border-color:var(--done);color:var(--done)}
+.s-shut{border-color:var(--hold);color:var(--sub)}
+.chk{font-size:14px}
+.scope[data-st]{cursor:pointer;background:var(--paper);font:inherit;font-size:11.5px}
+
+.b4x{font-family:var(--f-mono)}
+.lockbtn{border:none;background:none;padding:0 4px;font-size:15px;cursor:pointer;line-height:1}
+.lockbtn:focus-visible{outline:2px solid var(--accent)}
+.tg{display:inline-block;margin-left:4px;padding:0 6px;border-radius:3px;background:var(--accent-weak);color:var(--accent);font-family:var(--f-mono);font-size:11px}
+.tg.g{background:transparent;border:1px solid var(--done);color:var(--done)}
+.lkinfo{display:flex;flex-direction:column;gap:8px}
+.lkinfo div{display:flex;gap:10px;align-items:baseline}
+.upd{border:none;background:none;padding:0;font-family:var(--f-mono);font-size:13px;color:var(--accent);text-decoration:underline dotted;cursor:pointer}
+.plus{color:var(--wait);font-weight:700;margin-left:1px}
+.diff{font-size:12px;background:var(--bg);border-radius:4px;padding:6px;white-space:pre-wrap;overflow-x:auto;margin:4px 0}
+.diff .add{color:var(--done)}.diff .del{color:var(--sub);text-decoration:line-through}
+.lkt{color:var(--sub);font-size:13px;margin-left:2px}
+.sq{width:100%;box-sizing:border-box;font:inherit;padding:8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
+.sqn{font-size:12px;color:var(--sub);margin:4px 0}
+.idc{font-size:12px;white-space:nowrap}
+tr[hidden]{display:none}
+.tagbox{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px}
+.tgx{display:inline-flex;gap:4px;align-items:center}
+.tgx.lockx{color:var(--sub)}
+.sub{color:var(--sub);font-size:12px}
+.tagbox .tmsg{flex-basis:100%;margin:2px 0 0}
+.s-nda{border-color:#c0392b;color:#c0392b}
+.scope{font-size:11.5px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);vertical-align:middle}
+.warn{display:inline-block;font-size:11px;padding:1px 6px;border-radius:3px;background:#fdecea;color:#b03a2e;border:1px solid #f1b8b2}
+.memo{font-weight:700;margin:4px 0}
+.todo{display:block;margin:0 0 14px;padding:10px 14px;border-radius:6px;background:var(--wait);color:var(--paper);font-weight:700;text-decoration:none}
+details.done{margin:18px 0;font-size:13.5px}details.done summary{cursor:pointer;color:var(--sub)}
+button.ng{border-color:#c0392b;color:#c0392b}
+button.frtog{font-size:11px;padding:1px 8px;margin-left:6px}
+.updates.wait li{border-left:3px solid var(--wait)}
+.sqbar{position:sticky;top:calc(env(safe-area-inset-top,0px) + 42px);background:var(--paper);z-index:1;padding-bottom:4px}
+@media (max-width:600px){table.cardable thead{display:none}table.cardable tr{display:block;border-bottom:1px solid var(--line);padding:6px 0}
+  table.cardable td{display:block;border:none;padding:2px 10px}tr.child td,tr.fr td{padding-left:26px!important}}
+.back{font-size:13px;padding:3px 10px}
+figure.hl{outline:2px solid var(--accent);outline-offset:4px;border-radius:4px}
+/* コメント（やること付き＝指摘） */
+.acts{margin:0 0 12px}
+button.rvb{font-size:12px;padding:3px 10px;border-color:var(--wait);color:var(--wait)}
+button.rvmain{font-size:13px;padding:6px 14px}
+.rvn{display:inline-block;font-size:11px;padding:0 7px;border-radius:999px;background:var(--wait);color:var(--paper);margin-left:6px}
+.rvbox{background:var(--paper);border:1px solid var(--line);border-left:3px solid var(--wait);border-radius:6px;padding:2px 14px 8px;margin:0 0 12px}
+.rvs{list-style:none;padding:0;margin:6px 0;display:flex;flex-direction:column;gap:10px}
+.rvs li{border-bottom:1px solid var(--line);padding-bottom:8px}
+.rvs li:last-child{border-bottom:none}
+.rvst{font-size:11px;padding:1px 6px;border-radius:3px;background:var(--wait);color:var(--paper)}
+.rv.done .rvst{background:var(--done)}.rv.note .rvst{background:var(--accent)}
+.rvtask{border:1px solid var(--line);border-radius:6px;padding:4px 10px 8px;margin-top:12px}.rvtask[hidden]{display:none}
+.rvt{font-weight:700;margin:2px 0}
+.rvpics{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+button.thumb{padding:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;width:96px;height:96px}button.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.mbox .full img{max-width:100%;height:auto;display:block;border-radius:4px}
+.rvf select,.rvf input[type=date]{font:inherit;padding:6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);max-width:100%}
+.rvdrop{border:1px dashed var(--line);border-radius:6px;padding:10px;text-align:center;color:var(--sub);font-size:13px;margin-top:4px}
+.rvdrop.on{border-color:var(--accent);background:var(--accent-weak)}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.thumbs div{position:relative}
+.thumbs img{width:88px;height:88px;object-fit:cover;border-radius:4px;border:1px solid var(--line);display:block}
+.thumbs button{position:absolute;top:-6px;right:-6px;padding:0 6px;font-size:12px;border-radius:999px}
+/* 工程 */
+.gantt-wrap{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:8px}
+.gbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px}.gsp{flex:1}
+.gtab{font-size:13px;padding:4px 12px}.gtab.on{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.gedit.on{background:var(--wait);border-color:var(--wait);color:var(--paper)}
+.gview{overflow-x:auto}.gview[hidden]{display:none}
+svg.gantt{width:100%;min-width:760px;height:auto;display:block;border:1px solid var(--line);border-radius:4px}
+svg.gantt [data-task]{cursor:pointer}svg.gantt text.name{text-decoration:underline;fill:#1f6f8b}
+.mdprev article{max-height:55vh;overflow:auto;font-size:14px}
+.editing svg.gantt rect[data-task]:not(.hit){cursor:ew-resize}.editing svg.gantt{touch-action:none}
+.ghint{font-size:12.5px;color:var(--wait);margin:2px 0 6px}
+.late{color:#c0392b;font-weight:700}
+button.tlink{border:none;background:none;padding:0;color:var(--accent);text-decoration:underline;font:inherit;text-align:left}
+.tinfo{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:13.5px;margin:0}
+.tinfo dt{font-size:12px}
+.ttl{font-size:13px;margin:4px 0 0;padding-left:16px}.ttl li{margin:2px 0}
+.tdone{color:var(--sub);text-decoration:line-through}
+ul.plain{padding-left:18px;font-size:13.5px}
+.ml{display:none;color:var(--sub);font-size:12px}
+.gscroll{display:none;font-size:12px;color:var(--sub)}
+@media (max-width:600px){.ml{display:inline}.gscroll{display:inline}}
+.impact{background:var(--accent-weak);border-radius:6px;padding:8px 12px;font-size:14px}
+.card .pmsum{color:var(--ink);font-size:12.5px}
+.savebox{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin:6px 0}
+.mbox select{font:inherit;padding:6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);max-width:100%}
+/* 工程表の編集 */
+.ged{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:8px}
+.gebar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}.gebar button{font-size:13px;padding:5px 10px}
+.eview.on{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.gegrid{display:flex;border:1px solid var(--line);border-radius:4px;max-height:60vh;overflow:auto;background:#fff;color:#1c2631}
+.gel{flex:none;width:210px;border-right:1px solid var(--line);position:sticky;left:0;background:#fff;z-index:1}
+.ehd{height:40px;box-sizing:border-box;border-bottom:1px solid #1c2631;font-size:11px;color:#5a6672;padding:22px 6px 0}
+.ern{height:30px;box-sizing:border-box;display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;border-bottom:1px solid #f2f4f6}
+.ern small{color:#5a6672;font-size:10px}.ern.on{background:#e2eff3}.ern.chg span{color:#b7791f;font-weight:700}
+.ger{flex:1}.gesvg{display:block}.gesvg .ebar,.gesvg .ems{cursor:grab}.gesvg .eh{cursor:col-resize}.ged .gesvg{touch-action:none}
+.gepanel,.gechg{margin-top:10px;border:1px solid var(--line);border-radius:6px;padding:4px 12px 10px}
+.gepanel h3,.gechg h3{font-size:14px;margin:8px 0}
+.epf{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px 12px}
+.epf label{display:flex;flex-direction:column;font-size:12px;color:var(--sub);gap:2px}
+.epf input,.epf select{font:inherit;font-size:14px;padding:5px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
+.epf fieldset{grid-column:1/-1;border:1px solid var(--line);border-radius:4px;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 14px}
+.epf fieldset label{flex-direction:row;align-items:center;color:var(--ink);font-size:13px}
+a.gelink{margin:0;padding:5px 12px;font-size:13px}
+@media (max-width:600px){.gel{width:120px}.ern small{display:none}}
+footer{color:var(--sub);font-size:11px;text-align:center;padding-bottom:20px}
+</style>
+<header><div class="bar"><button id="back" class="back" type="button" onclick="goBack()" aria-label="1つ前の画面に戻る" disabled>← 戻る</button><a class="brand" href="#home">開発ノート閲覧</a><nav><a href="#home">案件</a><a href="#week">今週の更新</a><!--NAV--></nav><span class="who">閲覧者 {{USER}}</span></div></header>
+<main id="view"></main>
+<div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mt"><div class="mbox"><h2 id="mt">確認</h2><div class="mbody"></div><div class="gbtns"><button class="ok mok" type="button">許可する</button><button class="mcancel" type="button">やめる</button></div></div></div>
+<footer>生成 {{BUILT}} ・ 閲覧権限のあるノートだけを表示しています</footer>
+<script>
+const PAGES=/*PAGES*/;const ASSETS=/*ASSETS*/;const MYTAGS=/*MYTAGS*/;const TAGS=/*TAGS*/;const USERS=/*USERS*/;const HOL=new Set(/*HOL*/);
+// 画面遷移：#n-ID.F02 はノートを開いてフレームまで移動。戻るは独自の履歴で管理（どのタブでも共通）
+const HIST=[];let CUR=null,BACKING=false;
+function show(){const raw=(location.hash||'#home').slice(1);const [k,fr]=raw.split('.');const v=document.getElementById('view');
+  if(CUR&&CUR!==raw&&!BACKING)HIST.push(CUR);BACKING=false;CUR=raw;
+  v.innerHTML=PAGES[k]||'<h1>見つかりません</h1><p class="lead">このページは存在しないか、閲覧権限がありません。<a href="#home">案件一覧へ</a></p>';
+  v.querySelectorAll('x-a').forEach(e=>{e.outerHTML=ASSETS[e.getAttribute('k')]||'';});
+  const tgt=fr&&document.getElementById('fr-'+fr);if(tgt){tgt.scrollIntoView();tgt.classList.add('hl');}else window.scrollTo(0,0);
+  document.getElementById('back').disabled=!HIST.length;if(window.initEditor)initEditor();}
+function goBack(){if(!HIST.length)return;BACKING=true;location.hash=HIST.pop();}
+addEventListener('hashchange',show);
+// 開示申請：確認ポップアップ → 許可（試作では、結果をチャットに貼って反映する）
+const M=document.getElementById('modal');
+// 見られるタグの選択：元の鍵（全部そろった人が見られる）と開示先タグ。自分が見られなくなる変更はできない
+const MY=new Set(MYTAGS);
+function itemsOf(els){return els.map(c=>({base:JSON.parse(c.dataset.base||'[]'),aud:JSON.parse(c.dataset.aud||'[]')}));}
+function canSee(it,baseOn,auds){return (baseOn&&it.base.length&&it.base.every(t=>MY.has(t)))||auds.some(t=>MY.has(t));}
+function renderTags(box,items){box.items=items;if(!items.length){box.innerHTML='<p class="sub">資料を選ぶと表示されます</p>';return;}
+  const baseKey=JSON.stringify(items[0].base);const sameBase=items.every(i=>JSON.stringify(i.base)===baseKey);
+  let html='';
+  if(sameBase&&items[0].base.length)html+=`<label class="tgx"><input type="checkbox" class="tb" checked> ${items[0].base.join(' ＋ ')}<span class="sub">（元の鍵）</span></label>`;
+  for(const t of TAGS){if(sameBase&&items[0].base.includes(t))continue;const n=items.filter(i=>i.aud.includes(t)).length;
+    html+=`<label class="tgx"><input type="checkbox" class="ta" value="${t}" ${n===items.length?'checked':''} data-mixed="${n>0&&n<items.length?1:0}"> ${t}${n>0&&n<items.length?'<span class="sub">（一部のみ）</span>':''}</label>`;}
+  box.innerHTML=html+'<p class="sub tmsg"></p>';guard(box);}
+function stateOf(box){const tb=box.querySelector('.tb');const add=[...box.querySelectorAll('.ta:checked')].map(c=>c.value);
+  const rem=[...box.querySelectorAll('.ta:not(:checked)')].filter(c=>c.dataset.mixed==='1'||box.items.some(i=>i.aud.includes(c.value))).map(c=>c.value);
+  return {baseOn:tb?tb.checked:true,add,rem};}
+function after(it,st){const a=new Set(it.aud);st.add.forEach(t=>a.add(t));st.rem.forEach(t=>a.delete(t));return [...a];}
+function guard(box){const st=stateOf(box);box.querySelectorAll('.tb,.ta').forEach(cb=>{if(!cb.checked){cb.disabled=false;return;}
+    cb.checked=false;const s2=stateOf(box);cb.checked=true;const ok=box.items.every(i=>canSee(i,s2.baseOn,after(i,s2)));cb.disabled=!ok;
+    cb.closest('label').title=ok?'':'外すとあなたが見られなくなります';cb.closest('label').classList.toggle('lockx',!ok);});
+  const m=box.querySelector('.tmsg');if(m)m.textContent=[...box.querySelectorAll('.tb:disabled,.ta:disabled')].length?'灰色の項目は、外すとあなた自身が見られなくなるため外せません。':'';}
+function summary(it,st){return (st.baseOn?it.base.join(' ＋ '):'')+(after(it,st).length?(st.baseOn?' ／ ':'')+'公開 '+after(it,st).join(' / '):'');}
+function sel(sec){return [...sec.querySelectorAll('.gt:checked,.sn:checked')];}
+function aud(sec){const a=sec.querySelector('input[name=aud]:checked');return a?a.value:'';}
+function checks(sec){return [...sec.querySelectorAll('.ck:checked')].map(c=>c.value);}
+function why(sec){const c=checks(sec),r=sec.querySelector('textarea').value.trim();return [c.length?'確認項目：'+c.join('、'):'',r].filter(Boolean).join(' ／ ');}
+function openModal(sec,act){const msg=sec.querySelector('.gmsg');const reason=why(sec);const it=sel(sec);
+  if(!reason){msg.textContent='確認項目にチェックするか、コメント（判断の理由）を入力してください。';sec.querySelector('textarea').focus();return;}
+  if(act!=='reject'&&!it.length){msg.textContent='公開する資料を1件以上選んでください。';return;}
+  M.querySelector('h2').textContent=act==='reject'?'却下の確認':act==='scope'?'見せる相手の変更':'社内公開の確認';
+  if(act==='scope'){const box=sec.querySelector('.tagbox');const st=stateOf(box);if(!st.add.length&&!st.rem.length&&st.baseOn){msg.textContent='見られるタグが変わっていません。';return;}
+    it.forEach((c,k)=>{const i=box.items[k];c.dataset.after=summary(i,st);});M.st=st;}
+  M.querySelector('.mbody').innerHTML=(act!=='reject'?(act==='scope'?'<p>次の資料の見せる相手を変更します。</p>':'<p>次の資料を社内に公開します。</p>')+'<ul>'+it.map(c=>`<li><b>${c.dataset.label}</b>${c.dataset.before?`<br><span class="b4x">${c.dataset.before}</span> → <span class="af">${c.dataset.after}</span>`:''}</li>`).join('')+'</ul>':'<p>この申請を却下します。</p>')
+    +`<p class="mreason">理由：${reason.replace(/</g,'&lt;')}</p>`;
+  M.querySelector('.mok').textContent=act==='reject'?'却下する':act==='scope'?'変更する':'公開する';M.dataset.act=act;M.sec=sec;M.hidden=false;M.querySelector('.mok').focus();}
+document.addEventListener('change',e=>{if(e.target.classList.contains('gall')){e.target.closest('section').querySelectorAll('.gt,.sn').forEach(c=>{if(!c.closest('tr')||!c.closest('tr').hidden)c.checked=e.target.checked;});}});
+document.addEventListener('change',e=>{const c=e.target;if(c.classList.contains('sn')||c.classList.contains('gall')){const sec=c.closest('section');const box=sec&&sec.querySelector('.tagbox');if(box)renderTags(box,itemsOf([...sec.querySelectorAll('.sn:checked')]));}
+  if(c.classList.contains('tb')||c.classList.contains('ta'))guard(c.closest('.tagbox'));});
+document.addEventListener('input',e=>{if(!e.target.classList.contains('sq'))return;const q=e.target.value.trim().toLowerCase();const sec=e.target.closest('section');let n=0;
+  sec.querySelectorAll('tr[data-q]').forEach(tr=>{const hit=q?tr.dataset.q.includes(q):!tr.classList.contains('fr');tr.hidden=!hit;if(hit)n++;});sec.querySelector('.sqn').textContent=q?`${n} 件`:'';});
+function openLock(b){M.querySelector('h2').textContent='🔒 '+b.dataset.lkLabel;M.dataset.act='info';
+  M.querySelector('.mbody').innerHTML=`<dl class="lkinfo"><div><dt>公開の依頼先</dt><dd>${b.dataset.lkWho}</dd></div><div><dt>文書ID</dt><dd><span class="mono">${b.dataset.lkId}</span> <button class="copyid" type="button">コピー</button></dd></div></dl><p class="lead">見る必要がある場合は、依頼先に文書IDを伝えて公開を依頼してください。</p>`;
+  M.querySelector('.mok').hidden=true;M.querySelector('.mcancel').textContent='閉じる';M.hidden=false;M.querySelector('.mcancel').focus();}
+function openScope(b){M.querySelector('h2').textContent='見せる相手の変更';M.dataset.act='single';M.btn=b;
+  M.querySelector('.mbody').innerHTML=`<p><b>${b.dataset.sl}</b><br><span class="sub">文書ID ${b.dataset.st}</span></p><p class="rl">見せる相手</p><div class="tagbox"></div>
+   <p class="rl">確認項目</p><label class="chk"><input type="checkbox" class="sck" value="顧客情報なし"> 顧客情報なし</label>
+   <label class="rl" for="sr">コメント（確認項目にチェックがない場合は必須）</label><textarea id="sr" rows="2"></textarea><p class="smsg" aria-live="polite"></p><pre class="gout" hidden></pre>`;
+  renderTags(M.querySelector('.tagbox'),itemsOf([b]));M.querySelector('.mok').textContent='変更する';M.hidden=false;}
+function doScope(){const b=M.btn,body=M.querySelector('.mbody');const box=body.querySelector('.tagbox');const st=stateOf(box);
+  if(!st.add.length&&!st.rem.length&&st.baseOn){body.querySelector('.smsg').textContent='見られるタグが変わっていません。';return;}
+  const c=[...body.querySelectorAll('.sck:checked')].map(x=>x.value),r=body.querySelector('#sr').value.trim();
+  const why=[c.length?'確認項目：'+c.join('、'):'',r].filter(Boolean).join(' ／ ');
+  if(!why){body.querySelector('.smsg').textContent='確認項目にチェックするか、コメントを入力してください。';return;}
+  const it=box.items[0];const out=body.querySelector('.gout');
+  out.textContent=`見せる相手の変更\n対象: ${b.dataset.st}\n変更前: ${summary(it,{baseOn:true,add:[],rem:[]})}\n変更後: ${summary(it,st)}\n付ける: ${st.add.filter(t=>!it.aud.includes(t)).join(', ')||'—'}\n外す: ${st.rem.join(', ')||'—'}${st.baseOn?'':'\n元の鍵を外す: はい'}\n理由: ${why}`;out.hidden=false;
+  body.querySelector('.smsg').innerHTML='記録しました（反映待ち）。試作では、この内容をチャットに貼ると反映されます。<button class="copy" type="button">コピー</button>';
+  M.querySelector('.mok').hidden=true;M.querySelector('.mcancel').textContent='閉じる';b.classList.add('pending');}
+document.addEventListener('click',async e=>{
+  const ft=e.target.closest('button.frtog'); if(ft){let tr=ft.closest('tr').nextElementSibling;const open=ft.classList.toggle('open');
+    while(tr&&tr.classList.contains('fr')){tr.hidden=!open;tr=tr.nextElementSibling;}return;}
+  const lk=e.target.closest('button.lockbtn'); if(lk){openLock(lk);return;}
+  const ci=e.target.closest('button.copyid'); if(ci){const t=ci.previousElementSibling.textContent;try{await navigator.clipboard.writeText(t);ci.textContent='コピーしました';}catch(_){const r=document.createRange();r.selectNodeContents(ci.previousElementSibling);const s=getSelection();s.removeAllRanges();s.addRange(r);ci.textContent='選択しました';}return;}
+  const up=e.target.closest('button.upd'); if(up){const d=up.dataset;M.querySelector('h2').textContent='版の情報';M.dataset.act='info';
+    M.querySelector('.mbody').innerHTML=`<dl class="lkinfo"><div><dt>表示中の版</dt><dd><span class="mono">${d.h}</span></dd></div><div><dt>コミットした人</dt><dd>${d.w}</dd></div><div><dt>日時</dt><dd class="mono">${d.a}</dd></div></dl>`
+      +(d.lh?`<p class="rl">＋ 新しい版があります（社内公開の確認待ち）</p><dl class="lkinfo"><div><dt>最新の版</dt><dd><span class="mono">${d.lh}</span></dd></div><div><dt>コミットした人</dt><dd>${d.lw}</dd></div><div><dt>日時</dt><dd class="mono">${d.la}</dd></div></dl>`:'');
+    M.querySelector('.mok').hidden=true;M.querySelector('.mcancel').textContent='閉じる';M.hidden=false;M.querySelector('.mcancel').focus();return;}
+  if(e.target.closest('#modal a')){M.hidden=true;}
+  const ss=e.target.closest('button.scope[data-st]'); if(ss){M.querySelector('.mok').hidden=false;M.querySelector('.mcancel').textContent='やめる';openScope(ss);return;}
+  if(e.target.closest('.mok')&&M.dataset.act==='single'){doScope();return;}
+  if(M&&!M.hidden&&M.dataset.act==='single'&&(e.target.classList.contains('tb')||e.target.classList.contains('ta'))){guard(e.target.closest('.tagbox'));}
+  const sc=e.target.closest('button.scope'); if(sc){const sec=sc.closest('section.grant');sc.closest('.gitem').querySelector('.gt').checked=true;openModal(sec,'approve');return;}
+  const b=e.target.closest('button[data-act]'); if(b){openModal(b.closest('section.grant'),b.dataset.act);return;}
+  if(e.target.closest('.mcancel')){M.hidden=true;M.querySelector('.mok').hidden=false;M.querySelector('.mcancel').textContent='やめる';return;}
+  if(e.target.closest('.mok')){const sec=M.sec,act=M.dataset.act;M.hidden=true;const reason=why(sec);const it=sel(sec);
+    const out=sec.querySelector('.gout');const txt=act==='scope'?`見せる相手の変更\n対象: ${it.map(c=>c.value).join(', ')}\n付ける: ${M.st.add.join(', ')||'—'}\n外す: ${M.st.rem.join(', ')||'—'}${M.st.baseOn?'':'\n元の鍵を外す: はい'}\n理由: ${reason}`:`公開の判断 ${sec.dataset.gid}\n判断: ${act==='approve'?'公開':'却下'}\n対象: ${act==='approve'?it.map(c=>c.value).join(', '):'—'}\n理由: ${reason}`;
+    out.textContent=txt;out.hidden=false;const st=sec.querySelector('.gstate');if(st)st.textContent='状態：'+(act==='reject'?'却下（反映待ち）':'許可（反映待ち）');
+    sec.querySelector('.gmsg').innerHTML='判断を記録しました。試作では、下の内容をチャットに貼ると反映されます。<button class="copy" type="button">コピー</button>';}
+  const cp=e.target.closest('button.copy'); if(cp){const t=(cp.closest('section')||cp.closest('.mbox')).querySelector('.gout');try{await navigator.clipboard.writeText(t.textContent);cp.textContent='コピーしました';}catch(_){const r=document.createRange();r.selectNodeContents(t);const s=getSelection();s.removeAllRanges();s.addRange(r);cp.textContent='選択しました。長押しでコピー';}}
+});
+// コメント：誰でも書ける。対象（ノート・フレーム・添付・引用）を選び、内容・画像を付ける。「やることにする」と担当・期限が付き、担当者に届く（指摘）
+let RVIMG=[];
+function openReview(pre){const main=document.querySelector('#view .rvmain');if(!main)return;const opts=JSON.parse(main.dataset.rv);
+  M.querySelector('h2').textContent='コメント';M.dataset.act='review';RVIMG=[];
+  const d=new Date();d.setDate(d.getDate()+7);const due=d.toISOString().slice(0,10);
+  M.querySelector('.mbody').innerHTML=`<div class="rvf"><label class="rl" for="rvt">対象</label><select id="rvt">${opts.map(o=>`<option value="${o.t}" ${o.t===pre?'selected':''}>${o.l.replace(/</g,'&lt;')}</option>`).join('')}</select>
+   <label class="rl" for="rvx">内容（必須）</label><textarea id="rvx" rows="3" placeholder="例：図2の荷重条件が不明。根拠を追記してほしい"></textarea>
+   <label class="chk" style="display:block;margin-top:12px"><input type="checkbox" id="rvk"> やることにする（担当・期限を付けて相手に届ける）</label>
+   <div class="rvtask" hidden><label class="rl" for="rva">担当</label><select id="rva">${Object.entries(USERS).map(([k,v])=>`<option value="${k}" ${k===main.dataset.owner?'selected':''}>${v}</option>`).join('')}</select>
+   <label class="rl" for="rvd">期限</label><input id="rvd" type="date" value="${due}"></div>
+   <p class="rl">画像（任意）</p><label class="rvdrop" tabindex="0">画像を選ぶ・ここにドロップ・貼り付け<input id="rvi" type="file" accept="image/*" multiple hidden></label><div class="thumbs"></div>
+   <p class="smsg" aria-live="polite"></p><pre class="gout" hidden></pre></div>`;
+  M.querySelector('.mok').hidden=false;M.querySelector('.mok').textContent='送る';M.querySelector('.mcancel').textContent='やめる';M.hidden=false;M.querySelector('#rvx').focus();}
+function addImgs(files){[...files].filter(f=>f.type.startsWith('image/')).forEach(f=>{const r=new FileReader();r.onload=()=>{RVIMG.push({name:f.name||'貼り付け画像.png',url:r.result});drawThumbs();};r.readAsDataURL(f);});}
+function drawThumbs(){const t=M.querySelector('.thumbs');if(!t)return;t.innerHTML=RVIMG.map((im,i)=>`<div><img src="${im.url}" alt="${im.name.replace(/"/g,'')}"><button type="button" class="rvdel" data-i="${i}" aria-label="外す">×</button></div>`).join('');}
+function doReview(){const b=M.querySelector('.mbody');const x=b.querySelector('#rvx').value.trim();
+  if(!x){b.querySelector('.smsg').textContent='内容を入力してください。';b.querySelector('#rvx').focus();return;}
+  const tk=b.querySelector('#rvk').checked;
+  const sel=b.querySelector('#rvt');const out=b.querySelector('.gout');
+  out.textContent=`コメント\n対象: ${sel.value}（${sel.options[sel.selectedIndex].text}）\n`+(tk?`やること: 担当 ${b.querySelector('#rva').value} ・ 期限 ${b.querySelector('#rvd').value}\n`:'')+`内容: ${x}\n画像: ${RVIMG.length?RVIMG.length+'枚（'+RVIMG.map(i=>i.name).join(', ')+'）':'なし'}`;out.hidden=false;
+  b.querySelector('.smsg').innerHTML='記録しました（反映待ち）。試作では、この内容をチャットに貼り'+(RVIMG.length?'、同じ画像をチャットに添付する':'る')+'と反映されます。<button class="copy" type="button">コピー</button>';
+  M.querySelector('.mok').hidden=true;M.querySelector('.mcancel').textContent='閉じる';}
+document.addEventListener('click',e=>{const th=e.target.closest('button.thumb');if(th){M.querySelector('h2').textContent='画像';M.dataset.act='info';
+  M.querySelector('.mbody').innerHTML='<div class="full">'+(ASSETS[th.dataset.full]||'')+'</div>';M.querySelector('.mok').hidden=true;M.querySelector('.mcancel').textContent='閉じる';M.hidden=false;return;}});
+document.addEventListener('click',e=>{const r=e.target.closest('button.rvb');if(r){openReview(r.dataset.pre||'');return;}
+  if(e.target.closest('.mok')&&M.dataset.act==='review'){e.stopImmediatePropagation();doReview();return;}
+  const dl=e.target.closest('button.rvdel');if(dl){RVIMG.splice(+dl.dataset.i,1);drawThumbs();}},true);
+document.addEventListener('change',e=>{if(e.target.id==='rvi')addImgs(e.target.files);if(e.target.id==='rvk')M.querySelector('.rvtask').hidden=!e.target.checked;});
+document.addEventListener('paste',e=>{if(!M.hidden&&M.dataset.act==='review'&&e.clipboardData.files.length){addImgs(e.clipboardData.files);e.preventDefault();}});
+['dragover','dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{const z=e.target.closest&&e.target.closest('.rvdrop');if(!z)return;e.preventDefault();
+  z.classList.toggle('on',ev==='dragover');if(ev==='drop')addImgs(e.dataTransfer.files);}));
+// ---------- 工程：表示切替・タスクの経過・ドラッグで日程調整・画像保存 ----------
+const DAY=864e5;const iso=d=>d.toISOString().slice(0,10);const pd=s=>new Date(s+'T00:00:00Z');const md=s=>{const d=pd(s);return (d.getUTCMonth()+1)+'/'+d.getUTCDate();};
+const isWork=d=>{const w=d.getUTCDay();return w>0&&w<6&&!HOL.has(iso(d));};
+function wdays(a,b){a=pd(a);b=pd(b);if(+a===+b)return 0;const sg=b>a?1:-1;let n=0;for(let d=new Date(Math.min(a,b)+DAY);d<=new Date(Math.max(a,b));d=new Date(+d+DAY))if(isWork(d))n++;return sg*n;}
+function wrapOf(el){return el.closest('.gantt-wrap')||document.querySelector('#view .gantt-wrap');}
+function taskPopup(wrap,tid){const T=JSON.parse(wrap.dataset.tasks||'{}')[tid];if(!T)return;
+  const li=(a,f)=>a.length?'<ul class="ttl">'+a.map(f).join('')+'</ul>':'<p class="sub">なし</p>';
+  M.querySelector('h2').textContent=(T.milestone?'◆ ':'')+T.name;M.dataset.act='info';
+  M.querySelector('.mbody').innerHTML=`<p class="sub mono">${T.id}</p><dl class="tinfo"><dt>状態</dt><dd>${T.state||'—'}${T.delay>0?` <span class="late">当初比 +${T.delay}日</span>`:''}</dd>
+   <dt>当初計画</dt><dd>${T.base}</dd><dt>今の計画</dt><dd>${T.plan}</dd><dt>実績</dt><dd>${T.act}</dd><dt>見込み</dt><dd>${T.fc}</dd>
+   ${T.milestone?'':`<dt>やること</dt><dd>${T.cnt}（完了／総数）</dd><dt>担当</dt><dd>${T.owner}</dd>`}</dl>
+   ${T.req?`<div class="impact" style="margin-top:10px"><b style="color:var(--wait)">申請中の計画変更</b>（${T.req.by}）<br>${T.req.code}：${T.req.reason}<ul class="ttl">${T.req.ch.map(c=>`<li>${c}</li>`).join('')}</ul>承認が要る理由：${T.req.why||'—'}${wrap.dataset.mgr==='1'?'<br><a href="#grants">確認待ちで判断する →</a>':''}</div>`:''}
+   <p class="rl">週報</p>${li(T.weekly,w=>`<li><b>${w.w}</b> ${w.cnt?'やること '+w.cnt:''} ${w.fc?'・見込み '+w.fc:''} ${w.act?'・'+w.act:''}<br>${w.did}${w.issue?`<br><span style="color:var(--wait)">課題：${w.issue}</span>`:''} <span class="sub">${w.who}</span></li>`)}
+   ${T.milestone||T.group?'':'<p class="rl">やること</p>'+li(T.todos,t=>`<li class="${t[0]?'tdone':''}">${t[0]?'☑':'☐'} ${t[1]}</li>`)}
+   <p class="rl">計画変更の履歴</p>${li(T.hist,h=>`<li><span class="mono">${h.at}</span> ${h.what}<br><span class="sub">${h.code} ・ ${h.why} ・ 承認 ${h.by}</span></li>`)}`;
+  M.querySelector('.mok').hidden=true;M.querySelector('.mcancel').textContent='閉じる';M.hidden=false;}
+let DRAG=null;
+// タスク名を押す：まとめノート（md）のプレビュー
+function notePopup(wrap,tid){const T=JSON.parse(wrap.dataset.tasks||'{}')[tid];if(!T)return;const N=T.note;
+  M.querySelector('h2').textContent=T.name+'：まとめ';M.dataset.act='info';
+  M.querySelector('.mbody').innerHTML=!N?'<p class="lead">まとめのノートがまだありません。工程タスクに紐づくノート（やることに task:: を付けたノート）を作ると、ここに出ます。</p>'
+    :N.lock?`<p class="lead">🔒 ${N.title}（閲覧権限がありません）</p>`
+    :(ASSETS[N.k]||'')+`<p><a href="#n-${N.id}">ノートを開く →</a> ・ <button type="button" class="tlink" data-task="${tid}">タスクの経過を見る</button></p>`;
+  M.querySelector('.mok').hidden=true;M.querySelector('.mcancel').textContent='閉じる';M.hidden=false;}
+document.addEventListener('click',e=>{
+  const tb=e.target.closest('.gtab');if(tb){const w=wrapOf(tb);w.querySelectorAll('.gtab').forEach(b=>b.classList.toggle('on',b===tb));w.querySelectorAll('.gview').forEach(v=>v.hidden=v.dataset.v!==tb.dataset.v);return;}
+  const ge=e.target.closest('.gedit');if(ge){const w=wrapOf(ge);const on=ge.classList.toggle('on');w.classList.toggle('editing',on);w.querySelector('.ghint').hidden=!on;ge.textContent=on?'調整をやめる':'日程を調整';return;}
+  const gs=e.target.closest('.gsave');if(gs){saveImg(wrapOf(gs),false);return;}
+  const sr=e.target.closest('input.sreq');if(sr){saveImg(M.W,sr.checked);return;}
+  const tl=e.target.closest('button.tlink');if(tl){taskPopup(wrapOf(tl),tl.dataset.task);return;}
+  const nm=e.target.closest('svg.gantt text.name');if(nm){notePopup(wrapOf(nm),nm.dataset.task);return;}
+  const dt=e.target.closest('svg.gantt [data-task]');if(dt&&!wrapOf(dt).classList.contains('editing')){taskPopup(wrapOf(dt),dt.dataset.task);return;}
+  const pa=e.target.closest('button[data-act^="plan-"]');if(pa){e.stopImmediatePropagation();planDecide(pa);return;}
+},true);
+function svgPt(svg,ev){const p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;return p.matrixTransform(svg.getScreenCTM().inverse());}
+// 棒の中ほどをつかむ＝ずらす、端（左右10px）をつかむ＝開始日・終了日だけ動かす（長さが変わる）
+function edgeOf(el,svg,ev){if(!el||!el.classList.contains('plan'))return 'move';const x=svgPt(svg,ev).x,x1=+el.getAttribute('x'),w=+el.getAttribute('width');const z=Math.min(10,w/3);
+  return x<x1+z?'start':x>x1+w-z?'end':'move';}
+document.addEventListener('pointermove',e=>{if(DRAG)return;const el=e.target.closest('.editing svg.gantt rect.plan');if(!el)return;const m=edgeOf(el,el.closest('svg'),e);el.style.cursor=m==='move'?'grab':'col-resize';});
+document.addEventListener('pointerdown',e=>{const el=e.target.closest('.editing svg.gantt [data-task]');if(!el)return;const svg=el.closest('svg');const geo=JSON.parse(svg.dataset.geo);
+  const tid=el.dataset.task;const T=JSON.parse(wrapOf(svg).dataset.tasks)[tid];if(!T||T.group)return;
+  const plan=svg.querySelector(`rect.plan[data-task="${tid}"]`);const mode=T.milestone?'move':edgeOf(plan,svg,e);
+  e.preventDefault();DRAG={svg,geo,tid,T,mode,plan,x0:svgPt(svg,e).x,px:plan?+plan.getAttribute('x'):0,pw:plan?+plan.getAttribute('width'):0,
+    els:[...svg.querySelectorAll(`rect[data-task="${tid}"]:not(.hit),path[data-task="${tid}"]`)],dd:0};});
+document.addEventListener('pointermove',e=>{if(!DRAG)return;const g=DRAG.geo;const ppd=(g.x1-g.x0)/((pd(g.e)-pd(g.s))/DAY);const snap=g.view==='m1'?1:7;
+  let dd=Math.round((svgPt(DRAG.svg,e).x-DRAG.x0)/ppd/snap)*snap;const len=Math.round(DRAG.pw/ppd);
+  if(DRAG.mode==='start')dd=Math.min(dd,len-1);if(DRAG.mode==='end')dd=Math.max(dd,1-len);if(dd===DRAG.dd)return;DRAG.dd=dd;
+  if(DRAG.mode==='move')DRAG.els.forEach(el=>el.setAttribute('transform',`translate(${dd*ppd},0)`));
+  else if(DRAG.mode==='start'){DRAG.plan.setAttribute('x',DRAG.px+dd*ppd);DRAG.plan.setAttribute('width',DRAG.pw-dd*ppd);}
+  else DRAG.plan.setAttribute('width',DRAG.pw+dd*ppd);});
+function undrag(D){D.els.forEach(el=>el.removeAttribute('transform'));if(D.plan){D.plan.setAttribute('x',D.px);D.plan.setAttribute('width',D.pw);}}
+document.addEventListener('pointerup',e=>{if(!DRAG)return;const D=DRAG;DRAG=null;if(!D.dd){undrag(D);return;}
+  D.ds=D.mode==='end'?0:D.dd;D.de=D.mode==='start'?0:D.dd;planRequest(D);});
+function planRequest(D){const T=D.T;const sh=(s,k)=>iso(new Date(+pd(s)+k*DAY));
+  // 休日に落ちたら、開始・節目は次の稼働日、終了は前の稼働日へ寄せる
+  const fwd=x=>{let d=pd(x);while(!isWork(d))d=new Date(+d+DAY);return iso(d);},back=x=>{let d=pd(x);while(!isWork(d))d=new Date(+d-DAY);return iso(d);};
+  const ns=fwd(sh(T.s,D.ds)),ne=T.milestone?ns:back(sh(T.e,D.de));D.ns=ns;D.ne=ne;const late=wdays(T.e,ne);const need=T.milestone||late>5;const dd=D.dd;
+  M.querySelector('h2').textContent='計画変更の申請';M.dataset.act='plan-req';M.D=D;
+  M.querySelector('.mbody').innerHTML=`<p><b>${T.name}</b></p><p><span class="b4x">${T.milestone?md(T.s):md(T.s)+'〜'+md(T.e)}</span> → <span class="af">${T.milestone?md(ns):md(ns)+'〜'+md(ne)}</span>（${D.mode==='move'?'ずらす':D.mode==='start'?'開始を':'終了を'} ${dd>0?'+':''}${dd}日）</p>
+   <p class="${need?'late':'sub'}">${need?'上司の承認が必要（'+(T.milestone?'節目の移動':'実働'+late+'日の遅れ')+'）':'承認は不要（実働5日以内）。記録だけ残ります'}</p>
+   <label class="chk"><input type="checkbox" id="pshift" checked> 後ろにつながるタスクも一緒にずらす</label>
+   <label class="rl" for="pcode">理由の区分（必須）</label><select id="pcode"><option value="">選んでください</option>${['見積の誤り','仕様変更','外部待ち（部品・外注・顧客）','不具合・やり直し','人の都合（他案件・休み）','その他'].map(x=>`<option>${x}</option>`).join('')}</select>
+   <label class="rl" for="pwhy">理由（必須）</label><textarea id="pwhy" rows="2"></textarea><p class="smsg" aria-live="polite"></p><pre class="gout" hidden></pre>`;
+  M.querySelector('.mok').hidden=false;M.querySelector('.mok').textContent=need?'承認を依頼する':'変更を記録する';M.querySelector('.mcancel').textContent='やめる';M.hidden=false;}
+document.addEventListener('click',e=>{if(!(e.target.closest('.mok')&&M.dataset.act==='plan-req'))return;e.stopImmediatePropagation();
+  const b=M.querySelector('.mbody'),D=M.D,T=D.T;const code=b.querySelector('#pcode').value,why=b.querySelector('#pwhy').value.trim();
+  if(!code||!why){b.querySelector('.smsg').textContent='理由の区分と理由を入れてください。';return;}
+  const sh=(s,k)=>iso(new Date(+pd(s)+k*DAY));const sid=wrapOf(D.svg).dataset.sid;
+  const out=b.querySelector('.gout');out.textContent=`計画変更の申請\n工程表: ${sid}\n対象: ${T.id.split('#')[1]} ${T.name}\n変更後: ${T.milestone?D.ns:D.ns+' 〜 '+D.ne}\n後ろも一緒にずらす: ${b.querySelector('#pshift').checked?'はい':'いいえ'}\n区分: ${code}\n理由: ${why}`;out.hidden=false;
+  b.querySelector('.smsg').innerHTML='申請を作りました（反映待ち）。試作では、この内容をチャットに貼ると反映されます。<button class="copy" type="button">コピー</button>';
+  M.querySelector('.mok').hidden=true;M.querySelector('.mcancel').textContent='閉じる';},true);
+document.addEventListener('click',e=>{if(e.target.closest('.mcancel')&&M.D){undrag(M.D);M.D=null;}},true);
+function planDecide(btn){const sec=btn.closest('section');const c=sec.querySelector('textarea').value.trim();const msg=sec.querySelector('.gmsg');
+  if(!c){msg.textContent='コメントを入れてください。';sec.querySelector('textarea').focus();return;}
+  const ok=btn.dataset.act==='plan-ok';const out=sec.querySelector('.gout');out.textContent=`計画変更の判断 ${sec.dataset.gid}\n判断: ${ok?'承認':'却下'}\nコメント: ${c}`;out.hidden=false;
+  msg.innerHTML='判断を記録しました。試作では、この内容をチャットに貼ると反映されます。<button class="copy" type="button">コピー</button>';}
+function saveImg(w,withReq){const v=[...w.querySelectorAll('.gview')].find(x=>!x.hidden);const svg=v.querySelector('svg').cloneNode(true);
+  svg.querySelectorAll('.hit').forEach(x=>x.remove());if(!withReq)svg.querySelectorAll('.req').forEach(x=>x.remove());
+  const vb=svg.getAttribute('viewBox').split(' ').map(Number);const hgt=vb[3];svg.removeAttribute('data-geo');svg.setAttribute('width','1188');svg.setAttribute('height',String(hgt));
+  const src=new XMLSerializer().serializeToString(svg);const url='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(src);
+  const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=2376;c.height=hgt*2;const x=c.getContext('2d');x.drawImage(img,0,0,2376,hgt*2);
+    let png='';try{png=c.toDataURL('image/png');}catch(_){}
+    const tab=w.querySelector('.gtab.on');const name=`${w.dataset.name||'工程表'}_${tab?tab.textContent:''}_${new Date().toISOString().slice(0,10).replace(/-/g,'')}`;
+    M.querySelector('h2').textContent='画像を保存（書き込みなし）';M.dataset.act='info';M.W=w;
+    M.querySelector('.mbody').innerHTML=`<div class="savebox"><label><input type="checkbox" class="sreq" ${withReq?'checked':''}> 申請中（未承認）の計画も入れる</label></div><p class="sub">パワポに貼る用。下の画像を長押し（PCは右クリック）して「コピー」「画像を保存」。</p><img src="${png||url}" alt="ガント図" style="max-width:100%;border:1px solid var(--line)">
+`;
+    M.querySelector('.mok').hidden=true;M.querySelector('.mcancel').textContent='閉じる';M.hidden=false;};img.src=url;}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')M.hidden=true;});
+/*EDITOR_JS*/
+show();
+</script>

@@ -1,0 +1,81 @@
+vaults:
+  vault-yamada: yamada
+  vault-boss: boss
+  vault-staff: staff
+  proj-P00001: boss
+users:
+  yamada: 山田（開発担当）
+  boss: 上司
+  staff: 一般社員（別チーム）
+  bucho: 部長
+  infosec: 情報管理部
+part_regex: ^[0-9]{6}-[A-Z0-9]{4}$
+ref_types:
+- part
+- proj
+- user
+- doc
+- tag
+- data
+limits:
+  attach_max_bytes: 100000000
+tags:
+  P00001-team:
+    owner: boss
+    members:
+    - yamada
+    - boss
+    pdf: true
+    ai: false
+    deputy: bucho
+  A社-NDA:
+    owner: boss
+    members:
+    - yamada
+    - boss
+    pdf: false
+    ai: false
+    expires: 2027-03-31
+    deputy: bucho
+    hide_title: true
+  社内:
+    owner: infosec
+    members:
+    - yamada
+    - boss
+    - staff
+    pdf: true
+    ai: false
+    deputy: bucho
+  技術ロードマップ:
+    owner: boss
+    deputy: bucho
+    members:
+    - boss
+    - bucho
+    pdf: true
+    ai: false
+projects:
+  P00001:
+    name: 昇降ステージ改良版
+    short: X200
+    status: 進行中
+    owner: boss
+    default_tags:
+    - P00001-team
+customer_words:
+- A社
+holidays:
+- '2026-10-12'
+- '2026-11-03'
+- '2026-11-23'
+- '2026-12-29'
+- '2026-12-30'
+- '2026-12-31'
+- '2027-01-01'
+- '2027-01-04'
+- '2027-01-05'
+- '2027-01-11'
+- '2027-02-11'
+- '2027-02-23'
+- '2027-03-22'

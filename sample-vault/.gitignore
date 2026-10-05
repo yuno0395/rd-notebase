@@ -1,0 +1,8 @@
+# 他人のノートのスタブ・キャッシュ・完全ローカルのメモはGitに入れない
+_refs/
+_cache/
+_private/
+# Obsidianの画面状態（人ごとに違う）
+.obsidian/workspace*.json
+.obsidian/cache
+.trash/

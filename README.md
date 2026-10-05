@@ -1,1 +1,121 @@
 # rd-notebase
+
+研究開発・量産メーカー向けの「開発ノートを正本にする基幹システム」の試作です。
+Obsidian（Markdown＋Excalidraw）で各人が考えを書き、Gitで集め、サーバが索引・権限・Web閲覧・PDF・工程管理を受け持ちます。
+
+> 試作段階のコードです。サンプルデータの会社名・製品名・人物はすべて架空です。
+
+## 考え方
+
+- **考えの過程が資産**。検討・計算・図・報告をノートとして残し、文書は引用で組み立てる（コピーしない）
+- **1人1 vault**。他人のノートはサーバの索引を通して参照する（同期しない）
+- **ノート単位の鍵（機密タグ）**。見せる範囲はサーバが配信時に判定。必要な図だけ「開示」できる
+- **AIなしで全機能が動く**（AIは任意の拡張）
+- ISO 9001（7.5 文書化した情報、8.3 設計・開発）の記録を、普段の作業から自動で残す
+
+詳しくは `docs/` の要件書を参照してください。
+
+## 中身
+
+```
+tools/           Pythonプログラム（索引・権限・Web閲覧・PDF・工程管理）と画面
+  kv.py          ノート作成・ID採番・添付・push時の検査・索引・開示申請・コメント
+  pm.py          工程管理：週報・計画変更の申請と承認・編集の反映・Excalidrawのガント図
+  gantt.py       工程の集計（やることの数・見込み・遅れ）とガント図の描画
+  pages.py ほか  Web閲覧のページ生成（render / access / pm_pages / core）
+  pdf_out.py     PDF出力（日本語フォント埋め込み、ID・版・QRのフッター）
+  site_template.html, editor.js   画面（素のHTML/CSS/JavaScript）
+  setup_demo.py  サンプルデータから試作環境を作る
+  dev/           サンプルデータを作った時の台本（参考）
+sample-vault/    Obsidian vault の雛形（フォルダ・テンプレート・初期設定・LFS設定）
+sample-data/     サンプルデータ（山田・上司・一般社員の vault、案件 P00001 の工程表）
+config/          タグ台帳・利用者・案件・休日（registry.yml）
+docs/            要件書（基本方針・非機能要件・ID体系・vault設計・工程管理・要件整理）とレビュー記録
+```
+
+## 試作を動かす
+
+必要なもの：Python 3.10以上、Git、Git LFS、日本語フォント（PDF出力用）
+
+```bash
+pip install -r requirements.txt
+python3 tools/setup_demo.py          # 作り直す時は --reset
+```
+
+`site/` にWeb閲覧ができます（ブラウザで開くだけ。サーバ不要）。
+
+| ファイル | 閲覧者 | 見どころ |
+|---|---|---|
+| `site/index.html` | 上司（鍵の管理者） | 確認待ち（公開の判断・計画変更の承認）、見せる相手の変更、工程・ロードマップ |
+| `site/yamada.html` | 開発担当（山田） | 工程表の編集画面（ドラッグ・追加・削除・分割・段階に分解）、コメント |
+| `site/staff.html` | 別チームの一般社員 | 公開された資料だけが見える。見えない資料は🔒と相談先 |
+
+### よく使うコマンド
+
+```bash
+python3 tools/kv.py push vault-yamada "メッセージ"     # 検査 → コミット → サーバへ → 索引更新
+python3 tools/view.py build boss index.html            # Web閲覧を作り直す（閲覧者ごと）
+python3 tools/view.py pdf <ノートID> A4 boss            # PDF出力（A4〜A0）
+python3 tools/pm.py gantt <工程表ID> m3                 # Excalidrawのガント図（書き込みは残して作り直す）
+python3 tools/pm.py edit vault-yamada <工程表ID> ops.json <区分> <理由>   # 編集画面の申請を反映
+python3 tools/pm.py decide <申請ID> approved boss "コメント"               # 承認
+```
+
+PDFの日本語フォントは自動で探します。見つからない時は環境変数 `RDNB_FONT` にTTF/TTCのパスを指定してください。
+
+### 試作の割り切り
+
+- Web閲覧は「閲覧者ごとに、見てよいものだけを入れた1枚のHTML」を事前に作る方式です
+- 画面での承認・コメント・申請は、出てきた文字を手で反映します（画面から直接保存しない）。本番はサーバに送ります
+- 工程表の履歴（計画変更の経緯）は、`setup_demo.py` で作り直すと最初の1件からになります
+
+## Obsidian で使う
+
+`sample-vault/` を自分の vault の雛形として使います。
+
+```
+vault-<ユーザーID>/
+├─ 00_inbox/         思いつき・未整理のメモ
+├─ 01_daily/         デイリーノート（今日の予定・やることの一覧）
+├─ 10_notes/         ノート本体（フラット。分類はプロパティとリンク）。図付きノートもここ
+├─ 20_drawings/      文章を持たない図だけ（ガント図など。通常は使わない）
+├─ 30_calc/          計算（Pythonスクリプトと結果）
+├─ 40_attachments/   添付（中身は Git LFS）と付属ノート
+└─ 90_templates/     テンプレート（共通リポジトリから配る。直接編集しない）
+```
+
+### 初期設定
+
+1. `sample-vault/` をコピーして Obsidian で開く
+2. コミュニティプラグインを入れる（`.obsidian/community-plugins.json` の5つ）
+   - Excalidraw、Templater、Obsidian Git、Day Planner、Obsidian Tasks
+3. 設定済みの内容（`.obsidian/` に同梱）
+   - 新しいノート → `10_notes`、添付 → `40_attachments`、リンクは `[[…]]` 形式
+   - デイリーノート → `01_daily`、テンプレート「デイリー」
+   - Templater のテンプレートフォルダ → `90_templates`
+   - Excalidraw：**図データの圧縮オフ**（Gitの差分を読めるように）、保存先 `10_notes`
+   - Obsidian Git：10分ごとに自動コミット・プッシュ
+4. Git LFS を有効にする：`git lfs install`（`.gitattributes` は同梱）
+
+### テンプレート（最初の6つ）
+
+| テンプレート | 用途 |
+|---|---|
+| デイリー | 今日の予定（Day Planner）・未完了のやること（Tasks）・メモ |
+| 検討 | 目的 → 前提 → 検討 → 結論 → 却下した案と理由 → やること |
+| 検討_図付き | 文章と Excalidraw の図を1ファイルに（前半が文章、`%%` の後が図） |
+| 議事録 | 参加者・決まったこと・宿題（担当と期限付きのやること） |
+| 報告 | 要旨・スライド（各ノートの図のフレームを引用）・結論と依頼事項 |
+| 計算 | 目的・条件・式/スクリプト・結果・判定 |
+
+テンプレートで作ると、ファイル名 `作成日_タイトル_hash`（例 `261004_X200中間報告_wfyzi.md`）と、プロパティ `id`（例 `261004-wfyzi`）が自動で付きます。
+
+### 書き方の約束
+
+- やること：`- [ ] 内容 📅 2026-10-14 [task:: 工程表ID#T02]`（`task::` で工程タスクに紐づき、進捗＝完了数／総数になる）
+- 図のフレームの引用：`![[作成日_タイトル_hash.excalidraw#F02]]`、版を固定する時は `#F02@コミット`
+- 品番などの外部ID：`[[part:482015-BR1C]]`
+
+## ライセンス
+
+未定（試作）。

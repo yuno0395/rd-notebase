@@ -1,0 +1,2 @@
+{ "templates_folder": "90_templates", "trigger_on_file_creation": false, "enable_folder_templates": true,
+  "folder_templates": [{ "folder": "01_daily", "template": "90_templates/デイリー.md" }] }
