@@ -91,6 +91,7 @@ vault-<ユーザーID>/
    - 新しいノート → `10_notes`、添付 → `40_attachments`、リンクは `[[…]]` 形式
    - デイリーノート → `01_daily`（名前 `2026-10-05`）、週ノート → `01_daily/週`（名前 `2026-W41`）。Periodic Notes で作る
    - **Periodic Notes とコアのデイリーノートの「テンプレート」は空にする**。テンプレートは Templater がフォルダごとに当てる（01_daily＝デイリー、01_daily/週＝週ノート、10_notes＝メモ）。Periodic Notes にテンプレートを指定すると、Templater の書き方が実行されずに、プロパティにプログラムがそのまま入る
+   - Obsidian Tasks：全体の絞り込み（Global Query）に `path does not include 90_templates` を設定済み。テンプレートの中の `- [ ]` が、デイリー・週ノートの「やること」に出ないようにするため
    - もし既にそうなったノートがあれば、そのノートを開いて Templater の「Replace templates in the active file」を実行すると直る
    - Templater のテンプレートフォルダ → `90_templates`
    - Excalidraw：**図データの圧縮オフ**（Gitの差分を読めるように）、保存先 `10_notes`
