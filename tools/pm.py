@@ -21,7 +21,7 @@ def make_vault(name, owner):
     sh(f'git init -q --bare -b main {bare}')
     os.makedirs(vp); sh('git init -q -b main', vp)
     open(os.path.join(vp, '.gitattributes'), 'w').write(open(os.path.join(ROOT, 'vault-boss', '.gitattributes')).read())
-    for f in ('10_notes', '20_drawings', '40_attachments'):
+    for f in ('10_notes', '40_attachments'):
         os.makedirs(os.path.join(vp, f)); open(os.path.join(vp, f, '.gitkeep'), 'w').close()
     sh(f'git config user.name {owner}; git config user.email {owner}@example.com', vp)
     sh('git add -A && git commit -qm init', vp); sh(f'git remote add origin {bare}', vp); sh('git push -q origin main', vp)

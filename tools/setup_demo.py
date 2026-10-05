@@ -47,7 +47,8 @@ def main():
             sh(f'git init -q --bare -b main "{bare}"')
             sh('git init -q -b main', vp); sh(f'git remote add origin "{bare}"', vp)
         shutil.copy(GA, os.path.join(vp, '.gitattributes'))
-        for f in ('00_inbox', '01_daily', '10_notes', '20_drawings', '30_calc', '40_attachments'):
+        shutil.rmtree(os.path.join(vp, '00_inbox'), ignore_errors=True)   # inboxは置かない（未分類はプロパティで見分ける）
+        for f in ('01_daily', '10_notes', '30_calc', '40_attachments'):
             os.makedirs(os.path.join(vp, f), exist_ok=True)
             if not os.listdir(os.path.join(vp, f)): open(os.path.join(vp, f, '.gitkeep'), 'w').close()
         sh('git lfs install --local', vp)

@@ -47,11 +47,19 @@ def at_version(n, ver):
     if key not in _AT: _AT[key] = _at_version(n, ver)
     return _AT[key]
 
+def path_at(n, ver):
+    """その版でのファイルの場所。フォルダを移しても版の固定が効くよう、ファイル名末尾のhashで探す"""
+    bare = os.path.join(SRV, n['vault'] + '.git')
+    names = subprocess.run(['git', f'--git-dir={bare}', '-c', 'core.quotepath=off', 'ls-tree', '-r', '--name-only', ver],
+                           capture_output=True, text=True).stdout.splitlines()
+    h = n['id'].split('-')[1]
+    return n['path'] if n['path'] in names else next((x for x in names if re.search(rf'_{h}\.(excalidraw\.)?md$', x)), n['path'])
+
 def _at_version(n, ver):
     """版を固定した引用：指定コミット時点のノート本文を返す"""
     if not ver or ver == n['commit_']: return n
     bare = os.path.join(SRV, n['vault'] + '.git')
-    r = subprocess.run(['git', f'--git-dir={bare}', 'show', f'{ver}:{n["path"]}'], capture_output=True, text=True)
+    r = subprocess.run(['git', f'--git-dir={bare}', 'show', f'{ver}:{path_at(n, ver)}'], capture_output=True, text=True)
     if r.returncode: return n
     from kv import split_fm
     m = dict(n); m['body'] = split_fm(r.stdout)[1]; return m
@@ -197,7 +205,7 @@ def ver_info(n, upto=None):
 def _ver_info(vault, path, upto):
     n = {'vault': vault, 'path': path}
     bare = os.path.join(SRV, n['vault'] + '.git')
-    r = subprocess.run(['git', f'--git-dir={bare}', 'log', '-1', '--date=format:%Y-%m-%d %H:%M', '--format=%h|%an|%ad', upto or 'main', '--', n['path']],
+    r = subprocess.run(['git', f'--git-dir={bare}', 'log', '-1', '--follow', '--date=format:%Y-%m-%d %H:%M', '--format=%h|%an|%ad', upto or 'main', '--', n['path']],
                        capture_output=True, text=True).stdout.strip()
     h, who, at = (r.split('|') + ['', '', ''])[:3]
     return {'hash': h, 'who': who, 'at': at}

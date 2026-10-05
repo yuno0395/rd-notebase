@@ -65,7 +65,7 @@ TEMPL = {
  'calc': "## 目的\n\n## 条件\n\n## 結果\n",
  'report': "## 要旨\n\n## 内容\n",
 }
-FOLDER = {'grant': '10_notes', 'daily': '01_daily', 'drawing': '20_drawings', 'calc': '30_calc', 'attachment': '40_attachments'}
+FOLDER = {'grant': '10_notes', 'daily': '01_daily', 'calc': '30_calc', 'attachment': '40_attachments'}
 
 def cmd_new(vault, typ, title, project=None, extra=None, drawing=False, **kw):
     extra = {**(extra or {}), **kw}

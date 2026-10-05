@@ -1,0 +1,15 @@
+# 未分類のノート（type が空）＝inbox の代わり。振り分けはプロパティを入れるだけ
+filters:
+  and:
+    - file.inFolder("10_notes")
+    - 'type == null || type == ""'
+views:
+  - type: table
+    name: 未分類
+    order:
+      - file.name
+      - created
+      - project
+    sort:
+      - property: created
+        direction: ASC
