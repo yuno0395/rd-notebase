@@ -85,12 +85,12 @@ vault-<ユーザーID>/
 ### 初期設定
 
 1. `sample-vault/` をコピーして Obsidian で開く
-2. コミュニティプラグインを入れる（`.obsidian/community-plugins.json` の6つ）
-   - Excalidraw、Templater、Obsidian Git、Day Planner、Obsidian Tasks、Periodic Notes
+2. コミュニティプラグインを入れる（`.obsidian/community-plugins.json` の7つ）
+   - Excalidraw、Templater、Obsidian Git、Day Planner、Obsidian Tasks、Periodic Notes、Calendar
 3. 設定済みの内容（`.obsidian/` に同梱）
    - 新しいノート → `10_notes`、添付 → `40_attachments`、リンクは `[[…]]` 形式
    - デイリーノート → `01_daily`（名前 `2026-10-05`）、週ノート → `01_daily/週`（名前 `2026-W41`）。Periodic Notes で作る
-   - **週の始まりを月曜にする必要がある**。日本語環境では週の始まりが日曜のため、Periodic Notes は月〜土曜に前の週（例 10/5 に `2026-W40`）を作ってしまう（要対応）
+   - **週の始まりは月曜**（Calendar プラグインの設定 `weekStart: monday` を同梱）。日本語環境の既定は日曜始まりで、そのままだと Periodic Notes が月〜土曜に前の週（例 10/5 に `2026-W40`）を作ってしまう
    - **Periodic Notes とコアのデイリーノートの「テンプレート」は空にする**。テンプレートは Templater がフォルダごとに当てる（01_daily＝daily、01_daily/週＝weekly、10_notes＝memo）。Periodic Notes にテンプレートを指定すると、Templater の書き方が実行されずに、プロパティにプログラムがそのまま入る
    - Obsidian Tasks：全体の絞り込み（Global Query）に `path does not include 90_templates` を設定済み。テンプレートの中の `- [ ]` が、デイリー・週ノートの「やること」に出ないようにするため
    - もし既にそうなったノートがあれば、そのノートを開いて Templater の「Replace templates in the active file」を実行すると直る
