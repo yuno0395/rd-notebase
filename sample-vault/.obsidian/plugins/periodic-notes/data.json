@@ -1,0 +1,26 @@
+{
+ "showGettingStartedBanner": false,
+ "hasMigratedDailyNoteSettings": true,
+ "hasMigratedWeeklyNoteSettings": true,
+ "daily": {
+  "enabled": true,
+  "folder": "01_daily",
+  "format": "YYYY-MM-DD",
+  "template": ""
+ },
+ "weekly": {
+  "enabled": true,
+  "folder": "01_daily/週",
+  "format": "GGGG-[W]WW",
+  "template": ""
+ },
+ "monthly": {
+  "enabled": false
+ },
+ "quarterly": {
+  "enabled": false
+ },
+ "yearly": {
+  "enabled": false
+ }
+}

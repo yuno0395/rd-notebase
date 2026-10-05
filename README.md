@@ -85,11 +85,13 @@ vault-<ユーザーID>/
 ### 初期設定
 
 1. `sample-vault/` をコピーして Obsidian で開く
-2. コミュニティプラグインを入れる（`.obsidian/community-plugins.json` の5つ）
-   - Excalidraw、Templater、Obsidian Git、Day Planner、Obsidian Tasks
+2. コミュニティプラグインを入れる（`.obsidian/community-plugins.json` の6つ）
+   - Excalidraw、Templater、Obsidian Git、Day Planner、Obsidian Tasks、Periodic Notes
 3. 設定済みの内容（`.obsidian/` に同梱）
    - 新しいノート → `10_notes`、添付 → `40_attachments`、リンクは `[[…]]` 形式
-   - デイリーノート → `01_daily`、テンプレート「デイリー」
+   - デイリーノート → `01_daily`（名前 `2026-10-05`）、週ノート → `01_daily/週`（名前 `2026-W41`）。Periodic Notes で作る
+   - **Periodic Notes とコアのデイリーノートの「テンプレート」は空にする**。テンプレートは Templater がフォルダごとに当てる（01_daily＝デイリー、01_daily/週＝週ノート、10_notes＝メモ）。Periodic Notes にテンプレートを指定すると、Templater の書き方が実行されずに、プロパティにプログラムがそのまま入る
+   - もし既にそうなったノートがあれば、そのノートを開いて Templater の「Replace templates in the active file」を実行すると直る
    - Templater のテンプレートフォルダ → `90_templates`
    - Excalidraw：**図データの圧縮オフ**（Gitの差分を読めるように）、保存先 `10_notes`
    - Obsidian Git：10分ごとに自動コミット・プッシュ
@@ -99,12 +101,13 @@ vault-<ユーザーID>/
 
 思いつきも含め、新しいノートは全部 `10_notes` に作ります（既定のテンプレート「メモ」が自動で動く）。`type` が空のノートが「未分類」で、`未分類.base` の一覧（デイリーノートに表示）が inbox の代わりです。振り分けはプロパティを入れるだけで、ファイルは動かしません。
 
-### テンプレート（最初の7つ）
+### テンプレート（最初の8つ）
 
 | テンプレート | 用途 |
 |---|---|
 | メモ | 既定（新規作成で自動）。id・タイトル・本文だけ。種類は後で決める |
 | デイリー | 今日の予定（Day Planner）・未完了のやること（Tasks）・未分類の一覧・メモ |
+| 週ノート | 1人1週。今週のねらい・週報の記入欄（金曜に案件ごとの週報に分けて出す）・今週終わったやること・来週のやること・期限切れ・ふりかえり |
 | 検討 | 目的 → 前提 → 検討 → 結論 → 却下した案と理由 → やること |
 | 検討_図付き | 文章と Excalidraw の図を1ファイルに（前半が文章、`%%` の後が図） |
 | 議事録 | 参加者・決まったこと・宿題（担当と期限付きのやること） |

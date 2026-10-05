@@ -210,7 +210,8 @@ def check(vp):
         if fn != nfc(fn): errs.append(f"{fn}: NFCでない")
         if not ID_RE.match(nid): errs.append(f"{fn}: id形式不正 {nid}")
         m = FN_RE.match(fn)
-        daily_ok = fm.get('type') == 'daily' and re.match(r'^\d{4}-\d{2}-\d{2}\.md$', fn)   # デイリーは日付の名前でよい
+        daily_ok = (fm.get('type') == 'daily' and re.match(r'^\d{4}-\d{2}-\d{2}\.md$', fn)) or \
+                   (fm.get('type') == 'weeknote' and re.match(r'^\d{4}-W\d{2}\.md$', fn))   # デイリー・週ノートは日付・週の名前でよい（Periodic Notes）
         if not daily_ok and (not m or f"{m.group(1)}-{m.group(3)}" != nid): errs.append(f"{fn}: ファイル名とidが不一致")
         for t in fm.get('access') or []:
             if t not in tags: errs.append(f"{fn}: 未登録タグ {t}")

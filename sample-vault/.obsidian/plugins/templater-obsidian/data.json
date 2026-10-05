@@ -10,6 +10,10 @@
   {
    "folder": "10_notes",
    "template": "90_templates/メモ.md"
+  },
+  {
+   "folder": "01_daily/週",
+   "template": "90_templates/週ノート.md"
   }
  ]
 }
