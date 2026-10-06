@@ -124,11 +124,18 @@ class Site:
         home = []
         if self.mgr and self.todo:
             home.append(f'<a class="todo" href="#grants">確認待ちが {self.todo} 件あります</a>')
-        home.append('<h1>案件</h1><div class="cards">')
+        if SELF:   # 自分の vault だけを見る時：自分のノートを全部、更新の新しい順に
+            mine = sorted([n for n in self.vis.values() if n['type'] not in ('comment', 'grant', 'attachment')], key=lambda n: (str(n['updated']), n['id']), reverse=True)
+            unsorted = [n for n in mine if not n['type']]
+            home.append(f'<h1>自分のノート</h1><p class="lead">{len(mine)} 件・更新の新しい順' + (f'（未分類 {len(unsorted)} 件）' if unsorted else '') + '。Obsidian がなくても読める控えです</p>'
+                        '<div class="tablewrap"><table class="cardable"><thead><tr><th>種類</th><th>ノート</th><th>担当</th><th>状況</th><th>次にやること</th><th>更新</th></tr></thead><tbody>'
+                        + ''.join(self.note_row(n) for n in mine) + '</tbody></table></div>')
+        cards = []
         for pid, p in self.r['projects'].items():
             ns = [n for n in self.vis.values() if n['project'] == pid and n['type'] not in ('comment', 'schedule', 'planreq', 'weekly') and not json.loads(n['fm']).get('gantt')]
+            if SELF and not ns: continue
             wait = len([n for n in ns if n.get('progress') == 'レビュー待ち'])
-            home.append(f'<a class="card" href="#p-{pid}"><span class="mono">{pid} ・ {esc(p.get("short", ""))}</span><b>{esc(p["name"])}</b>'
+            cards.append(f'<a class="card" href="#p-{pid}"><span class="mono">{pid} ・ {esc(p.get("short", ""))}</span><b>{esc(p["name"])}</b>'
                         f'<span>{len(ns)} 件のノート{f" ・ レビュー待ち {wait} 件" if wait else ""}</span>'
                         + (f'<span class="pmsum">{esc(self.pm_summary[pid])}</span>' if pid in self.pm_summary else '') + '</a>')
             rows, used = [], set()
@@ -147,7 +154,8 @@ class Site:
                 + ''.join(f'<p><a class="btn" href="#g-{s["id"]}">工程表を見る</a></p>' for s in self.vis.values() if s['type'] == 'schedule' and s['project'] == pid)
                 + '<div class="tablewrap"><table class="cardable"><thead><tr><th>種類</th><th>ノート</th><th>担当</th><th>状況</th><th>次にやること</th><th>更新</th></tr></thead><tbody>'
                 + ''.join(rows) + '</tbody></table></div>')
-        home.append('</div><p><a class="btn" href="#week">今週の更新を見る</a></p>')
+        if cards or not SELF: home.append('<h1>案件</h1><div class="cards">' + ''.join(cards) + '</div>')
+        home.append('<p><a class="btn" href="#week">今週の更新を見る</a></p>')
         self.pages['home'] = ''.join(home)
 
     # ---------- 今週の更新：確認待ちを先頭に ----------
@@ -175,7 +183,7 @@ class Site:
                 frs, els = frames_of(n)
                 body = '<div class="slides">' + ''.join(
                     f'<figure class="slide" id="fr-{(f.get("customData") or {}).get("kvFrame", "")}"><div class="scopebar">{self.scope(n, "#" + (f.get("customData") or {}).get("kvFrame", ""))}</div>'
-                    f'{svg_frame(n, f, els, u, self.notes)}<figcaption>#{(f.get("customData") or {}).get("kvFrame")} {esc(f.get("name", ""))}{self.fr_rv(n, f)}</figcaption></figure>'
+                    f'{svg_frame(n, f, els, u, self.notes)}<figcaption>{"#" + (f.get("customData") or {}).get("kvFrame") + " " if (f.get("customData") or {}).get("kvFrame") else ""}{esc(f.get("name", ""))}{self.fr_rv(n, f)}</figcaption></figure>'
                     for f in frs) + '</div>'
                 txt = text_part(n['body'])          # 図付きノート：前半の文章も本文として出す
                 if txt: body = render_body(dict(n, body=txt), u, self.notes) + '<h2 class="figh">図</h2>' + body
@@ -199,7 +207,7 @@ class Site:
             else:
                 ps = [p for p in parents(self.c, self.notes, nid) if ok(u, self.notes, p)]
                 if ps: fam = '<div class="family up">この資料を使っている報告：' + '、'.join(f'<a href="#n-{p["id"]}">{esc(p["title"])}</a>' for p in ps) + '</div>'
-            bl = [self.notes.get(s) for s, k in back.get(nid.split('-')[1], [])]
+            bl = [self.notes.get(s) for s in dict.fromkeys(s for s, k in back.get(nid.split('-')[1], []) if s != nid)]   # 同じノートからの複数のリンクは1つに
             bl_html = ''.join(f'<li>{link(b["id"])}</li>' for b in bl if b and b['type'] not in ('grant', 'comment'))
             self.pages[f'n-{nid}'] = (
                 f'<p class="crumb"><a href="#home">案件</a> / <a href="#p-{n["project"]}">{esc(n["project"])}</a></p>'
@@ -347,6 +355,8 @@ class Site:
         r = self.r
         nav = (('<a href="#pm">工程</a>' if 'pm' in self.pages else '') + ('<a href="#comments">コメント</a>' if 'comments' in self.pages else '') + '<a href="#keys">相談先</a>' + ('<a href="#scope">見せる相手</a>' if 'scope' in self.pages else '')
                + (f'<a href="#grants">確認待ち <span class="cnt">{self.todo}</span></a>' if 'grants' in self.pages else ''))
+        if SELF:   # 自分の vault だけの時は、先頭のページは「自分のノート」
+            self.pages = {k: v.replace('<a href="#home">案件</a>', '<a href="#home">自分のノート</a>') for k, v in self.pages.items()}
         rep = {'/*PAGES*/': json.dumps(self.pages, ensure_ascii=False), '/*ASSETS*/': json.dumps(ASSETS, ensure_ascii=False),
                '/*MYTAGS*/': json.dumps([t for t, g in r['tags'].items() if self.user in g['members']], ensure_ascii=False),
                '/*TAGS*/': json.dumps([t for t, g in r['tags'].items() if not g.get('hide')], ensure_ascii=False),
@@ -358,8 +368,8 @@ class Site:
                '{{BUILT}}': datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}
         out = open(os.path.join(os.path.dirname(__file__), 'site_template.html'), encoding='utf-8').read()
         for k, v in rep.items(): out = out.replace(k, v)
-        os.makedirs(os.path.join(ROOT, 'site'), exist_ok=True)
-        open(os.path.join(ROOT, 'site', outname), 'w', encoding='utf-8').write(out)
+        os.makedirs(os.path.join(OUT, 'site'), exist_ok=True)
+        open(os.path.join(OUT, 'site', outname), 'w', encoding='utf-8').write(out)
         self.dump_text(outname)
         print('サイト生成', len(self.pages), 'ページ', f'（{self.user} が閲覧できるノート {len(self.vis)} 件）', f'{len(out)//1024}KB')
 
@@ -369,7 +379,7 @@ class Site:
             h = re.sub(r'<x-a k="[^"]+"></x-a>', '[図]', h)
             h = re.sub(r'<(tr|li|h1|h2|p|div|figure|section|details)[^>]*>', '\n', h)
             return html.unescape(re.sub(r'<[^>]+>', ' ', h))
-        open(os.path.join(ROOT, 'site', outname + '.txt'), 'w', encoding='utf-8').write(
+        open(os.path.join(OUT, 'site', outname + '.txt'), 'w', encoding='utf-8').write(
             '\n\n'.join(f'===== ページ #{k} =====\n' + re.sub(r'\n\s*\n+', '\n', txt(v)) for k, v in self.pages.items()))
 
 def build(user, outname='index.html'):

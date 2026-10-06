@@ -10,8 +10,10 @@
 import sys, os, re, json, hashlib, secrets, subprocess, unicodedata, datetime, sqlite3, shutil, yaml, html, base64, glob
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-SRV = os.path.join(ROOT, 'server')
+SRV = os.environ.get('RDNB_SERVER') or os.path.join(ROOT, 'server')        # 利用者のPCで自分の vault を見る時は client/run.py が手元の置き場を指す
 REG = os.environ.get('RDNB_REGISTRY') or os.path.join(SRV, 'registry.yml')   # 利用者のPCでは client/run.py が config/registry.yml を指す
+OUT = os.environ.get('RDNB_OUT') or ROOT                                    # site/（Web閲覧）と out/（PDF）の置き場
+SELF = os.environ.get('RDNB_SELF')                                          # 自分の vault だけを見る時の本人（全部見てよい）
 IDS = os.path.join(SRV, 'allocated_ids.txt')
 DB = os.path.join(SRV, 'index.db')
 ALPH = 'abcdefghijkmnpqrstuvwxyz23456789'  # 0 o 1 l 除外 = 32種
@@ -21,6 +23,9 @@ REL = ['derived_from', 'based_on', 'verifies', 'affects', 'supersedes', 'promote
 TITLE_MAX = 40
 
 def reg(): return yaml.safe_load(open(REG, encoding='utf-8'))
+def bare_of(vault):
+    """vault の Git（サーバでは server/<vault>.git。自分の vault を見る時は台帳の repos で vault の .git を指す）"""
+    return (reg().get('repos') or {}).get(vault) or os.path.join(SRV, vault + '.git')
 def nfc(s): return unicodedata.normalize('NFC', s)
 def today(): return datetime.date.today()
 def sh(cmd, cwd=None):
@@ -128,7 +133,7 @@ def cmd_attach(vault, src, target, origin=''):
     return fn
 
 # ---------- 解析 ----------
-LINK_RE = re.compile(r'(!?)\[\[([^\]|#@]+)(#F\d+)?(@[0-9a-f]{7,})?(\|[^\]]*)?\]\]')
+LINK_RE = re.compile(r'(!?)\[\[([^\]|#@]+)(#F\d+|#\^frame=[^\]|@]+)?(@[0-9a-f]{7,})?(\|[^\]]*)?\]\]')   # フレームは #F02 か Excalidraw の #^frame=
 
 def hash_of(target):
     m = re.search(r'_([' + ALPH + r']{5})(\.[a-z.]+)?$', target.strip())
@@ -271,12 +276,15 @@ def cmd_index():
         create table ext(src, ref);
         create virtual table fts using fts5(id, title, body, tokenize='trigram');""")
     for vault in r['vaults']:
-        bare = os.path.join(SRV, vault + '.git'); work = os.path.join(SRV, 'work', vault)
+        bare = bare_of(vault); work = os.path.join(SRV, 'work', vault)
         if os.path.exists(work): shutil.rmtree(work)
         os.makedirs(work)
-        sh(f'git --git-dir={bare} --work-tree={work} checkout -qf main')
+        # main の中身を書き出す。一時の index を使い、元のリポジトリの HEAD・index には触らない（LFS は下で中身に戻す）
+        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(SRV, 'work', '.index'), GIT_LFS_SKIP_SMUDGE='1')
+        for args in (['read-tree', 'main'], ['checkout-index', '-a', '-f']):
+            subprocess.run(['git', f'--git-dir={bare}', f'--work-tree={work}', *args], env=env, check=True, capture_output=True)
         lfs_resolve(work, bare)
-        commit = sh(f'git --git-dir={bare} rev-parse --short main')
+        commit = sh(f'git --git-dir="{bare}" rev-parse --short main')
         for nid, n in scan_vault(work).items():
             fm = n['fm']; body = n['body']
             db.execute('insert into notes values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', (
@@ -303,9 +311,10 @@ def cmd_index():
     db.commit(); print('索引更新', db.execute('select count(*) from notes').fetchone()[0], '件')
 
 def can_see(user, access):
+    if SELF and user == SELF: return True   # 自分の vault だけを見る時は全部自分のノート
     r = reg(); a = json.loads(access) if isinstance(access, str) else access
     if not a: return False  # タグなし＝本人のみ
-    return all(user in r['tags'][t]['members'] for t in a)
+    return all(user in (r['tags'].get(t) or {}).get('members', []) for t in a)
 
 # ---------- 購読（他人のノートのスタブ。vault設計 6.2・6.3 レベル2） ----------
 STUB_KEYS = ['id', 'type', 'title', 'owner', 'project', 'status', 'access', 'created', 'updated', 'summary', 'progress', 'next', 'parts'] + REL

@@ -9,6 +9,8 @@
   run.py            （引数なし）初回は初期設定。以降は 更新 → 検査 → push
   run.py push       検査 → push だけ（タスクスケジューラから定期実行）
   run.py update     vault の更新だけ
+  run.py view       自分の vault を Obsidian なしで見る（workspace/閲覧.html を作って開く）
+  run.py pdf <ID>   ノートを PDF に（A4。2つ目の引数で A3〜A0。workspace/pdf/ に出す）
   run.py status     状態の表示
 """
 import os, sys, re, json, glob, shutil, hashlib, secrets, subprocess, datetime, time, unicodedata, urllib.request, tempfile, platform
@@ -22,6 +24,8 @@ CFG = os.path.join(VAULT, '.rdnb', 'config.yml')
 STATE = os.path.join(VAULT, '.rdnb', 'managed.json')
 LOCK = os.path.join(ROOT, '.state', 'lock')
 LOG = os.path.join(ROOT, '.state', 'log.txt')
+VIEW = os.path.join(ROOT, '.state', 'view')        # 自分の vault だけの索引（Web閲覧・PDF用）
+NOTICE = os.path.join(VAULT, '_notebase のお知らせ.md')   # 保存（push）できない時に Obsidian で目に入るように置く
 MAN = yaml.safe_load(open(os.path.join(ROOT, 'client', 'vault.yml'), encoding='utf-8'))
 TASK = 'rd-notebase push'
 PUSH_MINUTES = 30
@@ -229,8 +233,7 @@ def push(quiet=False):
     errs, warns = kv.check(VAULT)
     for w in warns: say('警告:', w)
     if errs:
-        for e in errs: say('拒否:', e)
-        raise SystemExit('検査で止まりました。上の「拒否」を直してから、もう一度実行してください')
+        raise SystemExit('検査で止まりました。次の「拒否」を直してから、もう一度実行してください\n' + '\n'.join('拒否: ' + e for e in errs))
     git('add', '-A')
     n = len(git('status', '--porcelain').splitlines())
     if n:
@@ -238,10 +241,11 @@ def push(quiet=False):
     head = git('rev-parse', '--short', 'HEAD')
     if not c.get('remote'):   # 定期実行でも毎回1行残す（動いたかどうかをログで分かるように）
         say(f"{'定期' if quiet else ''}保存：変更 {n} 件（{head}）" + ('' if quiet else '。正本が未設定なので push はしていません（.rdnb/config.yml の remote に書くと push します）'))
-        return
+        return n
     r = subprocess.run(['git', 'push', '-q', '-u', 'origin', f"HEAD:{c.get('branch', 'main')}"], cwd=VAULT, capture_output=True, text=True, encoding='utf-8', errors='replace')
     if r.returncode: raise SystemExit(f'push できませんでした（ネットワーク・権限を確認）：\n{r.stderr.strip()}')
     say(f"{'定期' if quiet else ''}push しました：変更 {n} 件（{head}）")
+    return n
 
 def refs():
     """購読（.rdnb/config.yml の subscribe に vault 名を並べる）：見てよい他人のノートのスタブを _refs/ に作る"""
@@ -250,6 +254,80 @@ def refs():
     import kv
     if not os.path.exists(kv.DB): say('参照：索引に届かないので、スタブは前のまま'); return
     say(kv.cmd_refs(VAULT, c['user'], subs))
+
+# ---------- 自分の vault を見る（Web閲覧 段階1・PDF） ----------
+def local_index():
+    """自分の vault だけで索引を作る（サーバと同じ部品を、手元の置き場 .state/view で動かす）。作れない時は None"""
+    c = cfg() or {}; user = c.get('user')
+    if not user or not git('rev-parse', '--verify', '-q', 'main', check=False): return None
+    import kv
+    r = yaml.safe_load(read(kv.REG)); vname = f'vault-{user}'
+    r['vaults'] = {vname: user}; r['repos'] = {vname: os.path.join(VAULT, '.git')}
+    r.setdefault('users', {}).setdefault(user, user)
+    write(os.path.join(VIEW, 'registry.yml'), yaml.safe_dump(r, allow_unicode=True, sort_keys=False))
+    kv.SRV, kv.REG, kv.DB, kv.OUT, kv.SELF = VIEW, os.path.join(VIEW, 'registry.yml'), os.path.join(VIEW, 'index.db'), VIEW, user
+    quietly(kv.cmd_index)
+    return user
+
+def quietly(f, *a):
+    import contextlib, io
+    with contextlib.redirect_stdout(io.StringIO()): return f(*a)
+
+def view(open_it=False):
+    """Obsidian なしで読める控え：workspace/閲覧.html（1つのファイルに全部入り。ダブルクリックで開く）"""
+    out = os.path.join(WS, '閲覧.html'); stamp = os.path.join(VIEW, 'built')
+    head = git('rev-parse', '-q', '--verify', 'main', check=False)
+    if not open_it and os.path.exists(out) and os.path.exists(stamp) and read(stamp) == head: return   # 前に作った時から変わっていない
+    try:
+        user = local_index()
+        if not user: return
+        import pages   # 索引の置き場を決めてから読み込む
+        quietly(pages.build, user, 'index.html')
+    except Exception as e:   # 控えが作れなくても保存（push）は止めない
+        if open_it: raise
+        say('閲覧.html を作れませんでした：', e); return
+    shutil.copy(os.path.join(VIEW, 'site', 'index.html'), out); write(stamp, head)
+    say('閲覧.html を作りました' + ('' if open_it else '（workspace の 閲覧.html をダブルクリックで開けます）'))
+    if open_it: open_file(out)
+
+def pdf(key, size='A4'):
+    user = local_index()
+    if not user: raise SystemExit('まだノートが保存されていません')
+    import kv, sqlite3
+    con = sqlite3.connect(kv.DB)
+    rows = con.execute('select id, title from notes where id = ? or path like ? or title = ?', (key, f'%{key}%', key)).fetchall()
+    if len(rows) != 1:
+        raise SystemExit(f'「{key}」に合うノートが{"見つかりません" if not rows else " " + str(len(rows)) + " 件あります：" + "、".join(f"{t}（{i}）" for i, t in rows[:5])}。ノートの id で指定してください')
+    import pdf_out
+    quietly(pdf_out.pdf, rows[0][0], size.upper(), user)
+    src = os.path.join(VIEW, 'out', f'{rows[0][0]}_{size.upper()}.pdf')
+    dst = os.path.join(WS, 'pdf', f"{kv.safe_title(rows[0][1] or '')}_{rows[0][0]}_{size.upper()}.pdf")
+    os.makedirs(os.path.dirname(dst), exist_ok=True); shutil.move(src, dst)
+    say('PDF を作りました：', os.path.relpath(dst, WS)); open_file(dst)
+
+def open_file(p):
+    if platform.system() == 'Windows': os.startfile(p)
+    elif shutil.which('xdg-open'): subprocess.Popen(['xdg-open', p])
+
+# ---------- 保存できない時のお知らせ ----------
+def notice(msg=None):
+    """push や検査が止まったら vault に「_notebase のお知らせ」を置く（Obsidian の一覧とデイリーの未分類に出る）。直ったら消す"""
+    if not os.path.isdir(VAULT): return
+    if msg is None:
+        if os.path.exists(NOTICE): os.remove(NOTICE); say('お知らせを消しました（保存できるようになりました）')
+        return
+    write(NOTICE, f"""# 保存（push）ができていません
+
+{datetime.datetime.now():%Y-%m-%d %H:%M} の notebase の実行で止まりました。直るまで、書いたノートは手元にだけあります。
+
+```
+{msg}
+```
+
+- 「拒否」と出ている時は、そのノートを直してください
+- ネットワーク・権限の時は、社内ネットワークにつながっているかを確かめてから、workspace の notebase.cmd をダブルクリックしてください
+- 直って保存できると、このお知らせは自動で消えます（このファイルは Git に入りません）
+""")
 
 def autosave(msg):
     """更新の前に、利用者の変更を退避（戻せるように）"""
@@ -270,15 +348,26 @@ def status():
         say('お知らせ: notebase.cmd に新しい版があります（.notebase/client/notebase.cmd を workspace にコピーしてください）')
 
 def main():
-    cmd = sys.argv[1] if len(sys.argv) > 1 else 'sync'
+    cmd, *args = sys.argv[1:] or ['sync']
     try:
         with Lock():
             if cmd == 'status': return status()
-            if cmd == 'push': push(quiet=True); return refs()
+            if cmd == 'push':
+                try: push(quiet=True)
+                except (SystemExit, Exception) as e: notice(str(getattr(e, 'code', e))); raise
+                notice(); refs(); view()   # 控え（閲覧.html）は中身が変わった時だけ作り直す
+                return
             if not cfg(): return setup()
+            if cmd == 'view': autosave('閲覧前の自動保存'); return view(open_it=True)
+            if cmd == 'pdf':
+                if not args: raise SystemExit('使い方：notebase.cmd pdf <ノートのid> [A4〜A0]')
+                autosave('PDF出力前の自動保存'); return pdf(*args[:2])
             if cmd in ('sync', 'update'):
                 autosave('更新前の自動保存'); update_vault()
-                if cmd == 'sync': push(); refs()
+                if cmd == 'sync':
+                    try: push()
+                    except (SystemExit, Exception) as e: notice(str(getattr(e, 'code', e))); raise
+                    notice(); refs(); view()
                 status()
             else: print(__doc__)
     except SystemExit as e:

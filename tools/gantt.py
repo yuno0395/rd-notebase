@@ -1,7 +1,7 @@
 """工程管理：工程表・ロードマップ・週報・やることを集計し、ガント図を描く。
 描画は layout() 1つだけ。SVG（Web閲覧・画像保存）とExcalidraw（書き込み）は、その結果を変換するだけ（見た目のずれを防ぐ）"""
 import os, re, json, datetime, subprocess, secrets
-from kv import ROOT, SRV, reg, read_note, join_fm, parse_drawing, split_fm
+from kv import bare_of, ROOT, SRV, reg, read_note, join_fm, parse_drawing, split_fm
 D = datetime.date
 def d(s): return s if isinstance(s, D) else D.fromisoformat(str(s))
 def esc(s): return str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
@@ -73,7 +73,7 @@ def weekly_of(notes, sched_id):
 
 def history(n):
     """工程表ノートのGit履歴から、タスクごとの計画変更（いつ・何日から何日へ・理由・承認者）を作る"""
-    work = os.path.join(SRV, 'work', n['vault']); bare = os.path.join(SRV, n['vault'] + '.git')
+    work = os.path.join(SRV, 'work', n['vault']); bare = bare_of(n['vault'])
     log = subprocess.run(['git', f'--git-dir={bare}', 'log', '--reverse', '--format=%h%x09%ad%x09%s', '--date=format:%Y-%m-%d %H:%M', 'main', '--', n['path']],
                          capture_output=True, text=True).stdout.strip().splitlines()
     prev, ch = None, {}
@@ -133,7 +133,7 @@ def ripple(tasks, fixed, hol=None):
 
 def ids_ever(n):
     """工程表の履歴に一度でも出たタスクID（番号は再利用しない）"""
-    bare = os.path.join(SRV, n['vault'] + '.git'); out = set()
+    bare = bare_of(n['vault']); out = set()
     for h in subprocess.run(['git', f'--git-dir={bare}', 'log', '--format=%h', 'main', '--', n['path']], capture_output=True, text=True).stdout.split():
         txt = subprocess.run(['git', f'--git-dir={bare}', 'show', f'{h}:{n["path"]}'], capture_output=True, text=True).stdout
         out |= {t['id'] for t in (split_fm(txt)[0].get('tasks') or [])}

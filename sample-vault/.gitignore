@@ -2,6 +2,8 @@
 _refs/
 _cache/
 _private/
+# notebase が保存できない時に置くお知らせ（直ると消える）
+/_notebase*
 # Obsidianの画面状態（人ごとに違う）
 .obsidian/workspace*.json
 .obsidian/cache

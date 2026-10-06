@@ -1,7 +1,7 @@
 """PDF出力"""
 import sys, os, re, json, sqlite3, html, base64, datetime, subprocess, hashlib, functools, yaml, markdown
 sys.path.insert(0, os.path.dirname(__file__))
-from kv import ROOT, SRV, DB, reg, parse_drawing, embedded_files, LINK_RE, hash_of, can_see, read_note, split_fm
+from kv import OUT, ROOT, SRV, DB, reg, parse_drawing, embedded_files, LINK_RE, hash_of, can_see, read_note, split_fm
 from core import *
 from access import *
 from render import *
@@ -26,10 +26,10 @@ def pdf(nid, size='A4', user=None):
     c = db(); r = reg(); notes = all_notes(c); n = notes[nid]; hmap = by_hash(notes)
     if user and not can_see(user, n['access']): raise SystemExit('PDF出力不可：閲覧権限なし')
     for t in json.loads(n['access']):
-        if not r['tags'][t].get('pdf', True): raise SystemExit(f'PDF出力不可：タグ {t}')
+        if not (r['tags'].get(t) or {}).get('pdf', True): raise SystemExit(f'PDF出力不可：タグ {t}')
     PW, PH = landscape({'A4': A4, 'A3': A3, 'A2': A2, 'A1': A1, 'A0': A0}[size])
-    os.makedirs(os.path.join(ROOT, 'out'), exist_ok=True)
-    fn = os.path.join(ROOT, 'out', f"{nid}_{size}.pdf")
+    os.makedirs(os.path.join(OUT, 'out'), exist_ok=True)
+    fn = os.path.join(OUT, 'out', f"{nid}_{size}.pdf")
     cv = canvas.Canvas(fn, pagesize=(PW, PH)); k = PW / 842  # A4基準の倍率
     seq = []  # (図ノート, フレーム, 要素)
     if n['type'] == 'report':
@@ -60,7 +60,7 @@ def pdf(nid, size='A4', user=None):
             t = e['type']
             if t == 'rectangle': cv.roundRect(X, Y - H, W, H, 3 * s, stroke=1, fill=1 if bg else 0)
             elif t == 'ellipse': cv.ellipse(X, Y - H, X + W, Y, stroke=1, fill=1 if bg else 0)
-            elif t in ('line', 'arrow'):
+            elif t in ('line', 'arrow', 'freedraw'):
                 pts = [T(e['x'] + p[0], e['y'] + p[1]) for p in e['points']]
                 p = cv.beginPath(); p.moveTo(*pts[0])
                 for q in pts[1:]: p.lineTo(*q)
@@ -76,9 +76,8 @@ def pdf(nid, size='A4', user=None):
                 for i, line in enumerate(str(e.get('text', '')).split('\n')):
                     cv.drawString(X, Y - fs * (i + 1) + fs * .2, line)
             elif t == 'image':
-                side = hmap.get(hash_of(files.get(e.get('fileId')) or ''))
-                if side and (not user or can_see(user, side['access'])):
-                    p = os.path.join(os.path.dirname(work_path(side)), json.loads(side['fm'])['file'])
+                p = image_file(dn, files.get(e.get('fileId')), user, notes, hmap)
+                if p:
                     cv.drawImage(ImageReader(p), X, Y - H, W, H)
                 else:
                     cv.setFillColorRGB(.93, .94, .95); cv.rect(X, Y - H, W, H, fill=1)
@@ -89,10 +88,11 @@ def pdf(nid, size='A4', user=None):
         info = f"ID {nid}  版 {n['commit_']}  状態 {fm.get('status')}  機密 {' / '.join(json.loads(n['access'])) or 'なし'}  出力 {datetime.datetime.now():%Y-%m-%d %H:%M}  {user or ''}"
         cv.drawString(mx, 18 * k, info); cv.drawRightString(PW - mx - 40 * k, 18 * k, f"{pi} / {len(frs)}")
         cv.setFont(F, 10 * k); src = '' if dn['id'] == nid else f"  （引用: {dn['title']}）"
-        cv.drawString(mx, PH - 20 * k, f"{fm.get('title')}  #{(fr.get('customData') or {}).get('kvFrame')} {fr.get('name','')}{src}")
+        fid = (fr.get('customData') or {}).get('kvFrame')
+        cv.drawString(mx, PH - 20 * k, f"{fm.get('title')}  {'#' + fid + ' ' if fid else ''}{fr.get('name','')}{src}")
         q = QrCodeWidget(f"https://viewer.example/#n-{nid}"); b = q.getBounds(); sz = 34 * k
         d = Drawing(sz, sz, transform=[sz / (b[2] - b[0]), 0, 0, sz / (b[3] - b[1]), 0, 0]); d.add(q)
         renderPDF.draw(d, cv, PW - mx - sz, 4 * k)
         cv.showPage()
-    cv.save(); print('PDF', os.path.relpath(fn, ROOT), len(frs), 'ページ', size)
+    cv.save(); print('PDF', os.path.relpath(fn, OUT), len(frs), 'ページ', size)
     return fn

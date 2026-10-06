@@ -1,7 +1,7 @@
 """描画：図（SVG）、本文、版、鍵、見せる相手の表示"""
-import sys, os, re, json, sqlite3, html, base64, datetime, subprocess, hashlib, functools, yaml, markdown
+import sys, os, re, json, sqlite3, html, base64, datetime, subprocess, hashlib, glob, functools, yaml, markdown
 sys.path.insert(0, os.path.dirname(__file__))
-from kv import ROOT, SRV, DB, reg, parse_drawing, embedded_files, LINK_RE, hash_of, can_see, read_note, split_fm
+from kv import bare_of, ROOT, SRV, DB, reg, parse_drawing, embedded_files, LINK_RE, hash_of, can_see, read_note, split_fm
 from core import *
 from access import *
 
@@ -49,7 +49,7 @@ def at_version(n, ver):
 
 def path_at(n, ver):
     """その版でのファイルの場所。フォルダを移しても版の固定が効くよう、ファイル名末尾のhashで探す"""
-    bare = os.path.join(SRV, n['vault'] + '.git')
+    bare = bare_of(n['vault'])
     names = subprocess.run(['git', f'--git-dir={bare}', '-c', 'core.quotepath=off', 'ls-tree', '-r', '--name-only', ver],
                            capture_output=True, text=True).stdout.splitlines()
     h = n['id'].split('-')[1]
@@ -58,18 +58,53 @@ def path_at(n, ver):
 def _at_version(n, ver):
     """版を固定した引用：指定コミット時点のノート本文を返す"""
     if not ver or ver == n['commit_']: return n
-    bare = os.path.join(SRV, n['vault'] + '.git')
+    bare = bare_of(n['vault'])
     r = subprocess.run(['git', f'--git-dir={bare}', 'show', f'{ver}:{path_at(n, ver)}'], capture_output=True, text=True)
     if r.returncode: return n
     from kv import split_fm
     m = dict(n); m['body'] = split_fm(r.stdout)[1]; return m
 
 def frames_of(n):
+    """図のフレームと要素。Obsidian で描いたままの図も見られるように補う：
+    フレームID（kvFrame）のないフレームには続きの番号を振り、どのフレームにも入っていない要素は「フレームの外」にまとめる"""
     d = parse_drawing(n['body'])
-    els = [e for e in d['elements'] if not e.get('isDeleted')]
+    els = [dict(e) for e in d['elements'] if not e.get('isDeleted')]
     fr = [e for e in els if e['type'] == 'frame']
+    used = {(f.get('customData') or {}).get('kvFrame') for f in fr}; k = 0
+    for f in fr:
+        if not (f.get('customData') or {}).get('kvFrame'):
+            k += 1
+            while f'F{k:02d}' in used: k += 1
+            f['customData'] = dict(f.get('customData') or {}, kvFrame=f'F{k:02d}'); used.add(f'F{k:02d}')
     fr.sort(key=lambda e: (e.get('customData') or {}).get('kvFrame', ''))
+    ids = {f['id'] for f in fr}
+    loose = [e for e in els if e['type'] != 'frame' and e.get('frameId') not in ids]
+    if loose:
+        xs, ys = [], []
+        for e in loose:
+            pts = e.get('points') or [[0, 0], [e.get('width', 0), e.get('height', 0)]]
+            xs += [e['x'] + p[0] for p in pts]; ys += [e['y'] + p[1] for p in pts]
+        m = 20; x0, y0 = min(xs) - m, min(ys) - m
+        fr.append({'id': '_loose', 'type': 'frame', 'name': 'フレームの外', 'x': x0, 'y': y0,
+                   'width': max(xs) + m - x0, 'height': max(ys) + m - y0, 'customData': {'kvFrame': ''}})
+        for e in loose: e['frameId'] = '_loose'
     return fr, els
+
+def frame_is(f, fr):
+    """リンクのフレーム指定（#F02、または Excalidraw の #^frame=要素ID / #^frame=フレーム名）に合うか"""
+    key = (fr or '').lstrip('#')
+    if key.startswith('^frame='): return key[7:] in (f['id'], f.get('name'))
+    return (f.get('customData') or {}).get('kvFrame') == key
+
+def image_file(n, fn, user, notes, hmap):
+    """図に貼った画像のファイル（見てよくなければ None）。付属ノートのない画像（Obsidian で貼ったまま）は、図と同じ見せる範囲で出す"""
+    side = hmap.get(hash_of(fn or ''))
+    if side:
+        if user and not (can_see(user, side['access']) or granted(user, notes, side['id'])): return None
+        return os.path.join(os.path.dirname(work_path(side)), json.loads(side['fm'])['file'])
+    if not fn or (user and not can_see(user, n['access'])): return None
+    work = os.path.join(SRV, 'work', n['vault'])
+    return next((x for x in [os.path.join(work, fn)] + glob.glob(os.path.join(work, '**', os.path.basename(fn)), recursive=True) if os.path.isfile(x)), None)
 
 def svg_frame(n, frame, els, user, notes, pad=10, mark=None):
     x0, y0, w, h = frame['x'], frame['y'], frame['width'], frame['height']
@@ -90,7 +125,7 @@ def svg_frame(n, frame, els, user, notes, pad=10, mark=None):
             out.append(f'<path d="M{X+W/2},{Y}L{X+W},{Y+H/2}L{X+W/2},{Y+H}L{X},{Y+H/2}Z" fill="{bg}" stroke="{sc}" stroke-width="{sw}"/>')
         elif t == 'ellipse':
             out.append(f'<ellipse cx="{X+W/2}" cy="{Y+H/2}" rx="{W/2}" ry="{H/2}" fill="{bg}" stroke="{sc}" stroke-width="{sw}"/>')
-        elif t in ('line', 'arrow'):
+        elif t in ('line', 'arrow', 'freedraw'):
             pts = ' '.join(f'{X+p[0]},{Y+p[1]}' for p in e['points'])
             mk = ' marker-end="url(#ah)"' if t == 'arrow' else ''
             out.append(f'<polyline points="{pts}" fill="none" stroke="{sc}" stroke-width="{sw}"{mk}/>')
@@ -100,10 +135,8 @@ def svg_frame(n, frame, els, user, notes, pad=10, mark=None):
             for i, line in enumerate(str(e.get('text', '')).split('\n')):
                 out.append(f'<text x="{tx}" y="{Y+fs*(i+1)}" text-anchor="{ta}" font-size="{fs}" fill="{sc}" font-family="BIZ UDPGothic, sans-serif">{esc(line)}</text>')
         elif t == 'image':
-            fn = files.get(e.get('fileId'))
-            side = hmap.get(hash_of(fn or ''))
-            if side and (can_see(user, side['access']) or granted(user, notes, side['id'])):
-                p = os.path.join(os.path.dirname(work_path(side)), json.loads(side['fm'])['file'])
+            p = image_file(n, files.get(e.get('fileId')), user, notes, hmap)
+            if p:
                 mime = 'image/png' if p.endswith('.png') else 'image/jpeg' if p.endswith(('.jpg', '.jpeg')) else 'image/svg+xml'
                 b = base64.b64encode(open(p, 'rb').read()).decode()
                 out.append(f'<image x="{X}" y="{Y}" width="{W}" height="{H}" href="data:{mime};base64,{b}"/>')
@@ -158,13 +191,13 @@ def render_body(n, user, notes):
                 gv = granted(user, notes, tn['id'] + fr)
                 if gv:
                     tv = at_version(tn, gv); frs, els = frames_of(tv); r_ = reg()
-                    f = next((f for f in frs if (f.get('customData') or {}).get('kvFrame') == fr.lstrip('#')), None)
+                    f = next((f for f in frs if frame_is(f, fr)), None)
                     if f: return (f'<figure class="cite granted">{svg_frame(tv, f, els, user, notes, mark="社内公開 " + r_["users"].get(user, user))}'
                                   f'<figcaption>{esc(tn["title"])} {fr} {esc(f.get("name",""))} {upd_html(tn, gv, fr.lstrip("#"))}</figcaption></figure>')
             LOCKS.append(tn['access'])
             ttl = tn['title']
             if bang and has_drawing(tn) and fr:
-                frs_, _ = frames_of(tn); f_ = next((f for f in frs_ if (f.get('customData') or {}).get('kvFrame') == fr.lstrip('#')), None)
+                frs_, _ = frames_of(tn); f_ = next((f for f in frs_ if frame_is(f, fr)), None)
                 ttl = (f_ or {}).get('name') or ttl
             return lock_html(tn['access'], 'アクセス権のない資料' if bang else 'アクセス権なし', ttl, tn['id'] + (fr if bang and fr else ''))
         if bang:
@@ -179,13 +212,12 @@ def render_body(n, user, notes):
             if has_drawing(tn):
                 tv = at_version(tn, ver.lstrip('@') if ver else None)
                 frs, els = frames_of(tv)
-                want = fr.lstrip('#') if fr else None
                 pin = ''
                 cur = ' ' + upd_html(tn, ver.lstrip('@') if ver else None, None)
                 parts = []
                 for f in frs:
                     fid = (f.get('customData') or {}).get('kvFrame')
-                    if want and fid != want: continue
+                    if fr and not frame_is(f, fr): continue
                     sb = f'<div class="scopebar">{scope_html(notes, tn, "#" + fid)}</div>' if is_mgr(user) else ''
                     cur = ' ' + upd_html(tn, ver.lstrip('@') if ver else None, fid)
                     parts.append(f'<figure class="cite">{sb}{svg_frame(tv, f, els, user, notes)}<figcaption>引用: <a href="#n-{tn["id"]}">{esc(tn["title"])}</a> #{fid} {esc(f.get("name",""))}{pin}{cur}</figcaption></figure>')
@@ -204,7 +236,7 @@ def ver_info(n, upto=None):
 @functools.lru_cache(maxsize=None)
 def _ver_info(vault, path, upto):
     n = {'vault': vault, 'path': path}
-    bare = os.path.join(SRV, n['vault'] + '.git')
+    bare = bare_of(n['vault'])
     r = subprocess.run(['git', f'--git-dir={bare}', 'log', '-1', '--follow', '--date=format:%Y-%m-%d %H:%M', '--format=%h|%an|%ad', upto or 'main', '--', n['path']],
                        capture_output=True, text=True).stdout.strip()
     h, who, at = (r.split('|') + ['', '', ''])[:3]
