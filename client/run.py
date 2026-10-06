@@ -243,6 +243,14 @@ def push(quiet=False):
     if r.returncode: raise SystemExit(f'push できませんでした（ネットワーク・権限を確認）：\n{r.stderr.strip()}')
     say(f"{'定期' if quiet else ''}push しました：変更 {n} 件（{head}）")
 
+def refs():
+    """購読（.rdnb/config.yml の subscribe に vault 名を並べる）：見てよい他人のノートのスタブを _refs/ に作る"""
+    c = cfg() or {}; subs = c.get('subscribe') or []
+    if not subs: return
+    import kv
+    if not os.path.exists(kv.DB): say('参照：索引に届かないので、スタブは前のまま'); return
+    say(kv.cmd_refs(VAULT, c['user'], subs))
+
 def autosave(msg):
     """更新の前に、利用者の変更を退避（戻せるように）"""
     if os.path.isdir(os.path.join(VAULT, '.git')):
@@ -266,11 +274,11 @@ def main():
     try:
         with Lock():
             if cmd == 'status': return status()
-            if cmd == 'push': return push(quiet=True)
+            if cmd == 'push': push(quiet=True); return refs()
             if not cfg(): return setup()
             if cmd in ('sync', 'update'):
                 autosave('更新前の自動保存'); update_vault()
-                if cmd == 'sync': push()
+                if cmd == 'sync': push(); refs()
                 status()
             else: print(__doc__)
     except SystemExit as e:

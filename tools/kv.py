@@ -3,6 +3,7 @@
   new    : ノート作成（ID採番・テンプレート）
   attach : 添付の自動処理（命名・付属ノート・タグコピー・重複防止）
   push   : 検査 → コミット → サーバへ反映 → 索引更新
+  refs   : 購読：見てよい他人のノートのスタブを _refs/ に作る
   build  : Web閲覧（上司用）生成
   pdf    : PDF出力
 """
@@ -306,6 +307,66 @@ def can_see(user, access):
     if not a: return False  # タグなし＝本人のみ
     return all(user in r['tags'][t]['members'] for t in a)
 
+# ---------- 購読（他人のノートのスタブ。vault設計 6.2・6.3 レベル2） ----------
+STUB_KEYS = ['id', 'type', 'title', 'owner', 'project', 'status', 'access', 'created', 'updated', 'summary', 'progress', 'next', 'parts'] + REL
+REFS_BASE = '''# notebase が作る（手で直しても次の更新で戻る）。購読している他人のノートの一覧
+filters:
+  and:
+    - file.ext == "md"
+properties:
+  note.title: {displayName: タイトル}
+  note.owner: {displayName: 書いた人}
+  note.type: {displayName: 種類}
+  note.project: {displayName: 案件}
+  note.updated: {displayName: 更新}
+  note.summary: {displayName: 要約}
+views:
+  - type: table
+    name: 参照
+    groupBy: {property: note.owner, direction: ASC}
+    order: [file.name, type, project, summary, updated]
+    sort:
+      - {property: updated, direction: DESC}
+'''
+
+def cmd_refs(vp, viewer, sources):
+    """購読した vault のノートのうち、viewer が見てよいものだけをスタブにして vp/_refs/<vault>/ に置く。
+    スタブはプロパティ（予約名と台帳で stub: true のもの）・要約・見てよいリンク先だけ。本文・図・添付は持たない。
+    見られなくなったノート（鍵の変更・削除）のスタブは消す。リンクが同じ名前で解決するよう、ファイル名は元と同じにする"""
+    r = reg(); con = sqlite3.connect(DB); users = r.get('users') or {}
+    keys = STUB_KEYS + [k for k, v in (r.get('properties') or {}).items() if v.get('stub')]
+    rows = {i: (v, p, json.loads(fm), json.loads(a), c) for i, v, p, fm, a, c in
+            con.execute('select id, vault, path, fm, access, commit_ from notes')}
+    seen = lambda i: i in rows and (rows[i][2].get('owner') == viewer or can_see(viewer, rows[i][3]))
+    byhash = {i.split('-')[1]: i for i in rows}
+    made, removed = 0, 0
+    for src in sources:
+        out = os.path.join(vp, '_refs', src); os.makedirs(out, exist_ok=True); keep = set()
+        for nid, (v, path, fm, acc, commit) in rows.items():
+            if v != src or not seen(nid): continue
+            name = os.path.basename(path); keep.add(name)
+            sfm = {k: fm[k] for k in keys if k in fm}
+            sfm['ref'] = f'{src}@{commit}'
+            links = []
+            for (dst,) in con.execute('select distinct dst from links where src = ?', (nid,)):
+                d = byhash.get(dst)
+                if d and seen(d): links.append(os.path.basename(rows[d][1])[:-3])
+            who = users.get(fm.get('owner'), fm.get('owner'))
+            body = (f"> [!quote] {who} のノート（参照用のスタブ）\n"
+                    f"> 本文・図はサーバで見る（Web閲覧）。ここを書き換えても元のノートは変わらず、次の更新で戻る\n\n"
+                    f"## 要約\n{fm.get('summary') or '（要約なし）'}\n")
+            if links: body += '\n## リンク先\n' + ''.join(f'- [[{l}]]\n' for l in sorted(links))
+            text = join_fm(sfm, body); p = os.path.join(out, name)
+            if not os.path.exists(p) or open(p, encoding='utf-8').read() != text:
+                open(p, 'w', encoding='utf-8').write(text); made += 1
+        for f in os.listdir(out):
+            if f not in keep: os.remove(os.path.join(out, f)); removed += 1
+    base = os.path.join(vp, '_refs', '参照.base')
+    if not os.path.exists(base) or open(base, encoding='utf-8').read() != REFS_BASE:
+        open(base, 'w', encoding='utf-8').write(REFS_BASE)
+    n = sum(len(fs) for _, _, fs in os.walk(os.path.join(vp, '_refs'))) - 1
+    return f'参照：スタブ {n} 件（更新 {made}・削除 {removed}）'
+
 def cmd_request(vault, report_path, targets, audience, purpose):
     """開示申請：見せてよい図のフレーム・添付を選んで申請（図に埋め込まれた画像も自動で対象に加える）"""
     vp = os.path.join(ROOT, vault); r = reg(); notes = scan_vault(vp); byhash = {i.split('-')[1]: n for i, n in notes.items()}
@@ -367,5 +428,6 @@ if __name__ == '__main__':
     elif c == 'attach': cmd_attach(a[0], a[1], a[2], a[3] if len(a) > 3 else '')
     elif c == 'push': cmd_push(a[0], a[1] if len(a) > 1 else 'auto')
     elif c == 'index': cmd_index()
+    elif c == 'refs': print(cmd_refs(os.path.join(ROOT, a[0]), reg()['vaults'][a[0]], a[1:]))   # kv.py refs <自分のvault> <購読するvault>...
     elif c == 'check': print(check(os.path.join(ROOT, a[0])))
     else: print(__doc__)

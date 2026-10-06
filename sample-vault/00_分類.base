@@ -1,5 +1,5 @@
 # ノートの分類（フォルダ分けの代わり）。分類は type などのプロパティを入れるだけで、ファイルは動かさない
-# 対象：01_daily・40_attachments・90_templates 以外のノート（ほぼ 10_notes）
+# 対象：01_daily・40_attachments・90_templates 以外の自分のノート（ほぼ 10_notes）。他人のノートのスタブ（_refs）は _refs/参照.base で見る
 # ビューを足す時は、filters に条件を書いて views の最後に足す。デイリー・週ノートは ![[00_分類.base#未分類]] で埋め込んでいる
 filters:
   and:
@@ -8,6 +8,8 @@ filters:
         - file.inFolder("01_daily")
         - file.inFolder("40_attachments")
         - file.inFolder("90_templates")
+        - file.inFolder("_refs")
+        - file.inFolder("_cache")
 formulas:
   図: 'if(file.name.contains(".excalidraw"), "図", "")'
 properties:

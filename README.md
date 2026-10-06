@@ -55,6 +55,7 @@ python3 tools/setup_demo.py          # 作り直す時は --reset
 
 ```bash
 python3 tools/kv.py push vault-yamada "メッセージ"     # 検査 → コミット → サーバへ → 索引更新
+python3 tools/kv.py refs vault-yamada vault-suzuki     # 購読：見てよい他人のノートのスタブを _refs/ に作る
 python3 tools/view.py build boss index.html            # Web閲覧を作り直す（閲覧者ごと）
 python3 tools/view.py pdf <ノートID> A4 boss            # PDF出力（A4〜A0）
 python3 tools/pm.py gantt <工程表ID> m3                 # Excalidrawのガント図（書き込みは残して作り直す）
@@ -68,6 +69,7 @@ PDFの日本語フォントは自動で探します。見つからない時は�
 
 - Web閲覧は「閲覧者ごとに、見てよいものだけを入れた1枚のHTML」を事前に作る方式です
 - 画面での承認・コメント・申請は、出てきた文字を手で反映します（画面から直接保存しない）。本番はサーバに送ります
+- 他人のノートの参照はスタブ（プロパティ・要約・リンク先）まで。スタブを開いて本文を取得する専用プラグインはまだ無く、本文は Web 閲覧で見ます
 - 工程表の履歴（計画変更の経緯）は、`setup_demo.py` で作り直すと最初の1件からになります
 
 ## Obsidian で使う（利用者の PC）
@@ -151,6 +153,15 @@ workspace/              好きな場所に作る空のフォルダ
 | 図付き | Excalidraw の図を持つノート |
 
 ビューを足す時は `00_分類.base` の `views` に条件を書いて足します（雛形を直すと notebase が全員に配る）。
+
+### 他人のノートを参照（購読）
+
+`.rdnb/config.yml` に `subscribe: [vault-suzuki]` のように購読する vault を書くと、notebase が更新・定期 push のたびに `_refs/vault-suzuki/` にスタブを作ります。
+
+- スタブは元と同じファイル名で、プロパティ（予約名と台帳で `stub: true` のもの）・要約・リンク先だけを持つ。`[[261007_X200 筐体材料の選定_smrki]]` のように自分のノートから直接リンクでき、被リンク・グラフもそのまま動く
+- 自分が見てよいノート（`access` の鍵を全部持っている）だけが届く。鍵が変わって見られなくなると、次の更新でスタブが消える。見てよくないノートへのリンクはスタブに載せない
+- `_refs/` は Git に入れず、`00_分類.base` にも出さない。一覧は `_refs/参照.base`（書いた人ごと）
+- 本文・図はサーバの索引から Web 閲覧で見る（専用プラグインは未作成）
 
 ### 書き方の約束
 

@@ -15,5 +15,13 @@
    "folder": "/",
    "template": "90_templates/new/01-base.md"
   }
+ ],
+ "ignore_folders_on_creation": [
+  {
+   "folder": "_refs"
+  },
+  {
+   "folder": "_cache"
+  }
  ]
 }
