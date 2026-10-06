@@ -10,7 +10,7 @@ const title = "Week of " + mon.format("YYYY-MM-DD");
 id: <% d %>-<% h %>
 type: weeknote
 title: "<% title %>"
-owner: ""        # your user ID (filled automatically by the plugin in production)
+owner: ""        # your user ID (filled automatically on push)
 project: ""
 status: draft
 access: []       # only you. The weekly-report part is split by project into weekly reports (type: weekly) on Friday
@@ -61,7 +61,7 @@ due before <% mon.format("YYYY-MM-DD") %>
 ```
 
 ## Unsorted (to be classified)
-![[未分類.base]]
+![[00_分類.base#未分類]]
 
 ## Retrospective (private, not included in the weekly report)
 - What went well:

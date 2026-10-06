@@ -9,7 +9,7 @@ const title = "Daily " + day.format("YYYY-MM-DD");
 id: <% d %>-<% h %>
 type: daily
 title: "<% title %>"
-owner: ""        # your user ID (filled automatically by the plugin in production)
+owner: ""        # your user ID (filled automatically on push)
 project: ""
 status: draft
 access: []       # keys (confidentiality tags). Empty = only you
@@ -34,7 +34,7 @@ group by filename
 ```
 
 ## Unsorted (to be classified)
-![[未分類.base]]
+![[00_分類.base#未分類]]
 
 ## Notes
 

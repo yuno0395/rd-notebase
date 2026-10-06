@@ -91,7 +91,8 @@ workspace/              好きな場所に作る空のフォルダ
 
 1. Git for Windows と Obsidian を入れる
 2. 空のフォルダに `notebase.cmd` を置いてダブルクリック。ユーザーIDと、自分の vault の正本リポジトリのURL（未定なら空）を聞かれる
-3. Obsidian で「保管庫としてフォルダを開く」→ `workspace/vault` を開き、設定 → コミュニティプラグイン →「制限モードを解除」（1回だけ）
+3. Obsidian で「保管庫としてフォルダを開く」→ `workspace/vault` を開く。「この保管庫の作成者を信頼しますか？」で「作成者を信頼しプラグインを有効化」を押す
+4. 設定 → Templater →「Trigger Templater on new file creation」をオン（確認の画面で「I understand the risks」にチェックして Enable）。端末ごとの設定なのでファイルでは配れない。デイリー・週ノートにテンプレートが入るようになる
 
 ### 普段
 
@@ -113,29 +114,38 @@ workspace/              好きな場所に作る空のフォルダ
 - 新しいノート → `10_notes`、添付 → `40_attachments`、リンクは `[[…]]` 形式
 - デイリーノート → `01_daily`（名前 `2026-10-05`）、週ノート → `01_daily/週`（名前 `2026-W41`）。Periodic Notes で作る
 - **週の始まりは月曜**（Calendar の `weekStart: monday`）。日本語環境の既定は日曜始まりで、そのままだと Periodic Notes が月〜土曜に前の週（例 10/5 に `2026-W40`）を作ってしまう
-- **Periodic Notes とコアのデイリーノートの「テンプレート」は空**。テンプレートは Templater がフォルダごとに当てる（01_daily＝daily、01_daily/週＝weekly、10_notes＝memo）。Periodic Notes にテンプレートを指定すると、Templater の書き方が実行されずにプロパティにプログラムがそのまま入る。もしそうなったノートがあれば、開いて Templater の「Replace templates in the active file」を実行すると直る
+- **Periodic Notes とコアのデイリーノートの「テンプレート」は空**。テンプレートは Templater がフォルダごとに当てる（01_daily＝periodic/daily、01_daily/週＝periodic/weekly）。Periodic Notes にテンプレートを指定すると、Templater の書き方が実行されずにプロパティにプログラムがそのまま入る。もしそうなったノートがあれば、開いて Templater の「Replace templates in the active file」を実行すると直る
 - Tasks：全体の絞り込みに `path does not include 90_templates`（テンプレートの `- [ ]` がやることの一覧に出ないように）
 - Templater の「Trigger Templater on new file creation」は**端末ごとの設定**（同梱できない）。オンにすると新規ノートの作成時にタイトルを聞いて名前・id を付ける。オフでも push 時に notebase が付ける
 - Excalidraw：**図データの圧縮オフ**（`onceOffCompressFlagReset: true` を同梱。無いと初回起動でプラグインが圧縮をオンに戻す）、保存先 `10_notes`、スクリプトの置き場 `90_templates/excalidraw-scripts`
 
-### 未整理のメモ（inboxは置かない）
+### 新しいノート（Ctrl+N）
 
-思いつきも含め、新しいノートは全部 `10_notes` に作ります（既定のテンプレート `memo` が自動で動く）。`type` が空のノートが「未分類」で、`未分類.base` の一覧（デイリーノートに表示）が inbox の代わりです。振り分けはプロパティを入れるだけで、ファイルは動かしません。
+**Ctrl+N でテンプレートを選んで作ります**（Templater の「Create new note from template」に割り当て済み）。タイトルを聞かれ、ファイル名 `作成日_タイトル_hash`（例 `261004_X200中間報告_wfyzi.excalidraw.md`）とプロパティ `id`（例 `261004-wfyzi`）が付きます。ノートは全部 `10_notes` に入ります（フォルダ分けはしない）。
 
-### テンプレート（最初の8つ）
-
-| テンプレート（ファイル名） | 用途 |
+| テンプレート（90_templates/new） | 用途 |
 |---|---|
-| `memo` | 既定（新規作成で自動）。id・タイトル・本文だけ。種類は後で決める |
-| `daily` | 今日の予定（Day Planner）・未完了のやること（Tasks）・未分類の一覧・メモ |
-| `weekly` | 1人1週。今週のねらい・週報の記入欄（金曜に案件ごとの週報に分けて出す）・今週終わったやること・来週のやること・期限切れ・ふりかえり |
-| `study` | 目的 → 前提 → 検討 → 結論 → 却下した案と理由 → やること |
-| `study-drawing` | 文章と Excalidraw の図を1ファイルに（前半が文章、`%%` の後が図） |
-| `meeting` | 参加者・決まったこと・宿題（担当と期限付きのやること） |
-| `report` | 要旨・スライド（各ノートの図のフレームを引用）・結論と依頼事項 |
-| `calc` | 目的・条件・式/スクリプト・結果・判定 |
+| `01-base` | **基本（一番上に出る）**。検討・メモ・計算など何でも。文章と Excalidraw の図を1ファイルに（前半が文章、`%%` の後が図）。`type` は空＝未分類で、後で決める |
+| `02-meeting` | 議事録。参加者・決まったこと・宿題（担当と期限付きのやること）＋ホワイトボード代わりの図 |
+| `03-report` | 報告。要旨・スライド（各ノートの図のフレームを引用）・結論と依頼事項。PDF に出す |
 
-テンプレートのファイル名と中身（見出し・説明）は英語。テンプレートで作ると、ファイル名 `作成日_タイトル_hash`（例 `261004_X200中間報告_wfyzi.md`）と、プロパティ `id`（例 `261004-wfyzi`）が自動で付きます。
+デイリー・週ノート（`90_templates/periodic`）は Periodic Notes で作ると自動で当たるので、Ctrl+N の一覧には出ません。テンプレートを使わずに作ったノートにも、push 時に notebase が id を付けます。
+
+### 分類（00_分類.base）
+
+フォルダで分けない代わりに、`00_分類.base` のビューで分けます。分類はプロパティ（主に `type`）を入れるだけで、ファイルは動かしません。
+
+| ビュー | 出るもの |
+|---|---|
+| 未分類 | `type` が空のノート（inbox の代わり。デイリー・週ノートにも埋め込み） |
+| 最近の更新 | 更新の新しい順に50件 |
+| 案件別 | `project` ごとにまとめて表示 |
+| 検討 / 議事録 / 報告 | `type` が study / meeting / report |
+| 計算・要求・メモ | `type` が calc / req / memo |
+| レビュー待ち | `progress` が「レビュー待ち」 |
+| 図付き | Excalidraw の図を持つノート |
+
+ビューを足す時は `00_分類.base` の `views` に条件を書いて足します（雛形を直すと notebase が全員に配る）。
 
 ### 書き方の約束
 
@@ -143,7 +153,7 @@ workspace/              好きな場所に作る空のフォルダ
 - 図のフレームの引用：`![[作成日_タイトル_hash.excalidraw#F02]]`、版を固定する時は `#F02@コミット`
 - 品番などの外部ID：`[[part:482015-BR1C]]`
 - プロパティ：決まった名前以外を自分用に足す時は `my_` を付ける（例 `my_優先`）。皆で使うなら `config/registry.yml` の `properties` に登録する。顧客名はプロパティに書かず本文に（他人に配る要約に載るため）。詳しくは `docs/` の vault設計 5.4
-- テンプレートは新規作成時に自動で適用される（10_notes＝memo、01_daily＝daily、01_daily/週＝weekly）。IDのないノートは push 時に拒否される
+- 新しいノートは Ctrl+N（テンプレートを選ぶ）。IDのないノートは push 時に notebase が id を付ける
 
 ## ライセンス
 

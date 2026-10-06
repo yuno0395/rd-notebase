@@ -8,31 +8,26 @@ await tp.file.rename(`${d}_${title}_${h}`);
 -%>
 ---
 id: <% d %>-<% h %>
-type: study
+type: report
 title: "<% title %>"
-owner: ""        # your user ID (filled automatically by the plugin in production)
+owner: ""        # your user ID (filled automatically on push)
 project: ""      # project ID (e.g. P00001). Setting it applies the project's default keys
 status: draft
 access: []       # keys (confidentiality tags). Empty = only you
 created: <% tp.date.now("YYYY-MM-DD") %>
 updated: <% tp.date.now("YYYY-MM-DD") %>
 summary: ""
-progress: 検討中   # 検討中 / レビュー待ち / 完了 / 保留 (fixed values read by the system)
+progress: 検討中   # 検討中 / レビュー待ち / 完了 / 保留
 next: ""
+based_on: []
 ---
 
-## Purpose
-<!-- What this study decides or clarifies -->
+## Summary
+<!-- 3 lines. Conclusion and requests first -->
 
-## Assumptions and conditions
+## Slides (exported to PDF in this order)
+<!-- Embed frames from each note's drawing, e.g. ![[YYMMDD_title_hash.excalidraw#F02]] -->
 
-## Study
-<!-- Compare the options. If the drawing is the main content, use "study-drawing" -->
+## Conclusion and requests
 
-## Conclusion
-
-## Rejected options and why
-
-## To-do
-<!-- To link to a schedule task, add [task:: scheduleID#T02] -->
-- [ ] 
+## Supporting material

@@ -1,19 +1,15 @@
 {
- "templates_folder": "90_templates",
+ "templates_folder": "90_templates/new",
  "trigger_on_file_creation": true,
  "enable_folder_templates": true,
  "folder_templates": [
   {
    "folder": "01_daily",
-   "template": "90_templates/daily.md"
-  },
-  {
-   "folder": "10_notes",
-   "template": "90_templates/memo.md"
+   "template": "90_templates/periodic/daily.md"
   },
   {
    "folder": "01_daily/週",
-   "template": "90_templates/weekly.md"
+   "template": "90_templates/periodic/weekly.md"
   }
  ]
 }

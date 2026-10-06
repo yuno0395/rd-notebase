@@ -9,7 +9,7 @@ mirror:
 folders: [01_daily, 01_daily/週, 10_notes, 30_calc, 40_attachments]
 
 # 雛形と同じにするファイル
-files: [未分類.base, .gitattributes, .rdnb/schema.yml]
+files: [00_分類.base, .gitattributes, .rdnb/schema.yml]
 
 # 行を足す（利用者が足した行は残す）
 append_lines: [.gitignore]
@@ -17,6 +17,7 @@ append_lines: [.gitignore]
 # 設定の JSON：雛形にある項目だけを上書き（利用者が変えたそれ以外の項目は残す）
 json_overlay:
   - .obsidian/app.json
+  - .obsidian/hotkeys.json         # Ctrl+N ＝ テンプレートを選んで新規作成
   - .obsidian/daily-notes.json
   - .obsidian/plugins/obsidian-excalidraw-plugin/data.json
   - .obsidian/plugins/obsidian-tasks-plugin/data.json
@@ -27,7 +28,16 @@ json_overlay:
 # 使うのをやめたもの（見つけたら外す・消す）
 retired:
   plugins: [obsidian-git]            # push は notebase に一本化（定期 push はタスクスケジューラ）
-  files:                             # 日本語名だった頃のテンプレート
+  files:                             # 旧テンプレート・旧 base
+    - 未分類.base
+    - 90_templates/memo.md
+    - 90_templates/study.md
+    - 90_templates/study-drawing.md
+    - 90_templates/meeting.md
+    - 90_templates/report.md
+    - 90_templates/calc.md
+    - 90_templates/daily.md
+    - 90_templates/weekly.md
     - 90_templates/デイリー.md
     - 90_templates/週ノート.md
     - 90_templates/メモ.md

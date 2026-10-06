@@ -1,0 +1,9 @@
+{
+  "templater-obsidian:create-new-note-from-template": [
+    {
+      "modifiers": ["Mod"],
+      "key": "N"
+    }
+  ],
+  "file-explorer:new-file": []
+}

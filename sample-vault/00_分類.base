@@ -1,0 +1,107 @@
+# ノートの分類（フォルダ分けの代わり）。分類は type などのプロパティを入れるだけで、ファイルは動かさない
+# 対象：01_daily・40_attachments・90_templates 以外のノート（ほぼ 10_notes）
+# ビューを足す時は、filters に条件を書いて views の最後に足す。デイリー・週ノートは ![[00_分類.base#未分類]] で埋め込んでいる
+filters:
+  and:
+    - file.ext == "md"
+    - not:
+        - file.inFolder("01_daily")
+        - file.inFolder("40_attachments")
+        - file.inFolder("90_templates")
+formulas:
+  図: 'if(file.name.contains(".excalidraw"), "図", "")'
+properties:
+  note.title:
+    displayName: タイトル
+  note.type:
+    displayName: 種類
+  note.project:
+    displayName: 案件
+  note.progress:
+    displayName: 状況
+  note.updated:
+    displayName: 更新
+  formula.図:
+    displayName: 図
+views:
+  - type: table
+    name: 未分類
+    filters:
+      and:
+        - 'type == null || type == ""'
+    order: [file.name, formula.図, project, created]
+    sort:
+      - property: created
+        direction: DESC
+  - type: table
+    name: 最近の更新
+    order: [file.name, type, project, progress, updated]
+    sort:
+      - property: file.mtime
+        direction: DESC
+    limit: 50
+  - type: table
+    name: 案件別
+    groupBy:
+      property: note.project
+      direction: ASC
+    order: [file.name, type, progress, updated]
+    sort:
+      - property: updated
+        direction: DESC
+  - type: table
+    name: 検討
+    filters:
+      and:
+        - 'type == "study"'
+    order: [file.name, formula.図, project, progress, next, updated]
+    sort:
+      - property: updated
+        direction: DESC
+  - type: table
+    name: 議事録
+    filters:
+      and:
+        - 'type == "meeting"'
+    order: [file.name, project, created]
+    sort:
+      - property: created
+        direction: DESC
+  - type: table
+    name: 報告
+    filters:
+      and:
+        - 'type == "report"'
+    order: [file.name, project, progress, access, updated]
+    sort:
+      - property: updated
+        direction: DESC
+  - type: table
+    name: 計算・要求・メモ
+    filters:
+      or:
+        - 'type == "calc"'
+        - 'type == "req"'
+        - 'type == "memo"'
+    order: [file.name, type, project, updated]
+    sort:
+      - property: updated
+        direction: DESC
+  - type: table
+    name: レビュー待ち
+    filters:
+      and:
+        - 'progress == "レビュー待ち"'
+    order: [file.name, type, project, next, updated]
+    sort:
+      - property: updated
+        direction: ASC
+  - type: table
+    name: 図付き
+    filters:
+      and:
+        - 'file.name.contains(".excalidraw")'
+    order: [file.name, type, project, updated]
+    sort:
+      - property: updated
+        direction: DESC
