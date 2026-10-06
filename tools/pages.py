@@ -195,9 +195,11 @@ class Site:
             link = lambda i: (f'<a href="#n-{i}">{esc(self.notes[i]["title"])}</a>' if ok(u, self.notes, self.notes[i])
                               else lock_html(self.notes[i]['access'], '非公開の資料', self.notes[i]['title'], i))
             rel = ''
-            for k, ja in (('derived_from', '元の要求'), ('based_on', '根拠'), ('verifies', '検証')):
-                ids = [by_hash(self.notes).get(hash_of(str(v).strip('[]'))) for v in fm.get(k) or []]
-                if ids: rel += f'<div><span class="k">{ja}</span> ' + '、'.join(link(x['id']) for x in ids if x) + '</div>'
+            for k, ja in (('derived_from', '元の要求'), ('based_on', '根拠'), ('verifies', '検証'), ('copied_from', 'コピー元')):
+                vs = fm.get(k) or []; vs = [vs] if isinstance(vs, str) else vs
+                ids = [by_hash(self.notes).get(hash_of(str(v).strip('[]'))) for v in vs]
+                if ids: rel += (f'<div><span class="k">{ja}</span> ' + '、'.join(link(x['id']) for x in ids if x)
+                                + (f' <span class="mono">版 {esc(fm.get("copied_version"))}</span>' if k == 'copied_from' and fm.get('copied_version') else '') + '</div>')
             parts = ' '.join(f'<a class="chip" href="#part-{esc(p)}">品番 {esc(p)}</a>' for p in fm.get('parts') or [])
             fam = ''
             if n['type'] == 'report':

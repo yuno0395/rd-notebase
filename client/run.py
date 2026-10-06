@@ -11,6 +11,7 @@
   run.py update     vault の更新だけ
   run.py view       自分の vault を Obsidian なしで見る（workspace/閲覧.html を作って開く）
   run.py pdf <ID>   ノートを PDF に（A4。2つ目の引数で A3〜A0。workspace/pdf/ に出す）
+  run.py copy <ID>  他人のノートを図・貼った画像ごと自分の vault にコピー（コピー元と版を残す）
   run.py status     状態の表示
 """
 import os, sys, re, json, glob, shutil, hashlib, secrets, subprocess, datetime, time, unicodedata, urllib.request, tempfile, platform
@@ -362,6 +363,15 @@ def main():
             if cmd == 'pdf':
                 if not args: raise SystemExit('使い方：notebase.cmd pdf <ノートのid> [A4〜A0]')
                 autosave('PDF出力前の自動保存'); return pdf(*args[:2])
+            if cmd == 'copy':
+                if not args: raise SystemExit('使い方：notebase.cmd copy <他人のノートの id>（スタブのプロパティ id）')
+                import kv
+                if not os.path.exists(kv.DB): raise SystemExit('サーバの索引に届かないので、コピーできません')
+                autosave('コピー前の自動保存')
+                made, msg = kv.cmd_copy(VAULT, cfg()['user'], args[0])
+                git('add', '--', *made); git('commit', '-q', '-m', msg)
+                for m in made: say('コピーしました：', os.path.relpath(m, VAULT))
+                say(msg); return
             if cmd in ('sync', 'update'):
                 autosave('更新前の自動保存'); update_vault()
                 if cmd == 'sync':

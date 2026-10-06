@@ -4,6 +4,7 @@
   attach : 添付の自動処理（命名・付属ノート・タグコピー・重複防止）
   push   : 検査 → コミット → サーバへ反映 → 索引更新
   refs   : 購読：見てよい他人のノートのスタブを _refs/ に作る
+  copy   : 他人のノートを図・貼った画像ごと自分の vault にコピー（コピー元と版をプロパティと履歴に残す）
   build  : Web閲覧（上司用）生成
   pdf    : PDF出力
 """
@@ -19,7 +20,7 @@ DB = os.path.join(SRV, 'index.db')
 ALPH = 'abcdefghijkmnpqrstuvwxyz23456789'  # 0 o 1 l 除外 = 32種
 ID_RE = re.compile(r'^\d{6}-[' + ALPH + r']{5}$')
 FN_RE = re.compile(r'^(\d{6})_(.+)_([' + ALPH + r']{5})\.(md|excalidraw\.md)$')
-REL = ['derived_from', 'based_on', 'verifies', 'affects', 'supersedes', 'promoted_to']
+REL = ['derived_from', 'based_on', 'verifies', 'affects', 'supersedes', 'promoted_to', 'copied_from']
 TITLE_MAX = 40
 
 def reg(): return yaml.safe_load(open(REG, encoding='utf-8'))
@@ -170,7 +171,7 @@ RESERVED = set('''id type title aliases owner project status access created upda
 tool env inputs result_hash promoted_to excalidraw-plugin note
 targets audience purpose requested_by approvers decision reason approved_targets approved_version approved_at report revoked
 about about_label assignee due state file sha256 source checks approved_by
-tasks baselines roadmap items week schedule changes ops lines code needs_approval why remap decided_by decided_at comment gantt'''.split()) | set(REL)
+copied_version tasks baselines roadmap items week schedule changes ops lines code needs_approval why remap decided_by decided_at comment gantt'''.split()) | set(REL)
 DATE_KEYS = ('created', 'updated', 'due')
 
 def check_props(fn, fm, r, warns, errs):
@@ -193,6 +194,14 @@ def check_props(fn, fm, r, warns, errs):
         if k in ('title', 'aliases', 'about_label', 'file', 'access') or k in REL: continue   # タイトル・ファイル名は鍵の「タイトル非公開」、鍵の名前は台帳で守る
         if any(w in str(v) for w in words):
             warns.append(f"{fn}: プロパティ「{k}」に顧客名が入っています。他人に配るスタブに載るので、本文に書いてください")
+
+def source_of(link):
+    """コピー元（[[ファイル名]]）を索引から探す。索引に届かない時は None"""
+    h = hash_of(str(link).strip('[]'))
+    try:
+        r = sqlite3.connect(DB).execute("select id, access from notes where id like ?", (f'%-{h}',)).fetchone()
+    except sqlite3.Error: return None
+    return {'id': r[0], 'access': json.loads(r[1])} if r else None
 
 def check(vp):
     r = reg(); errs, warns = [], []
@@ -221,6 +230,11 @@ def check(vp):
         if not daily_ok and (not m or f"{m.group(1)}-{m.group(3)}" != nid): errs.append(f"{fn}: ファイル名とidが不一致")
         for t in fm.get('access') or []:
             if t not in tags: errs.append(f"{fn}: 未登録タグ {t}")
+        if fm.get('copied_from'):   # コピーはコピー元より広く見せられない（コピー元の鍵を全部持つこと）
+            src = source_of(fm['copied_from'])
+            mine = fm.get('access') or []   # 鍵なし＝本人だけ（いちばん狭い）。鍵を付けるならコピー元の鍵を全部含める
+            lack = [t for t in (src or {}).get('access', []) if mine and t not in mine]
+            if lack: errs.append(f"{fn}: コピー元の鍵 {lack} が外れています（コピー元より広く見せることになる）")
         for p in fm.get('parts') or []:
             if not re.match(r['part_regex'], str(p)): warns.append(f"{fn}: 品番形式外 {p}")
         for k in fm:
@@ -302,7 +316,8 @@ def cmd_index():
                 h = hash_of(tgt)
                 if h: db.execute('insert into links values(?,?,?,?,?)', (nid, h, 'cites' if bang else 'link', fr, ver))
             for k in REL:
-                for v in (fm.get(k) or []):
+                vs = fm.get(k) or []
+                for v in ([vs] if isinstance(vs, str) else vs):   # 1つだけの時は文字列でもよい（copied_from など）
                     h = hash_of(str(v).strip('[]'))
                     if h: db.execute('insert into links values(?,?,?,?,?)', (nid, h, k, '', ''))
             for p in fm.get('parts') or []:
@@ -317,11 +332,12 @@ def can_see(user, access):
     return all(user in (r['tags'].get(t) or {}).get('members', []) for t in a)
 
 # ---------- 購読（他人のノートのスタブ。vault設計 6.2・6.3 レベル2） ----------
-STUB_KEYS = ['id', 'type', 'title', 'owner', 'project', 'status', 'access', 'created', 'updated', 'summary', 'progress', 'next', 'parts'] + REL
+STUB_KEYS = ['id', 'type', 'title', 'owner', 'project', 'status', 'access', 'created', 'updated', 'summary', 'progress', 'next', 'parts', 'copied_version'] + REL
 REFS_BASE = '''# notebase が作る（手で直しても次の更新で戻る）。購読している他人のノートの一覧
 filters:
   and:
     - file.ext == "md"
+    - file.inFolder("_refs")
 properties:
   note.title: {displayName: タイトル}
   note.owner: {displayName: 書いた人}
@@ -338,6 +354,23 @@ views:
       - {property: updated, direction: DESC}
 '''
 
+FIG = '_図'
+def write_if_changed(p, text):
+    if os.path.exists(p) and open(p, encoding='utf-8').read() == text: return False
+    os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'w', encoding='utf-8').write(text); return True
+
+def drawing_svgs(nid, viewer):
+    """図付きノートのフレームごとの SVG（Web閲覧と同じ描画。貼った画像は viewer が見てよいものだけ）"""
+    import render, core
+    c = core.db(); notes = core.all_notes(c); n = notes[nid]
+    frs, els = render.frames_of(n); out = []
+    for f in frs:
+        k = re.search(r'k="([^"]+)"', render.svg_frame(n, f, els, viewer, notes)).group(1)
+        svg = render.ASSETS.pop(k).replace('<svg ', f'<svg width="{f["width"] + 20:.0f}" height="{f["height"] + 20:.0f}" ', 1)
+        fid = (f.get('customData') or {}).get('kvFrame')
+        out.append((fid, f"{fid} {f.get('name', '')}".strip() if fid else f.get('name', ''), svg))   # 見出しに # を付けるとタグになる
+    return out
+
 def cmd_refs(vp, viewer, sources):
     """購読した vault のノートのうち、viewer が見てよいものだけをスタブにして vp/_refs/<vault>/ に置く。
     スタブはプロパティ（予約名と台帳で stub: true のもの）・要約・見てよいリンク先だけ。本文・図・添付は持たない。
@@ -350,7 +383,7 @@ def cmd_refs(vp, viewer, sources):
     byhash = {i.split('-')[1]: i for i in rows}
     made, removed = 0, 0
     for src in sources:
-        out = os.path.join(vp, '_refs', src); os.makedirs(out, exist_ok=True); keep = set()
+        out = os.path.join(vp, '_refs', src); os.makedirs(out, exist_ok=True); keep, keep_fig = {FIG}, set()
         for nid, (v, path, fm, acc, commit) in rows.items():
             if v != src or not seen(nid): continue
             name = os.path.basename(path); keep.add(name)
@@ -362,19 +395,65 @@ def cmd_refs(vp, viewer, sources):
                 if d and seen(d): links.append(os.path.basename(rows[d][1])[:-3])
             who = users.get(fm.get('owner'), fm.get('owner'))
             body = (f"> [!quote] {who} のノート（参照用のスタブ）\n"
-                    f"> 本文・図はサーバで見る（Web閲覧）。ここを書き換えても元のノートは変わらず、次の更新で戻る\n\n"
+                    f"> 本文はサーバで見る（Web閲覧）。図はサーバが描いた控え。ここを書き換えても元のノートは変わらず、次の更新で戻る\n\n"
                     f"## 要約\n{fm.get('summary') or '（要約なし）'}\n")
             if links: body += '\n## リンク先\n' + ''.join(f'- [[{l}]]\n' for l in sorted(links))
+            if name.endswith('.excalidraw.md'):   # 図はサーバで SVG にして置く（データそのものは配らない。貼った画像も見てよいものだけ）
+                body += '\n## 図\n'
+                for fid, label, svg in drawing_svgs(nid, viewer):
+                    sp = f'{FIG}/{nid}_{fid or "全体"}.svg'; keep_fig.add(os.path.basename(sp))
+                    write_if_changed(os.path.join(out, sp), svg)
+                    body += f'\n### {label}\n![[_refs/{src}/{sp}]]\n'
             text = join_fm(sfm, body); p = os.path.join(out, name)
             if not os.path.exists(p) or open(p, encoding='utf-8').read() != text:
                 open(p, 'w', encoding='utf-8').write(text); made += 1
         for f in os.listdir(out):
             if f not in keep: os.remove(os.path.join(out, f)); removed += 1
+        fd = os.path.join(out, FIG)
+        for f in os.listdir(fd) if os.path.isdir(fd) else []:
+            if f not in keep_fig: os.remove(os.path.join(fd, f))
     base = os.path.join(vp, '_refs', '参照.base')
     if not os.path.exists(base) or open(base, encoding='utf-8').read() != REFS_BASE:
         open(base, 'w', encoding='utf-8').write(REFS_BASE)
-    n = sum(len(fs) for _, _, fs in os.walk(os.path.join(vp, '_refs'))) - 1
+    n = sum(f.endswith('.md') for _, _, fs in os.walk(os.path.join(vp, '_refs')) for f in fs)
     return f'参照：スタブ {n} 件（更新 {made}・削除 {removed}）'
+
+# ---------- 他人のノートのコピー（図・貼った画像ごと） ----------
+def cmd_copy(vp, viewer, key):
+    """見てよい他人のノートを、新しい ID で自分の vault にコピーする。
+    コピー元はプロパティ copied_from（リンク）と copied_version（その時の版）に残し、鍵（access）はコピー元のまま引き継ぐ。
+    貼った画像も 40_attachments にコピーする。返り値：(作ったファイル, コミットの文言)"""
+    import core, render
+    c = core.db(); notes = core.all_notes(c); hmap = core.by_hash(notes)
+    n = notes.get(key) or hmap.get(hash_of(key) or '')
+    if not n:
+        hits = [x for x in notes.values() if key in (x['title'] or '') and x['owner'] != viewer and x['type'] not in ('attachment', 'grant', 'comment')]
+        if len(hits) != 1: raise SystemExit(f'「{key}」に合うノートが' + ('見つかりません' if not hits else f' {len(hits)} 件あります：' + '、'.join(f"{x['title']}（{x['id']}）" for x in hits[:5])))
+        n = hits[0]
+    fm = json.loads(n['fm'])
+    if fm.get('owner') == viewer: raise SystemExit('自分のノートです（コピーは他人のノートに使います）')
+    if not can_see(viewer, n['access']): raise SystemExit('このノートを見る権限がないので、コピーできません')
+    body = n['body']; files = embedded_files(body); copies = []
+    for fid, fn in files.items():   # 貼った画像：見てよいものだけ。1枚でも見られなければコピーしない
+        p = render.image_file(n, fn, viewer, notes, hmap)
+        if not p: raise SystemExit(f'図に貼った「{fn}」を見る権限がないので、コピーできません')
+        dst = os.path.basename(p); copies.append((p, dst))
+        body = body.replace(f'{fid}: [[{fn}]]', f'{fid}: [[{dst}]]')
+    nid = alloc_id(); src = os.path.basename(n['path'])
+    stem = src[:-3]
+    new = {k: v for k, v in fm.items() if not k.startswith('my_')}
+    new.update({'id': nid, 'owner': viewer, 'status': 'draft', 'created': str(today()), 'updated': str(today()),
+                'copied_from': f'[[{stem}]]', 'copied_version': n['commit_']})
+    ext = 'excalidraw.md' if src.endswith('.excalidraw.md') else 'md'
+    out = os.path.join(vp, '10_notes', fname(nid, fm.get('title') or stem, ext)); os.makedirs(os.path.dirname(out), exist_ok=True)
+    open(out, 'w', encoding='utf-8').write(join_fm(new, body))
+    made = [out]
+    for p, dst in copies:
+        d = os.path.join(vp, '40_attachments', dst)
+        if not os.path.exists(d): os.makedirs(os.path.dirname(d), exist_ok=True); shutil.copy(p, d); made.append(d)
+    who = reg()['users'].get(fm.get('owner'), fm.get('owner'))
+    msg = f"コピー: {fm.get('title')}（{who} の {n['id']}@{n['commit_']} から）"
+    return made, msg
 
 def cmd_request(vault, report_path, targets, audience, purpose):
     """開示申請：見せてよい図のフレーム・添付を選んで申請（図に埋め込まれた画像も自動で対象に加える）"""
@@ -437,6 +516,10 @@ if __name__ == '__main__':
     elif c == 'attach': cmd_attach(a[0], a[1], a[2], a[3] if len(a) > 3 else '')
     elif c == 'push': cmd_push(a[0], a[1] if len(a) > 1 else 'auto')
     elif c == 'index': cmd_index()
+    elif c == 'copy':   # kv.py copy <自分のvault> <ノートのid・タイトルの一部>
+        vp = os.path.join(ROOT, a[0]); made, msg = cmd_copy(vp, reg()['vaults'][a[0]], a[1])
+        for m in made: print('作成:', os.path.relpath(m, vp))
+        sh('git add -A', vp); sh(f'git commit -qm "{msg}"', vp); print(msg)
     elif c == 'refs': print(cmd_refs(os.path.join(ROOT, a[0]), reg()['vaults'][a[0]], a[1:]))   # kv.py refs <自分のvault> <購読するvault>...
     elif c == 'check': print(check(os.path.join(ROOT, a[0])))
     else: print(__doc__)

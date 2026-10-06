@@ -13,7 +13,7 @@ def by_hash(notes):
 
 def work_path(n): return os.path.join(SRV, 'work', n['vault'], n['path'])
 
-KIND_JA = {'cites': 'スライド・図', 'based_on': '根拠', 'derived_from': '元の要求', 'link': '参照', 'verifies': '検証'}
+KIND_JA = {'copied_from': 'コピー', 'cites': 'スライド・図', 'based_on': '根拠', 'derived_from': '元の要求', 'link': '参照', 'verifies': '検証'}
 def meta_row(n, r):
     a = json.loads(n['access'])
     tags = ''.join(f'<span class="tag">{esc(t)}</span>' for t in a)
