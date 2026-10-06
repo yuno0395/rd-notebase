@@ -227,14 +227,16 @@ def push(quiet=False):
         for e in errs: say('拒否:', e)
         raise SystemExit('検査で止まりました。上の「拒否」を直してから、もう一度実行してください')
     git('add', '-A')
-    if git('status', '--porcelain'):
+    n = len(git('status', '--porcelain').splitlines())
+    if n:
         git('commit', '-q', '-m', f'保存 {datetime.datetime.now():%Y-%m-%d %H:%M}')
-    if not c.get('remote'):
-        if not quiet: say('保存しました（正本が未設定なので push はしていません。.rdnb/config.yml の remote に書くと push します）')
+    head = git('rev-parse', '--short', 'HEAD')
+    if not c.get('remote'):   # 定期実行でも毎回1行残す（動いたかどうかをログで分かるように）
+        say(f"{'定期' if quiet else ''}保存：変更 {n} 件（{head}）" + ('' if quiet else '。正本が未設定なので push はしていません（.rdnb/config.yml の remote に書くと push します）'))
         return
     r = subprocess.run(['git', 'push', '-q', '-u', 'origin', f"HEAD:{c.get('branch', 'main')}"], cwd=VAULT, capture_output=True, text=True, encoding='utf-8', errors='replace')
     if r.returncode: raise SystemExit(f'push できませんでした（ネットワーク・権限を確認）：\n{r.stderr.strip()}')
-    say(f"push しました：{git('rev-parse', '--short', 'HEAD')}")
+    say(f"{'定期' if quiet else ''}push しました：変更 {n} 件（{head}）")
 
 def autosave(msg):
     """更新の前に、利用者の変更を退避（戻せるように）"""

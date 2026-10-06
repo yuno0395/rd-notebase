@@ -117,7 +117,10 @@ workspace/              好きな場所に作る空のフォルダ
 - **Periodic Notes とコアのデイリーノートの「テンプレート」は空**。テンプレートは Templater がフォルダごとに当てる（01_daily＝periodic/daily、01_daily/週＝periodic/weekly）。Periodic Notes にテンプレートを指定すると、Templater の書き方が実行されずにプロパティにプログラムがそのまま入る。もしそうなったノートがあれば、開いて Templater の「Replace templates in the active file」を実行すると直る
 - Tasks：全体の絞り込みに `path does not include 90_templates`（テンプレートの `- [ ]` がやることの一覧に出ないように）
 - Templater の「Trigger Templater on new file creation」は**端末ごとの設定**（同梱できない）。オンにすると新規ノートの作成時にタイトルを聞いて名前・id を付ける。オフでも push 時に notebase が付ける
-- Excalidraw：**図データの圧縮オフ**（`onceOffCompressFlagReset: true` を同梱。無いと初回起動でプラグインが圧縮をオンに戻す）、保存先 `10_notes`、スクリプトの置き場 `90_templates/excalidraw-scripts`
+- Excalidraw：**図データの圧縮オフ**（`onceOffCompressFlagReset: true` を同梱。無いと初回起動でプラグインが圧縮をオンに戻す）、保存先 `10_notes`、スクリプトの置き場 `90_templates/excalidraw-scripts`、部品（ライブラリ）の置き場 `90_templates/excalidraw-libraries`、起動時の案内画面はオフ
+- ホットキー：Ctrl+N ＝ テンプレートを選んで新規作成、Ctrl+Q ＝ 図付きノートの図と文章の切り替え
+- 見やすさ：`40_attachments/` は除外ファイル（検索・クイックスイッチャー・リンク候補に出ない）、すべてのファイル形式を一覧に表示、使わないコア機能（グラフ・キャンバス・コアのテンプレート・ノートコンポーザー・同期）はオフ
+- Iconic：ファイル・フォルダなどにアイコンと色を付けられる（ルールは未設定）
 
 ### 新しいノート（Ctrl+N）
 

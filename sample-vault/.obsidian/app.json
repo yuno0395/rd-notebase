@@ -5,5 +5,9 @@
   "useMarkdownLinks": false,
   "newLinkFormat": "shortest",
   "alwaysUpdateLinks": true,
-  "showFrontmatter": true
+  "showFrontmatter": true,
+  "userIgnoreFilters": [
+    "40_attachments/"
+  ],
+  "showUnsupportedFiles": true
 }

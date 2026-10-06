@@ -6,7 +6,7 @@ mirror:
   - 90_templates
 
 # 無ければ作るフォルダ
-folders: [01_daily, 01_daily/週, 10_notes, 30_calc, 40_attachments]
+folders: [01_daily, 01_daily/週, 10_notes, 30_calc, 40_attachments, 90_templates/excalidraw-libraries]
 
 # 雛形と同じにするファイル
 files: [00_分類.base, .gitattributes, .rdnb/schema.yml]
@@ -17,7 +17,8 @@ append_lines: [.gitignore]
 # 設定の JSON：雛形にある項目だけを上書き（利用者が変えたそれ以外の項目は残す）
 json_overlay:
   - .obsidian/app.json
-  - .obsidian/hotkeys.json         # Ctrl+N ＝ テンプレートを選んで新規作成
+  - .obsidian/hotkeys.json         # Ctrl+N ＝ テンプレートを選んで新規作成、Ctrl+Q ＝ 図と文章の切り替え
+  - .obsidian/core-plugins.json    # 使わないコア機能（グラフ・キャンバス・コアのテンプレートなど）をオフ
   - .obsidian/daily-notes.json
   - .obsidian/plugins/obsidian-excalidraw-plugin/data.json
   - .obsidian/plugins/obsidian-tasks-plugin/data.json
@@ -91,3 +92,10 @@ plugins:
     files:
       manifest.json: f3e9581338648512baa12d5b458490f7fd367918f7bdb6bd86171ce57be7d08b
       main.js: 7fb339e9cf9fdbe5a801fa2b8ab85b366b5b3777fbd193cbc8728bc27711d125
+  iconic:
+    url: https://github.com/gfxholo/iconic/releases/download/1.1.10
+    version: 1.1.10
+    files:
+      manifest.json: fa072ca3f66616a12a1236250c685754ba7f206cdebdecbac47ac5454f82bd3f
+      main.js: d8d7ddae3f0bbc07a7c2460b6d7898e5174a29ebb4ee857fe8e744ef801fb1ad
+      styles.css: d83afa6028ed6333ce3612547cf2086686f4a51565929cccbb0a516513a83077

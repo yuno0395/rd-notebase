@@ -1,9 +1,19 @@
 {
   "templater-obsidian:create-new-note-from-template": [
     {
-      "modifiers": ["Mod"],
+      "modifiers": [
+        "Mod"
+      ],
       "key": "N"
     }
   ],
-  "file-explorer:new-file": []
+  "file-explorer:new-file": [],
+  "obsidian-excalidraw-plugin:toggle-excalidraw-view": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "Q"
+    }
+  ]
 }
