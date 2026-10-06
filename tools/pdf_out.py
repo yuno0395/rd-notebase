@@ -53,26 +53,28 @@ def pdf(nid, size='A4', user=None):
         T = lambda x, y: (ox + (x - fr['x']) * s, oy - (y - fr['y']) * s)
         for e in els:
             if e.get('frameId') != fr['id']: continue
-            sc = hexc(e.get('strokeColor', '#1e1e1e')); bg = hexc(e.get('backgroundColor'))
-            cv.setStrokeColor(sc); cv.setLineWidth(e.get('strokeWidth', 1.5) * s)
+            sc = hexc(e.get('strokeColor', '#1e1e1e')); bg = hexc(e.get('backgroundColor'))   # 'transparent' は None（線を引かない）
+            st = 1 if sc else 0
+            if sc: cv.setStrokeColor(sc)
+            cv.setLineWidth(e.get('strokeWidth', 1.5) * s)
             if bg: cv.setFillColor(bg)
             X, Y = T(e['x'], e['y']); W, H = e.get('width', 0) * s, e.get('height', 0) * s
             t = e['type']
-            if t == 'rectangle': cv.roundRect(X, Y - H, W, H, 3 * s, stroke=1, fill=1 if bg else 0)
-            elif t == 'ellipse': cv.ellipse(X, Y - H, X + W, Y, stroke=1, fill=1 if bg else 0)
+            if t == 'rectangle': cv.roundRect(X, Y - H, W, H, 3 * s, stroke=st, fill=1 if bg else 0)
+            elif t == 'ellipse': cv.ellipse(X, Y - H, X + W, Y, stroke=st, fill=1 if bg else 0)
             elif t in ('line', 'arrow', 'freedraw'):
                 pts = [T(e['x'] + p[0], e['y'] + p[1]) for p in e['points']]
                 p = cv.beginPath(); p.moveTo(*pts[0])
                 for q in pts[1:]: p.lineTo(*q)
-                cv.drawPath(p, stroke=1, fill=0)
+                cv.drawPath(p, stroke=st, fill=0)
                 if t == 'arrow' and len(pts) > 1:
                     import math
                     (x1, y1), (x2, y2) = pts[-2], pts[-1]; a = math.atan2(y2 - y1, x2 - x1); L = 9 * s
-                    cv.setFillColor(sc); ah = cv.beginPath(); ah.moveTo(x2, y2)
+                    cv.setFillColor(sc or hexc('#1e1e1e')); ah = cv.beginPath(); ah.moveTo(x2, y2)
                     ah.lineTo(x2 - L * math.cos(a - .4), y2 - L * math.sin(a - .4)); ah.lineTo(x2 - L * math.cos(a + .4), y2 - L * math.sin(a + .4)); ah.close()
                     cv.drawPath(ah, stroke=0, fill=1)
             elif t == 'text':
-                fs = e.get('fontSize', 20) * s; cv.setFillColor(sc); cv.setFont(F, fs)
+                fs = e.get('fontSize', 20) * s; cv.setFillColor(sc or hexc('#1e1e1e')); cv.setFont(F, fs)
                 for i, line in enumerate(str(e.get('text', '')).split('\n')):
                     cv.drawString(X, Y - fs * (i + 1) + fs * .2, line)
             elif t == 'image':
