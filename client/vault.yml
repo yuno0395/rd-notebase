@@ -11,6 +11,9 @@ folders: [01_daily, 01_daily/週, 10_notes, 30_calc, 40_attachments, 90_template
 # 雛形と同じにするファイル
 files: [00_分類.base, .gitattributes, .rdnb/schema.yml]
 
+# 無い時だけ置くファイル（初期の画面配置。その後は利用者が変えてよい）
+initial: [.obsidian/workspace.json]
+
 # 行を足す（利用者が足した行は残す）
 append_lines: [.gitignore]
 
@@ -19,11 +22,13 @@ json_overlay:
   - .obsidian/app.json
   - .obsidian/hotkeys.json         # Ctrl+N ＝ テンプレートを選んで新規作成、Ctrl+Q ＝ 図と文章の切り替え
   - .obsidian/core-plugins.json    # 使わないコア機能（グラフ・キャンバス・コアのテンプレートなど）をオフ
+  - file: .obsidian/workspace.json # リボンで隠すアイコン（Excalidraw・ベースの新規作成など）。画面配置は上の initial
+    keys: [left-ribbon]
   - .obsidian/daily-notes.json
-  - .obsidian/plugins/obsidian-excalidraw-plugin/data.json
+  - .obsidian/plugins/obsidian-excalidraw-plugin/data.json   # 新規の図も 01-base から作る（templateFilePath）
   - .obsidian/plugins/obsidian-tasks-plugin/data.json
   - .obsidian/plugins/periodic-notes/data.json
-  - .obsidian/plugins/templater-obsidian/data.json
+  - .obsidian/plugins/templater-obsidian/data.json   # 空のノートには 01-base を入れる（folder_templates の "/"）
   - .obsidian/plugins/calendar/data.json
 
 # 使うのをやめたもの（見つけたら外す・消す）

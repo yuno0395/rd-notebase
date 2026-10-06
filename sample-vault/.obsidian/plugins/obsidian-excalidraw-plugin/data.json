@@ -5,5 +5,6 @@
  "embedUseExcalidrawFolder": false,
  "scriptFolderPath": "90_templates/excalidraw-scripts",
  "libraryFolderPath": "90_templates/excalidraw-libraries",
- "showSplashscreen": false
+ "showSplashscreen": false,
+ "templateFilePath": "90_templates/new/01-base.md"
 }

@@ -10,6 +10,10 @@
   {
    "folder": "01_daily/週",
    "template": "90_templates/periodic/weekly.md"
+  },
+  {
+   "folder": "/",
+   "template": "90_templates/new/01-base.md"
   }
  ]
 }

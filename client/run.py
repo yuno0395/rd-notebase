@@ -147,15 +147,20 @@ def update_vault():
     # ファイル
     for f in MAN['files']:
         copy_if_changed(os.path.join(TPL, f), os.path.join(VAULT, f), changed)
+    for f in MAN.get('initial', []):   # 無い時だけ置く（その後は利用者のもの）
+        if not os.path.exists(os.path.join(VAULT, f)): copy_if_changed(os.path.join(TPL, f), os.path.join(VAULT, f), changed)
     for f in MAN['append_lines']:
         p = os.path.join(VAULT, f); have = read(p).splitlines() if os.path.exists(p) else []
         add = [l for l in read(os.path.join(TPL, f)).splitlines() if l.strip() and l not in have]
         if add: write(p, '\n'.join(have + add) + '\n'); changed.append(f)
     # 設定の JSON
-    for f in MAN['json_overlay']:
+    for f in MAN['json_overlay']:   # 「ファイル名」か「{file: ファイル名, keys: [上書きする項目]}」
+        f, keys = (f['file'], f['keys']) if isinstance(f, dict) else (f, None)
         src, dst = os.path.join(TPL, f), os.path.join(VAULT, f)
         cur = json.loads(read(dst)) if os.path.exists(dst) else {}
-        new = deep_merge(json.loads(json.dumps(cur)), json.loads(read(src)))
+        add = json.loads(read(src))
+        if keys: add = {k: add[k] for k in keys}
+        new = deep_merge(json.loads(json.dumps(cur)), add)
         if new != cur: write(dst, json.dumps(new, ensure_ascii=False, indent=2) + '\n'); changed.append(f)
     # 有効にするプラグインの一覧（雛形の分を足し、やめたものを外す。利用者が足した分は残す）
     p = os.path.join(VAULT, '.obsidian', 'community-plugins.json')
