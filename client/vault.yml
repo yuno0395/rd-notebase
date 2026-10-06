@@ -1,0 +1,83 @@
+# 利用者の vault に配るもの（client/run.py が読む）
+# 雛形は sample-vault/。ここに書いた範囲だけを上書きし、ノート（01_daily 10_notes 30_calc 40_attachments）には触らない
+
+# 丸ごと同じにするフォルダ（前回配ったファイルで、雛形から消えたものは消す）
+mirror:
+  - 90_templates
+
+# 無ければ作るフォルダ
+folders: [01_daily, 01_daily/週, 10_notes, 30_calc, 40_attachments]
+
+# 雛形と同じにするファイル
+files: [未分類.base, .gitattributes, .rdnb/schema.yml]
+
+# 行を足す（利用者が足した行は残す）
+append_lines: [.gitignore]
+
+# 設定の JSON：雛形にある項目だけを上書き（利用者が変えたそれ以外の項目は残す）
+json_overlay:
+  - .obsidian/app.json
+  - .obsidian/daily-notes.json
+  - .obsidian/plugins/obsidian-excalidraw-plugin/data.json
+  - .obsidian/plugins/obsidian-tasks-plugin/data.json
+  - .obsidian/plugins/periodic-notes/data.json
+  - .obsidian/plugins/templater-obsidian/data.json
+  - .obsidian/plugins/calendar/data.json
+
+# 使うのをやめたもの（見つけたら外す・消す）
+retired:
+  plugins: [obsidian-git]            # push は notebase に一本化（定期 push はタスクスケジューラ）
+  files:                             # 日本語名だった頃のテンプレート
+    - 90_templates/デイリー.md
+    - 90_templates/週ノート.md
+    - 90_templates/メモ.md
+    - 90_templates/検討.md
+    - 90_templates/検討_図付き.md
+    - 90_templates/議事録.md
+    - 90_templates/報告.md
+    - 90_templates/計算.md
+    - 90_templates/excalidraw-scripts/スライドのヘッダ・フッタ.md
+
+# コミュニティプラグイン（版を固定。ダウンロードしたファイルは sha256 で照合）
+plugins:
+  obsidian-excalidraw-plugin:
+    url: https://github.com/zsviczian/obsidian-excalidraw-plugin/releases/download/2.28.1
+    version: 2.28.1
+    files:
+      manifest.json: 15dd0e8af2427f81ea401bf21639cef67e4507e3fc2d981213103dd1accf0522
+      main.js: 4cd3e55a4e6af8ad9835d77eaefb7cfeaaa0bb415d78f6ea9f8ad42970f9285f
+      styles.css: 173e9c161a01c53b3c173344e023de4d327fd0658e476961b46b0e6a93117ded
+  templater-obsidian:
+    url: https://github.com/SilentVoid13/Templater/releases/download/2.25.1
+    version: 2.25.1
+    files:
+      manifest.json: b99280d2c4ab2cd22ad010c12faeedf255bcf385d127d973b89f85deb27d23fd
+      main.js: eb86d9282694ce1f099154c320286fdd89473e60dc2441ee310f3ac331333e94
+      styles.css: 67a6dd2d1d6dedca1287c334ca884ec4196433f71ca47388a0bd3eac14cf8b5f
+  obsidian-tasks-plugin:
+    url: https://github.com/obsidian-tasks-group/obsidian-tasks/releases/download/8.4.0
+    version: 8.4.0
+    files:
+      manifest.json: 499cfa146ba9cbdd70ccfc9d16b6b6cbfb4243158d14335b2b336259e867c33f
+      main.js: c1e3333bce3fee7c1a06397ea2989cd27e1659cc30795c53ed5a60e7941e48fa
+      styles.css: 3b2ca53d3b74162b5899b251d18b695f532546181ebaed6354befbe72c29935d
+  periodic-notes:
+    url: https://github.com/liamcain/obsidian-periodic-notes/releases/download/0.0.17
+    version: 0.0.17
+    files:
+      manifest.json: bda29323f75d3b3fcbda489335825b97fe4b574914d04635e9a7e67f2414049c
+      main.js: ccf1a18673693d1036fc7614c3af9d23e5edfe425d1053df81dddcc29b1f8b0e
+      styles.css: 613f3985d4c84900ed2e25d8a46efb7b3ace6889fb71217055084084eb146238
+  obsidian-day-planner:
+    url: https://github.com/ivan-lednev/obsidian-day-planner/releases/download/0.35.1
+    version: 0.35.1
+    files:
+      manifest.json: 138e6280c1625d859f5cb2e1b0e46996e4af7950d7c6370c2fc7009b9d586312
+      main.js: 64009005f0985bdc79a8b586fba14c59d4da700f019b54fed9df725e840daf2c
+      styles.css: 7af0dbb68f28e948bf3e550e7e7082e632fd4938f6d831fddda57aef5286b11a
+  calendar:
+    url: https://github.com/liamcain/obsidian-calendar-plugin/releases/download/1.5.10
+    version: 1.5.10
+    files:
+      manifest.json: f3e9581338648512baa12d5b458490f7fd367918f7bdb6bd86171ce57be7d08b
+      main.js: 7fb339e9cf9fdbe5a801fa2b8ab85b366b5b3777fbd193cbc8728bc27711d125

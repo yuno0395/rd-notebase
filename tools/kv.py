@@ -10,7 +10,7 @@ import sys, os, re, json, hashlib, secrets, subprocess, unicodedata, datetime, s
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 SRV = os.path.join(ROOT, 'server')
-REG = os.path.join(SRV, 'registry.yml')
+REG = os.environ.get('RDNB_REGISTRY') or os.path.join(SRV, 'registry.yml')   # 利用者のPCでは client/run.py が config/registry.yml を指す
 IDS = os.path.join(SRV, 'allocated_ids.txt')
 DB = os.path.join(SRV, 'index.db')
 ALPH = 'abcdefghijkmnpqrstuvwxyz23456789'  # 0 o 1 l 除外 = 32種

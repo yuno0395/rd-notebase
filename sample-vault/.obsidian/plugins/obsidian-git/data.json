@@ -1,1 +1,0 @@
-{ "autoSaveInterval": 10, "autoPushInterval": 10, "autoPullInterval": 10, "commitMessage": "自動保存 {{date}}", "pullBeforePush": true }

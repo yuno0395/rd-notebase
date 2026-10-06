@@ -7,3 +7,8 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# notebase（利用者のPC）の実行環境・状態
+.venv/
+.tools/
+.state/

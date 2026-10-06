@@ -9,3 +9,8 @@ _private/
 .venv/
 venv/
 __pycache__/
+# プラグイン本体と配布の記録は notebase が配る（Gitに入れない）
+.obsidian/plugins/*/main.js
+.obsidian/plugins/*/styles.css
+.obsidian/plugins/*/manifest.json
+.rdnb/managed.json

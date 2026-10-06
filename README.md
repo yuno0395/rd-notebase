@@ -27,7 +27,8 @@ tools/           Pythonプログラム（索引・権限・Web閲覧・PDF・工
   site_template.html, editor.js   画面（素のHTML/CSS/JavaScript）
   setup_demo.py  サンプルデータから試作環境を作る
   dev/           サンプルデータを作った時の台本（参考）
-sample-vault/    Obsidian vault の雛形（フォルダ・テンプレート・初期設定・LFS設定）
+sample-vault/    Obsidian vault の雛形（フォルダ・テンプレート・初期設定・LFS設定）。notebase が利用者の vault に配る
+client/          利用者の PC で動く部分（notebase.cmd・run.py・配るものの一覧 vault.yml）
 sample-data/     サンプルデータ（山田・上司・一般社員の vault、案件 P00001 の工程表）
 config/          タグ台帳・利用者・案件・休日（registry.yml）
 docs/            要件書（基本方針・非機能要件・ID体系・vault設計・工程管理・要件整理）とレビュー記録
@@ -69,36 +70,53 @@ PDFの日本語フォントは自動で探します。見つからない時は�
 - 画面での承認・コメント・申請は、出てきた文字を手で反映します（画面から直接保存しない）。本番はサーバに送ります
 - 工程表の履歴（計画変更の経緯）は、`setup_demo.py` で作り直すと最初の1件からになります
 
-## Obsidian で使う
+## Obsidian で使う（利用者の PC）
 
-`sample-vault/` を自分の vault の雛形として使います。
+利用者が用意するのは **Git for Windows と Obsidian だけ**です。Python などは `notebase.cmd` が自動で用意します。
 
 ```
-vault-<ユーザーID>/
-├─ 01_daily/         デイリーノート（今日の予定・やることの一覧）
-├─ 10_notes/         ノート本体。新しいノートと図は全部ここ（フラット。分類はプロパティ）
-├─ 30_calc/          計算（Pythonスクリプトと結果）
-├─ 40_attachments/   添付（中身は Git LFS）と付属ノート
-└─ 90_templates/     テンプレート（共通リポジトリから配る。直接編集しない）
+workspace/              好きな場所に作る空のフォルダ
+├─ notebase.cmd         入口。ダブルクリックするだけ（client/notebase.cmd を配る）
+├─ vault/               自分の Obsidian vault（自分の正本リポジトリ）
+│   ├─ 01_daily/        デイリーノート・週ノート（01_daily/週）
+│   ├─ 10_notes/        ノート本体。新しいノートと図は全部ここ（フラット。分類はプロパティ）
+│   ├─ 30_calc/         計算（Pythonスクリプトと結果）
+│   ├─ 40_attachments/  添付（中身は Git LFS）と付属ノート
+│   ├─ 90_templates/    テンプレート（notebase が配る。直接編集しない）
+│   └─ .rdnb/           自分のID・正本の場所（config.yml）、構成の版
+└─ .notebase/           rd-notebase そのもの（隠しフォルダ。notebase.cmd が取得・更新）
 ```
 
-### 初期設定
+### はじめて使う時
 
-1. `sample-vault/` をコピーして Obsidian で開く
-2. コミュニティプラグインを入れる（`.obsidian/community-plugins.json` の7つ）
-   - Excalidraw、Templater、Obsidian Git、Day Planner、Obsidian Tasks、Periodic Notes、Calendar
-3. 設定済みの内容（`.obsidian/` に同梱）
-   - 新しいノート → `10_notes`、添付 → `40_attachments`、リンクは `[[…]]` 形式
-   - デイリーノート → `01_daily`（名前 `2026-10-05`）、週ノート → `01_daily/週`（名前 `2026-W41`）。Periodic Notes で作る
-   - **週の始まりは月曜**（Calendar プラグインの設定 `weekStart: monday` を同梱）。日本語環境の既定は日曜始まりで、そのままだと Periodic Notes が月〜土曜に前の週（例 10/5 に `2026-W40`）を作ってしまう
-   - **Periodic Notes とコアのデイリーノートの「テンプレート」は空にする**。テンプレートは Templater がフォルダごとに当てる（01_daily＝daily、01_daily/週＝weekly、10_notes＝memo）。Periodic Notes にテンプレートを指定すると、Templater の書き方が実行されずに、プロパティにプログラムがそのまま入る
-   - Obsidian Tasks：全体の絞り込み（Global Query）に `path does not include 90_templates` を設定済み。テンプレートの中の `- [ ]` が、デイリー・週ノートの「やること」に出ないようにするため
-   - もし既にそうなったノートがあれば、そのノートを開いて Templater の「Replace templates in the active file」を実行すると直る
-   - Templater のテンプレートフォルダ → `90_templates`
-   - **Templater の「Trigger Templater on new file creation」は端末ごとに手でオンにする**（Templater 2.25 以降、この設定は端末ローカルになり、同梱の設定では有効にならない。オフのままだと新規ノートに名前・idが付かない）
-   - Excalidraw：**図データの圧縮オフ**（Gitの差分を読めるように）、保存先 `10_notes`、スクリプトの置き場 `90_templates/excalidraw-scripts`（`onceOffCompressFlagReset: true` を同梱。無いと初回起動時にプラグインが圧縮をオンに戻す）
-   - Obsidian Git：10分ごとに自動コミット・プッシュ
-4. Git LFS を有効にする：`git lfs install`（`.gitattributes` は同梱）
+1. Git for Windows と Obsidian を入れる
+2. 空のフォルダに `notebase.cmd` を置いてダブルクリック。ユーザーIDと、自分の vault の正本リポジトリのURL（未定なら空）を聞かれる
+3. Obsidian で「保管庫としてフォルダを開く」→ `workspace/vault` を開き、設定 → コミュニティプラグイン →「制限モードを解除」（1回だけ）
+
+### 普段
+
+- **何もしなくてよい**。30分ごとに自動で検査して正本に push する（Windows のタスクスケジューラ「rd-notebase push」）
+- すぐ push したい時・システムを更新したい時は `notebase.cmd` をダブルクリック（本体の更新 → vault の更新 → 検査 → push）
+- 状態の確認は `notebase.cmd status`
+
+### notebase.cmd がすること
+
+| 処理 | 内容 |
+|---|---|
+| 本体の更新 | `.notebase` を `stable` ブランチに合わせる（開発者は `workspace/notebase.local.cmd` に `set "BRANCH=main"` を書くと main を使う） |
+| vault の更新 | `client/vault.yml` に書いた範囲だけを `sample-vault/` に合わせる：テンプレート、プラグイン本体（版を固定・sha256 で照合）、システムが決める設定項目。**ノートには触らない**。更新の前に vault を自動でコミットするので戻せる |
+| id の付与 | テンプレートを使わずに作ったノートに id を付け、名前を「作成日_タイトル_hash」に直す（vault 内のリンクも直す）。Templater の「新規作成時に実行」がオフの端末でも困らない |
+| 検査 → push | `tools/kv.py` の検査（予約プロパティ、日付の書き方、顧客名、鍵など）を通ったものだけを push する。push はこれに一本化（Obsidian Git は使わない） |
+
+### vault に入っている設定（sample-vault/.obsidian）
+
+- 新しいノート → `10_notes`、添付 → `40_attachments`、リンクは `[[…]]` 形式
+- デイリーノート → `01_daily`（名前 `2026-10-05`）、週ノート → `01_daily/週`（名前 `2026-W41`）。Periodic Notes で作る
+- **週の始まりは月曜**（Calendar の `weekStart: monday`）。日本語環境の既定は日曜始まりで、そのままだと Periodic Notes が月〜土曜に前の週（例 10/5 に `2026-W40`）を作ってしまう
+- **Periodic Notes とコアのデイリーノートの「テンプレート」は空**。テンプレートは Templater がフォルダごとに当てる（01_daily＝daily、01_daily/週＝weekly、10_notes＝memo）。Periodic Notes にテンプレートを指定すると、Templater の書き方が実行されずにプロパティにプログラムがそのまま入る。もしそうなったノートがあれば、開いて Templater の「Replace templates in the active file」を実行すると直る
+- Tasks：全体の絞り込みに `path does not include 90_templates`（テンプレートの `- [ ]` がやることの一覧に出ないように）
+- Templater の「Trigger Templater on new file creation」は**端末ごとの設定**（同梱できない）。オンにすると新規ノートの作成時にタイトルを聞いて名前・id を付ける。オフでも push 時に notebase が付ける
+- Excalidraw：**図データの圧縮オフ**（`onceOffCompressFlagReset: true` を同梱。無いと初回起動でプラグインが圧縮をオンに戻す）、保存先 `10_notes`、スクリプトの置き場 `90_templates/excalidraw-scripts`
 
 ### 未整理のメモ（inboxは置かない）
 
