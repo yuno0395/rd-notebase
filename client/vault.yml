@@ -31,11 +31,11 @@ json_overlay:
   - .obsidian/plugins/periodic-notes/data.json
   - .obsidian/plugins/templater-obsidian/data.json   # 空のノートには 01-base を入れる（folder_templates の "/"）
   - .obsidian/plugins/calendar/data.json
-  - .obsidian/plugins/project-manager/data.json   # dotpm：工程表の置き場 20_工程、ガントで開く、休日は台帳から
+  - .obsidian/plugins/project-planner/data.json   # Project Planner：土日を除く、クリティカルパス、やること1件ごとにノートを作らない
 
 # 使うのをやめたもの（見つけたら外す・消す）
 retired:
-  plugins: [obsidian-git]            # push は notebase に一本化（定期 push はタスクスケジューラ）
+  plugins: [obsidian-git, project-manager]   # push は notebase に一本化。工程は dotpm をやめて Project Planner に
   files:                             # 旧テンプレート・旧 base
     - 未分類.base
     - 90_templates/memo.md
@@ -106,10 +106,17 @@ plugins:
       manifest.json: fa072ca3f66616a12a1236250c685754ba7f206cdebdecbac47ac5454f82bd3f
       main.js: d8d7ddae3f0bbc07a7c2460b6d7898e5174a29ebb4ee857fe8e744ef801fb1ad
       styles.css: d83afa6028ed6333ce3612547cf2086686f4a51565929cccbb0a516513a83077
-  project-manager:                   # dotpm（工程表。取りまとめ役が 20_工程/<案件>/ で使う）
-    url: https://github.com/StepanKropachev/obsidian-pm/releases/download/2.6.0
-    version: 2.6.0
+  dataview:                          # Project Planner が使う（タスクの読み取り）
+    url: https://github.com/blacksmithgu/obsidian-dataview/releases/download/0.5.70
+    version: 0.5.68                  # 0.5.70 の配布物の manifest は 0.5.68 と書いてある
     files:
-      manifest.json: 59df71db0e8758328da4884c22ad4bf4d6623668937d7fa58f2556fb9d4fec42
-      main.js: 6c36da53198c47123cc4ea75604849e9e9749524eb7acd2827c5e9f8eb04ceea
-      styles.css: 3c3f9b6289f09e76c3a074877ada595799d22067b3552bedcc2c1d132f5f8edf
+      manifest.json: 9235db47112da81b85591c79ecb9ae2574e5e72207056e976472f90616286185
+      main.js: 6bb1cf7010afad830e73575fca0e2bfbd3279c562e3d9d24f2d2f45161eb7d00
+      styles.css: 3306dd9032e00f989ba7233a37fd255bc4d3f4340cee661762e952f3f6aa1de9
+  project-planner:                   # 工程（やることの行に依存・期間を書くと、ガント・依存の図・カンバン）
+    url: https://github.com/hmil1151/project-planner/releases/download/1.0.1
+    version: 1.0.1
+    files:
+      manifest.json: 20bae8981b32d745c51eadcfda1556979ffe936b7d7d2717c57927aa73a02c9d
+      main.js: bd2d21aa28bbc143f68dd38d4f510184f03ac751f96caa03e33b8df2587fbe32
+      styles.css: 06cb6bf80630ed4ebc60e4ca7859fe28a58a7b7c2ccfbd1363bac76a6ac7cc42
