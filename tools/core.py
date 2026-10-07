@@ -8,8 +8,14 @@ def esc(s): return html.escape(str(s or ''))
 def all_notes(c):
     return {r['id']: dict(r) for r in c.execute('select * from notes')}
 
+_BY = {}
 def by_hash(notes):
-    return {i.split('-')[1]: n for i, n in notes.items()}
+    """名前（今の名前・改名前の名前・スタブの名前・添付のファイル名）と id → ノート（同じ一覧には作り直さない）"""
+    from kv import names_index
+    k = (id(notes), len(notes))
+    if k not in _BY: _BY.clear(); _BY[k] = {key: notes[i] for key, i in names_index(notes).items()}
+    return _BY[k]
+by_name = by_hash
 
 def work_path(n): return os.path.join(SRV, 'work', n['vault'], n['path'])
 

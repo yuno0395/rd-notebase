@@ -19,7 +19,6 @@ IDS = os.path.join(SRV, 'allocated_ids.txt')
 DB = os.path.join(SRV, 'index.db')
 ALPH = 'abcdefghijkmnpqrstuvwxyz23456789'  # 0 o 1 l 除外 = 32種
 ID_RE = re.compile(r'^\d{6}-[' + ALPH + r']{5}$')
-FN_RE = re.compile(r'^(\d{6})_(.+)_([' + ALPH + r']{5})\.(md|excalidraw\.md)$')
 REL = ['derived_from', 'based_on', 'verifies', 'affects', 'supersedes', 'promoted_to', 'copied_from']
 TITLE_MAX = 40
 
@@ -60,9 +59,13 @@ def safe_title(t):
     t = re.sub(r'[\\/:*?"<>|#^\[\]]', '_', t)
     return t[:TITLE_MAX]
 
-def fname(nid, title, ext='md'):
-    d, h = nid.split('-')
-    return f"{d}_{safe_title(title)}_{h}.{ext}"
+def fname(nid, title, ext='md', folder=None):
+    """新しいノートの名前「作成日_タイトル」。ファイル名に乱数は入れない（一意なのは frontmatter の id）。
+    同じ名前があれば末尾に 2, 3 … を付ける（folder を渡した時）"""
+    d = nid.split('-')[0]; base = f"{d}_{safe_title(title)}"; n = 1; name = f"{base}.{ext}"
+    while folder and os.path.exists(os.path.join(folder, name)):
+        n += 1; name = f"{base} {n}.{ext}"
+    return name
 
 TEMPL = {
  'daily': "## 今日やること\n\n## メモ\n",
@@ -86,10 +89,10 @@ def cmd_new(vault, typ, title, project=None, extra=None, drawing=False, **kw):
     if typ in ('study', 'report'): fm.update({'progress': '検討中', 'next': ''})
     if extra: fm.update(extra)
     drawing = drawing or typ == 'drawing'
-    ext = 'excalidraw.md' if drawing else 'md'
+    ext = 'md'   # 図付きノートも .md（図かどうかは frontmatter の excalidraw-plugin で見分ける）
     folder = FOLDER.get(typ, '10_notes')
     os.makedirs(os.path.join(vp, folder), exist_ok=True)
-    p = os.path.join(vp, folder, fname(nid, title, ext))
+    p = os.path.join(vp, folder, fname(nid, title, ext, os.path.join(vp, folder)))
     body = TEMPL.get(typ, '')
     if drawing:   # 図付きMarkdown：前半が文章、%% の後が図のデータ（Excalidrawプラグインの形式）
         fm['excalidraw-plugin'] = 'parsed'
@@ -118,16 +121,16 @@ def cmd_attach(vault, src, target, origin=''):
             fn = sfm['file']; break
     else:
         nid = alloc_id(); stem, ext = os.path.splitext(os.path.basename(src))
-        stem = re.sub(r'^\d{6}_(.+)_[' + ALPH + r']{5}$', r'\1', stem)   # 既に命名済みのファイルは元の名前に戻す
-        fn = fname(nid, stem, ext.lstrip('.').lower())
+        stem = re.sub(r'^\d{6}_(.+?)(_[' + ALPH + r']{5})?$', r'\1', stem)   # 既に命名済みのファイルは元の名前に戻す
+        fn = fname(nid, stem, ext.lstrip('.').lower(), ad)
         shutil.copy(src, os.path.join(ad, fn))
         sfm = {'id': nid, 'type': 'attachment', 'title': nfc(stem), 'file': fn, 'sha256': h,
                'owner': tfm.get('owner'), 'project': tfm.get('project', ''),
                'access': list(tfm.get('access') or []), 'source': origin,
                'created': str(today()), 'updated': str(today()), 'summary': ''}
-        open(os.path.join(ad, fname(nid, stem)), 'w', encoding='utf-8').write(join_fm(sfm, ''))
+        open(os.path.join(ad, fname(nid, os.path.splitext(fn)[0][7:], 'md', ad)), 'w', encoding='utf-8').write(join_fm(sfm, ''))
         print(f"添付: {fn}  タグ{sfm['access']}で保存しました［変更］")
-    if target.endswith('.excalidraw.md'):
+    if has_drawing({'path': target, 'fm': tfm}):
         return fn  # 図への埋め込みは呼び出し側
     tbody = tbody.rstrip() + f"\n\n![[{fn}]]\n"
     open(target, 'w', encoding='utf-8').write(join_fm(tfm, tbody))
@@ -136,13 +139,44 @@ def cmd_attach(vault, src, target, origin=''):
 # ---------- 解析 ----------
 LINK_RE = re.compile(r'(!?)\[\[([^\]|#@]+)(#F\d+|#\^frame=[^\]|@]+)?(@[0-9a-f]{7,})?(\|[^\]]*)?\]\]')   # フレームは #F02 か Excalidraw の #^frame=
 
-def hash_of(target):
-    m = re.search(r'_([' + ALPH + r']{5})(\.[a-z.]+)?$', target.strip())
-    return m.group(1) if m else None
+def link_key(target):
+    """リンク先の書き方（[[名前]]・[[フォルダ/名前.excalidraw]]・[[名前.md|表示]]）→ 名前の比較用のキー。
+    ノートは名前でリンクし、索引が名前（今の名前・改名前の名前）→ id に引き直す。一意なのは frontmatter の id"""
+    if target is None: return None
+    s = nfc(str(target).strip()).strip('[]').split('|')[0].split('#')[0].split('@')[0].strip()
+    s = s.replace('\\', '/').rsplit('/', 1)[-1]
+    for ext in ('.md', '.excalidraw'):
+        if s.endswith(ext): s = s[:-len(ext)]
+    return s or None
+
+hash_of = link_key   # 互換（以前はファイル名末尾の乱数で引いていた）
+
+def short_name(user, users=None):
+    return str((users if users is not None else (reg().get('users') or {})).get(user, user or '')).split('（')[0]
+
+def stub_name(key, owner, users=None):
+    """他人のノートのスタブの名前「名前（書いた人）」。自分のノートと名前が重ならないように"""
+    return f"{key}（{short_name(owner, users)}）"
+
+def names_index(rows):
+    """索引の行（id・path・names・owner・fm）→ {名前のキー: id}。今の名前・改名前の名前・スタブの名前・id、添付は元のファイル名でも引ける"""
+    out = {}; users = reg().get('users') or {}
+    for i, n in rows.items():
+        keys = [link_key(n['path'])] + json.loads(n.get('names') or '[]')
+        fm = n['fm'] if isinstance(n['fm'], dict) else json.loads(n['fm'] or '{}')
+        if fm.get('type') == 'attachment' and fm.get('file'): keys.append(link_key(fm['file']))
+        for k in list(keys): keys.append(stub_name(k, n.get('owner'), users))
+        for k in keys + [i]:
+            if k: out.setdefault(k, i)
+    return out
 
 def has_drawing(n):
-    """図を持つノートか（図付きMarkdown＝.excalidraw.md）。種類（type）とは独立"""
-    return str(n.get('path', '')).endswith('.excalidraw.md')
+    """図を持つノートか（frontmatter に excalidraw-plugin がある図付き Markdown。以前の名前 .excalidraw.md も）。種類（type）とは独立"""
+    fm = n.get('fm') or {}
+    if isinstance(fm, str):
+        try: fm = json.loads(fm)
+        except ValueError: fm = {}
+    return bool(fm.get('excalidraw-plugin')) or str(n.get('path', '')).endswith('.excalidraw.md')
 
 DRAW_START = re.compile(r'\n?(%%\n)?#+ (Excalidraw Data|Text Elements|Embedded Files|Drawing)\b')
 def text_part(body):
@@ -202,17 +236,21 @@ def check_props(fn, fm, r, warns, errs):
 
 def source_of(link):
     """コピー元（[[ファイル名]]）を索引から探す。索引に届かない時は None"""
-    h = hash_of(str(link).strip('[]'))
     try:
-        r = sqlite3.connect(DB).execute("select id, access from notes where id like ?", (f'%-{h}',)).fetchone()
+        c = sqlite3.connect(DB); c.row_factory = sqlite3.Row
+        rows = {r['id']: dict(r) for r in c.execute('select id, path, names, owner, fm, access from notes')}
     except sqlite3.Error: return None
-    return {'id': r[0], 'access': json.loads(r[1])} if r else None
+    i = names_index(rows).get(link_key(link))
+    return {'id': i, 'access': json.loads(rows[i]['access'])} if i else None
 
 def check(vp):
     r = reg(); errs, warns = [], []
-    notes = scan_vault(vp); byhash = {i.split('-')[1]: n for i, n in notes.items()}
+    notes = scan_vault(vp); byhash = {}
+    for i, n in notes.items():
+        for k in (link_key(n['path']), i): byhash.setdefault(k, n)
     tags = set(r['tags'])
     ok = {t for n in notes.values() if n['fm'].get('type') == 'grant' and n['fm'].get('decision') == 'approved' for t in n['fm'].get('approved_targets') or []}
+    seen = {}
     # IDのないノート（テンプレートを使わずに作った）を見つける。テンプレート置き場と隠しフォルダは除く
     for p in glob.glob(os.path.join(vp, '**', '*.md'), recursive=True):
         rel = os.path.relpath(p, vp)
@@ -220,6 +258,8 @@ def check(vp):
         fm0 = read_note(p)[0]
         if is_pm(fm0): continue
         if not fm0.get('id'): errs.append(f"{rel}: id がありません（テンプレートから作り直すか、プラグインで付与）")
+        elif fm0['id'] in seen: errs.append(f"{rel}: id {fm0['id']} が {seen[fm0['id']]} と重複（コピーしたファイルなら id を消すと振り直す）")
+        else: seen[fm0['id']] = rel
     # 全社で重複するID（他のvaultの索引と比べる）
     try:
         con = sqlite3.connect(DB); vname = os.path.basename(vp)
@@ -231,10 +271,6 @@ def check(vp):
         check_props(fn, fm, r, warns, errs)
         if fn != nfc(fn): errs.append(f"{fn}: NFCでない")
         if not ID_RE.match(nid): errs.append(f"{fn}: id形式不正 {nid}")
-        m = FN_RE.match(fn)
-        daily_ok = (fm.get('type') == 'daily' and re.match(r'^\d{4}-\d{2}-\d{2}\.md$', fn)) or \
-                   (fm.get('type') == 'weeknote' and re.match(r'^\d{4}-W\d{2}\.md$', fn))   # デイリー・週ノートは日付・週の名前でよい（Periodic Notes）
-        if not daily_ok and (not m or f"{m.group(1)}-{m.group(3)}" != nid): errs.append(f"{fn}: ファイル名とidが不一致")
         for t in fm.get('access') or []:
             if t not in tags: errs.append(f"{fn}: 未登録タグ {t}")
         if fm.get('copied_from'):   # コピーはコピー元より広く見せられない（コピー元の鍵を全部持つこと）
@@ -251,7 +287,7 @@ def check(vp):
         mine = set(fm.get('access') or []); lack = {}
         for bang, tgt, fr, ver, _ in LINK_RE.findall(n['body']):
             if not bang: continue
-            src = byhash.get(hash_of(tgt))
+            src = byhash.get(link_key(tgt))
             if src and not set(src['fm'].get('access') or []) <= mine and f"{src['fm']['id']}{fr}" not in ok and src['fm']['id'] not in ok:
                 lack.setdefault(src['fm']['title'], set()).add(fr.lstrip('#') or '全体')
         if lack:
@@ -292,10 +328,11 @@ def cmd_index():
     if os.path.exists(DB): os.remove(DB)
     db = sqlite3.connect(DB)
     db.executescript("""create table notes(id primary key, vault, path, type, title, owner, project, status,
-        access, progress, next, updated, summary, commit_, fm, body);
+        access, progress, next, updated, summary, commit_, fm, body, names);
         create table links(src, dst, kind, frame, ver);
         create table ext(src, ref);
         create virtual table fts using fts5(id, title, body, tokenize='trigram');""")
+    pending = []   # リンクは全部のノートを入れてから、名前 → id に引き直す
     for vault in r['vaults']:
         bare = bare_of(vault); work = os.path.join(SRV, 'work', vault)
         if os.path.exists(work): shutil.rmtree(work)
@@ -306,13 +343,16 @@ def cmd_index():
             subprocess.run(['git', f'--git-dir={bare}', f'--work-tree={work}', *args], env=env, check=True, capture_output=True)
         lfs_resolve(work, bare)
         commit = sh(f'git --git-dir="{bare}" rev-parse --short main')
+        olds = renames(bare)
         for nid, n in scan_vault(work).items():
-            fm = n['fm']; body = n['body']
-            db.execute('insert into notes values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', (
+            fm = n['fm']; body = n['body']; rel = os.path.relpath(n['path'], work).replace(os.sep, '/')
+            db.execute('insert into notes values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', (
                 nid, vault, os.path.relpath(n['path'], work), fm.get('type'), fm.get('title'), fm.get('owner'),
                 fm.get('project'), fm.get('status'), json.dumps(fm.get('access') or [], ensure_ascii=False),
                 fm.get('progress'), fm.get('next'), str(fm.get('updated')), fm.get('summary'), commit,
-                json.dumps(fm, ensure_ascii=False, default=str), body))
+                json.dumps(fm, ensure_ascii=False, default=str), body,
+                json.dumps(sorted({link_key(o) for o in olds.get(rel, []) + (olds.get(os.path.dirname(rel) + '/' + fm['file'], []) if fm.get('type') == 'attachment' and fm.get('file') else [])}
+                                  - {link_key(rel)}), ensure_ascii=False)))   # 改名前の名前（添付は本体のファイルの前の名前も）
             text = body
             if has_drawing(n):
                 text = text_part(body) + ' ' + ' '.join(e.get('text', '') or e.get('name', '') or '' for e in parse_drawing(body)['elements'])
@@ -320,17 +360,40 @@ def cmd_index():
             for bang, tgt, fr, ver, _ in LINK_RE.findall(body):
                 if tgt.startswith(tuple(t + ':' for t in r['ref_types'])):
                     db.execute('insert into ext values(?,?)', (nid, tgt)); continue
-                h = hash_of(tgt)
-                if h: db.execute('insert into links values(?,?,?,?,?)', (nid, h, 'cites' if bang else 'link', fr, ver))
+                pending.append((vault, nid, tgt, 'cites' if bang else 'link', fr, ver))
             for k in REL:
                 vs = fm.get(k) or []
                 for v in ([vs] if isinstance(vs, str) else vs):   # 1つだけの時は文字列でもよい（copied_from など）
-                    h = hash_of(str(v).strip('[]'))
-                    if h: db.execute('insert into links values(?,?,?,?,?)', (nid, h, k, '', ''))
+                    pending.append((vault, nid, str(v), k, '', ''))
             for p in fm.get('parts') or []:
                 db.execute('insert into ext values(?,?)', (nid, f'part:{p}'))
             if fm.get('project'): db.execute('insert into ext values(?,?)', (nid, f"proj:{fm['project']}"))
+    db.row_factory = sqlite3.Row
+    rows = {x['id']: dict(x) for x in db.execute('select id, vault, path, names, owner, fm from notes')}
+    glob_ = names_index(rows); local = {}
+    for v in r['vaults']: local[v] = names_index({i: x for i, x in rows.items() if x['vault'] == v})
+    for vault, src, tgt, kind, fr, ver in pending:   # 同じ vault の名前を先に、なければ全体から
+        k = link_key(tgt); dst = local.get(vault, {}).get(k) or glob_.get(k)
+        if dst: db.execute('insert into links values(?,?,?,?,?)', (src, dst, kind, fr, ver))
     db.commit(); print('索引更新', db.execute('select count(*) from notes').fetchone()[0], '件')
+
+def renames(bare):
+    """Git の履歴の改名 → {今のパス: [前のパス, …]}（改名前の名前でリンクしても辿れるように）"""
+    out = subprocess.run(['git', f'--git-dir={bare}', '-c', 'core.quotepath=off', 'log', '--format=', '--name-status', '-M', 'main'],
+                         capture_output=True, text=True, encoding='utf-8').stdout
+    prev = {}
+    for line in out.splitlines():   # 新しい順
+        f = line.split('\t')
+        if f[0].startswith('R') and len(f) == 3: prev.setdefault(f[2], []).append(f[1])
+    res = {}
+    for new in prev:
+        seen, todo = [], list(prev[new])
+        while todo:
+            o = todo.pop()
+            if o in seen: continue
+            seen.append(o); todo += prev.get(o, [])
+        res[new] = seen
+    return res
 
 def can_see(user, access):
     if SELF and user == SELF: return True   # 自分の vault だけを見る時は全部自分のノート
@@ -361,6 +424,44 @@ views:
       - {property: updated, direction: DESC}
 '''
 
+def relink(vp, moved):
+    """vault の中のリンク [[旧名]]・[[旧名|…]]・[[旧名#…]] を新しい名前に直す（_refs・20_工程 は除く）"""
+    for p in glob.glob(os.path.join(vp, '**', '*.md'), recursive=True):
+        rel = os.path.relpath(p, vp).replace(os.sep, '/')
+        if rel.startswith(('_', '20_工程/', '.')): continue
+        t0 = t = open(p, encoding='utf-8').read()
+        for old, new in sorted(moved.items(), key=lambda x: -len(x[0])):   # 長い名前（.excalidraw 付き）から
+            t = re.sub(r'\[\[' + re.escape(old) + r'(?=(\.excalidraw)?(\.md)?[\]|#@])', '[[' + new, t)
+        if t != t0: open(p, 'w', encoding='utf-8').write(t)
+
+def drop_hash_names(vp):
+    """以前の名前から、末尾の _hash（id の hash と同じもの）と、図の .excalidraw を外す（何度実行してもよい）。
+    例：261004_X200中間報告_wfyzi.md → 261004_X200中間報告.md、261004_スライド_gzz7r.excalidraw.md → 261004_スライド.md
+    添付は本体のファイルも改名し、vault の中のリンクを直す。返り値：{旧名: 新名}"""
+    moved = {}
+    for p in sorted(glob.glob(os.path.join(vp, '**', '*.md'), recursive=True)):
+        rel = os.path.relpath(p, vp).replace(os.sep, '/')
+        if rel.startswith(('_', '20_工程/', '.', '90_templates/')): continue
+        fm, body = read_note(p); i = str(fm.get('id') or ''); base = os.path.basename(p)
+        xd = base.endswith('.excalidraw.md') and bool(fm.get('excalidraw-plugin'))
+        stem = base[:-len('.excalidraw.md')] if xd else base[:-3]
+        h = '_' + i.split('-')[1] if ID_RE.match(i) else None
+        new = stem[:-len(h)] if h and stem.endswith(h) else stem
+        if new == stem and not xd: continue
+        n = 1; d = os.path.dirname(p)
+        while os.path.exists(os.path.join(d, new + (f' {n}' if n > 1 else '') + '.md')): n += 1
+        new += f' {n}' if n > 1 else ''
+        if h and fm.get('type') == 'attachment' and fm.get('file'):   # 添付：本体も同じ名前の形に
+            fs, fe = os.path.splitext(fm['file'])
+            if fs.endswith(h) and os.path.exists(os.path.join(d, fm['file'])):
+                nf = fs[:-len(h)] + (f' {n}' if n > 1 else '') + fe
+                os.rename(os.path.join(d, fm['file']), os.path.join(d, nf)); moved[fm['file']] = nf; fm['file'] = nf
+                open(p, 'w', encoding='utf-8').write(join_fm(fm, body))
+        os.rename(p, os.path.join(d, new + '.md')); moved[stem] = new
+        if xd: moved[stem + '.excalidraw'] = new   # [[名前.excalidraw#F02]] と書いたリンクも
+    if moved: relink(vp, moved)
+    return moved
+
 FIG = '_図'
 def write_if_changed(p, text):
     if os.path.exists(p) and open(p, encoding='utf-8').read() == text: return False
@@ -381,31 +482,40 @@ def drawing_svgs(nid, viewer):
 def cmd_refs(vp, viewer, sources):
     """購読した vault のノートのうち、viewer が見てよいものだけをスタブにして vp/_refs/<vault>/ に置く。
     スタブはプロパティ（予約名と台帳で stub: true のもの）・要約・見てよいリンク先だけ。本文・図・添付は持たない。
-    見られなくなったノート（鍵の変更・削除）のスタブは消す。リンクが同じ名前で解決するよう、ファイル名は元と同じにする"""
+    見られなくなったノート（鍵の変更・削除）のスタブは消す。スタブの名前は「元の名前（書いた人）」。
+    書いた人が改名したら、スタブの名前を変え、自分のノートの中のそのスタブへのリンクも直す"""
     r = reg(); con = sqlite3.connect(DB); users = r.get('users') or {}
     keys = STUB_KEYS + [k for k, v in (r.get('properties') or {}).items() if v.get('stub')]
     rows = {i: (v, p, json.loads(fm), json.loads(a), c) for i, v, p, fm, a, c in
             con.execute('select id, vault, path, fm, access, commit_ from notes')}
     seen = lambda i: i in rows and (rows[i][2].get('owner') == viewer or can_see(viewer, rows[i][3]))
-    byhash = {i.split('-')[1]: i for i in rows}
+    def name_for(d):   # スタブの中のリンク：自分のノートは今の名前、他人のノートはスタブの名前
+        o = rows[d][2].get('owner'); k = link_key(rows[d][1])
+        return k if o == viewer else stub_name(k, o)
     made, removed = 0, 0
     for src in sources:
         out = os.path.join(vp, '_refs', src); os.makedirs(out, exist_ok=True); keep, keep_fig = {FIG}, set()
+        have = {}
+        for f in glob.glob(os.path.join(out, '*.md')):
+            i = read_note(f)[0].get('id')
+            if i: have[i] = f
+        moved = {}
         for nid, (v, path, fm, acc, commit) in rows.items():
             if v != src or not seen(nid): continue
-            name = os.path.basename(path); keep.add(name)
+            name = stub_name(link_key(path), fm.get('owner')) + '.md'; keep.add(name)
+            if nid in have and os.path.basename(have[nid]) != name:   # 書いた人が改名した
+                moved[os.path.basename(have[nid])[:-3]] = name[:-3]; os.remove(have[nid])
             sfm = {k: fm[k] for k in keys if k in fm}
             sfm['ref'] = f'{src}@{commit}'
             links = []
             for (dst,) in con.execute('select distinct dst from links where src = ?', (nid,)):
-                d = byhash.get(dst)
-                if d and seen(d): links.append(os.path.basename(rows[d][1])[:-3])
+                if dst in rows and seen(dst): links.append(name_for(dst))
             who = users.get(fm.get('owner'), fm.get('owner'))
             body = (f"> [!quote] {who} のノート（参照用のスタブ）\n"
                     f"> 本文はサーバで見る（Web閲覧）。図はサーバが描いた控え。ここを書き換えても元のノートは変わらず、次の更新で戻る\n\n"
                     f"## 要約\n{fm.get('summary') or '（要約なし）'}\n")
             if links: body += '\n## リンク先\n' + ''.join(f'- [[{l}]]\n' for l in sorted(links))
-            if name.endswith('.excalidraw.md'):   # 図はサーバで SVG にして置く（データそのものは配らない。貼った画像も見てよいものだけ）
+            if has_drawing({'path': path, 'fm': fm}):   # 図はサーバで SVG にして置く（データそのものは配らない。貼った画像も見てよいものだけ）
                 body += '\n## 図\n'
                 for fid, label, svg in drawing_svgs(nid, viewer):
                     sp = f'{FIG}/{nid}_{fid or "全体"}.svg'; keep_fig.add(os.path.basename(sp))
@@ -419,6 +529,7 @@ def cmd_refs(vp, viewer, sources):
         fd = os.path.join(out, FIG)
         for f in os.listdir(fd) if os.path.isdir(fd) else []:
             if f not in keep_fig: os.remove(os.path.join(fd, f))
+        if moved: relink(vp, moved)
     base = os.path.join(vp, '_refs', '参照.base')
     if not os.path.exists(base) or open(base, encoding='utf-8').read() != REFS_BASE:
         open(base, 'w', encoding='utf-8').write(REFS_BASE)
@@ -432,7 +543,7 @@ def cmd_copy(vp, viewer, key):
     貼った画像も 40_attachments にコピーする。返り値：(作ったファイル, コミットの文言)"""
     import core, render
     c = core.db(); notes = core.all_notes(c); hmap = core.by_hash(notes)
-    n = notes.get(key) or hmap.get(hash_of(key) or '')
+    n = notes.get(key) or hmap.get(link_key(key) or '')
     if not n:
         hits = [x for x in notes.values() if key in (x['title'] or '') and x['owner'] != viewer and x['type'] not in ('attachment', 'grant', 'comment')]
         if len(hits) != 1: raise SystemExit(f'「{key}」に合うノートが' + ('見つかりません' if not hits else f' {len(hits)} 件あります：' + '、'.join(f"{x['title']}（{x['id']}）" for x in hits[:5])))
@@ -450,9 +561,10 @@ def cmd_copy(vp, viewer, key):
     stem = src[:-3]
     new = {k: v for k, v in fm.items() if not k.startswith('my_')}
     new.update({'id': nid, 'owner': viewer, 'status': 'draft', 'created': str(today()), 'updated': str(today()),
-                'copied_from': f'[[{stem}]]', 'copied_version': n['commit_']})
-    ext = 'excalidraw.md' if src.endswith('.excalidraw.md') else 'md'
-    out = os.path.join(vp, '10_notes', fname(nid, fm.get('title') or stem, ext)); os.makedirs(os.path.dirname(out), exist_ok=True)
+                'copied_from': f"[[{stub_name(link_key(src), fm.get('owner'))}]]", 'copied_version': n['commit_']})
+    ext = 'md'
+    os.makedirs(os.path.join(vp, '10_notes'), exist_ok=True)
+    out = os.path.join(vp, '10_notes', fname(nid, fm.get('title') or stem, ext, os.path.join(vp, '10_notes')))
     open(out, 'w', encoding='utf-8').write(join_fm(new, body))
     made = [out]
     for p, dst in copies:
@@ -464,7 +576,10 @@ def cmd_copy(vp, viewer, key):
 
 def cmd_request(vault, report_path, targets, audience, purpose):
     """開示申請：見せてよい図のフレーム・添付を選んで申請（図に埋め込まれた画像も自動で対象に加える）"""
-    vp = os.path.join(ROOT, vault); r = reg(); notes = scan_vault(vp); byhash = {i.split('-')[1]: n for i, n in notes.items()}
+    vp = os.path.join(ROOT, vault); r = reg(); notes = scan_vault(vp); byhash = {}
+    for i, n in notes.items():
+        for k in (link_key(n['path']), link_key(n['fm'].get('file')) if n['fm'].get('type') == 'attachment' else None, i):
+            if k: byhash.setdefault(k, n)
     full = []
     for t in targets:
         full.append(t); nid, _, fid = t.partition('#'); n = notes.get(nid)
@@ -527,6 +642,8 @@ if __name__ == '__main__':
         vp = os.path.join(ROOT, a[0]); made, msg = cmd_copy(vp, reg()['vaults'][a[0]], a[1])
         for m in made: print('作成:', os.path.relpath(m, vp))
         sh('git add -A', vp); sh(f'git commit -qm "{msg}"', vp); print(msg)
+    elif c == 'drop-hash':   # kv.py drop-hash <vault>：ファイル名の末尾の _hash を外す（以前の名前の形からの移行）
+        print(len(drop_hash_names(os.path.join(ROOT, a[0]))), '件改名')
     elif c == 'refs': print(cmd_refs(os.path.join(ROOT, a[0]), reg()['vaults'][a[0]], a[1:]))   # kv.py refs <自分のvault> <購読するvault>...
     elif c == 'check': print(check(os.path.join(ROOT, a[0])))
     else: print(__doc__)

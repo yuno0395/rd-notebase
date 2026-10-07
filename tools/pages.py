@@ -67,7 +67,7 @@ class Site:
                 fid = (f.get('customData') or {}).get('kvFrame'); out.append({'t': f"{n['id']}#{fid}", 'l': f"フレーム #{fid} {f.get('name', '')}"})
         hm = by_hash(self.notes); seen = {o['t'] for o in out}
         for row in self.c.execute("select dst, frame from links where src=? and kind='cites'", (n['id'],)):
-            tn = hm.get(row['dst'])
+            tn = self.notes.get(row['dst'])
             if not tn: continue
             t = tn['id'] + (row['frame'] or '')
             if t in seen or not (ok(self.user, self.notes, tn) or granted(self.user, self.notes, t)): continue
@@ -209,7 +209,7 @@ class Site:
             else:
                 ps = [p for p in parents(self.c, self.notes, nid) if ok(u, self.notes, p)]
                 if ps: fam = '<div class="family up">この資料を使っている報告：' + '、'.join(f'<a href="#n-{p["id"]}">{esc(p["title"])}</a>' for p in ps) + '</div>'
-            bl = [self.notes.get(s) for s in dict.fromkeys(s for s, k in back.get(nid.split('-')[1], []) if s != nid)]   # 同じノートからの複数のリンクは1つに
+            bl = [self.notes.get(s) for s in dict.fromkeys(s for s, k in back.get(nid, []) if s != nid)]   # 同じノートからの複数のリンクは1つに
             bl_html = ''.join(f'<li>{link(b["id"])}</li>' for b in bl if b and b['type'] not in ('grant', 'comment'))
             self.pages[f'n-{nid}'] = (
                 f'<p class="crumb"><a href="#home">案件</a> / <a href="#p-{n["project"]}">{esc(n["project"])}</a></p>'

@@ -48,12 +48,11 @@ def at_version(n, ver):
     return _AT[key]
 
 def path_at(n, ver):
-    """その版でのファイルの場所。フォルダを移しても版の固定が効くよう、ファイル名末尾のhashで探す"""
+    """その版でのファイルの場所。改名・移動しても版の固定が効くよう、frontmatter の id で探す"""
     bare = bare_of(n['vault'])
-    names = subprocess.run(['git', f'--git-dir={bare}', '-c', 'core.quotepath=off', 'ls-tree', '-r', '--name-only', ver],
-                           capture_output=True, text=True).stdout.splitlines()
-    h = n['id'].split('-')[1]
-    return n['path'] if n['path'] in names else next((x for x in names if re.search(rf'_{h}\.(excalidraw\.)?md$', x)), n['path'])
+    r = subprocess.run(['git', f'--git-dir={bare}', '-c', 'core.quotepath=off', 'grep', '-l', '-E', f"^id: ['\"]?{n['id']}['\"]?$", ver, '--', '*.md'],
+                       capture_output=True, text=True, encoding='utf-8').stdout.splitlines()
+    return r[0].split(':', 1)[1] if r else n['path']
 
 def _at_version(n, ver):
     """版を固定した引用：指定コミット時点のノート本文を返す"""
@@ -261,10 +260,10 @@ def upd_html(n, granted_ver=None, fid=None):
 
 # ---------- 報告の親子関係 ----------
 def children(c, notes, nid, depth=2):
-    hm = by_hash(notes); out = []
+    out = []
     def walk(i, d):
         for row in c.execute('select dst,kind from links where src=?', (i,)):
-            ch = hm.get(row['dst'])
+            ch = notes.get(row['dst'])
             if not ch or ch['type'] == 'attachment' or ch['id'] == nid or ch['id'] in [x[0] for x in out]: continue
             out.append((ch['id'], row['kind'], d))
             if d < depth: walk(ch['id'], d + 1)

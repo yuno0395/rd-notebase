@@ -201,7 +201,6 @@ def fix_ids():
     user = (cfg() or {}).get('user', '')
     notes = glob.glob(os.path.join(VAULT, '**', '*.md'), recursive=True)
     used = {fm.get('id') for p in notes for fm in [kv.read_note(p)[0]] if fm.get('id')}
-    renames = {}
     for p in notes:
         rel = os.path.relpath(p, VAULT).replace(os.sep, '/')
         if rel.startswith(('90_templates/', '20_工程/', '_')): continue   # 20_工程 は案件のリポジトリ（取りまとめ役だけ）
@@ -217,19 +216,9 @@ def fix_ids():
             typ = 'daily' if re.match(r'^\d{4}-\d{2}-\d{2}$', stem) else 'weeknote' if re.match(r'^\d{4}-W\d{2}$', stem) else ''
             fm = {'id': nid, 'type': typ, 'title': nfc(stem), 'owner': user, 'project': '', 'status': 'draft', 'access': [],
                   'created': str(made), 'updated': str(made), 'summary': '', **fm}
-            if not typ:   # 日付・週のノート以外は「作成日_タイトル_hash」に名前を直す
-                new = kv.fname(nid, stem, 'excalidraw.md' if drawing else 'md')
-                renames[stem] = new[:-len('.excalidraw.md')] if drawing else new[:-3]
-                os.remove(p); p = os.path.join(os.path.dirname(p), new)
-            dirty = True
-            say(f'id を付けました：{rel} → {os.path.relpath(p, VAULT)}')
+            dirty = True   # 名前はそのまま（ファイル名は自由。一意なのは id）
+            say(f'id を付けました：{rel}（{nid}）')
         if dirty: write(p, kv.join_fm(fm, body))
-    if renames:   # vault 内のリンクを新しい名前に直す
-        for p in glob.glob(os.path.join(VAULT, '**', '*.md'), recursive=True):
-            s = read(p); t = s
-            for old, new in renames.items():
-                t = re.sub(r'\[\[' + re.escape(old) + r'(?=[\]|#])', '[[' + new, t)
-            if t != s: write(p, t)
 
 # ---------- 検査 → push ----------
 def push(quiet=False):
@@ -439,6 +428,12 @@ def main():
                 say(msg); return
             if cmd in ('sync', 'update'):
                 autosave('更新前の自動保存'); update_vault()
+                import kv
+                moved = kv.drop_hash_names(VAULT)   # 以前の名前「作成日_タイトル_hash(.excalidraw).md」→「作成日_タイトル.md」
+                if moved:
+                    n = len({v for v in moved.values()})
+                    git('add', '-A'); git('commit', '-q', '-m', f'ファイル名の末尾の乱数と .excalidraw を外す（{n} 件）')
+                    say(f'ファイル名の末尾の乱数と .excalidraw を外しました：{n} 件（リンクも直しました）')
                 if cmd == 'sync':
                     try: push()
                     except (SystemExit, Exception) as e: notice(str(getattr(e, 'code', e))); raise
