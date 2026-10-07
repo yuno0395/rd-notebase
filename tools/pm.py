@@ -6,11 +6,14 @@
   edit <vault> <工程表ID> <ops.json> <区分> <理由>     : 編集画面からの申請（追加・削除・分解・担当替えなど）
   decide <リクエストID> <approved|rejected> <承認者> <コメント> : 承認・却下（承認なら工程表に反映）
   gantt <工程表ID> <m1|m3|m6|y5|y10> [開始日]     : Excalidrawのガント図を作る・作り直す（書き込みは残す）
+  migrate <案件リポジトリ>                       : 工程表を dotpm の形（<案件>.md と _tasks/）にする
+  sync <案件リポジトリ>                          : dotpm の変更を工程表へ（承認が要るものは申請、却下されたら dotpm を計画に戻す）
 """
 import os, sys, json, glob, datetime, subprocess, yaml
 sys.path.insert(0, os.path.dirname(__file__))
 from kv import ROOT, SRV, reg, REG, read_note, join_fm, cmd_new, cmd_push, cmd_index, sh, scan_vault, parse_drawing, fname, DB
 import gantt as G
+import dotpm
 
 REASONS = ['見積の誤り', '仕様変更', '外部待ち（部品・外注・顧客）', '不具合・やり直し', '人の都合（他案件・休み）', 'その他']
 LIMIT_DAYS, EST_UP = 5, 0.20   # 承認が要る境目：実働5日超の遅れ、見積20%超の増加
@@ -188,14 +191,19 @@ def shift(x, n, hol):
 
 def cmd_decide(req_id, decision, by, comment):
     rv, rn = find(req_id); rfm = rn['fm']
+    if rfm.get('decision') == 'superseded': raise SystemExit('この申請は出し直されています（新しい申請を判断してください）')
     rfm.update(decision=decision, decided_by=by, comment=comment, decided_at=datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
     open(rn['path'], 'w', encoding='utf-8').write(join_fm(rfm, rn['body'])); commit(rv, f'計画変更の判断|{decision}')
-    if decision != 'approved': return
+    if decision != 'approved':
+        sv = find(rfm['schedule'])[0]
+        if dotpm.project_file(os.path.join(ROOT, sv)): after_decision(sv)   # 却下：dotpm を承認済みの計画に戻す
+        return
     sv, sn = find(rfm['schedule']); fm = sn['fm']
     if rfm.get('ops'):
         fm['tasks'] = apply_ops(fm['tasks'], rfm['ops'])
         open(sn['path'], 'w', encoding='utf-8').write(join_fm(fm, sn['body']))
         commit(sv, f"{'範囲の変更' if any(o['op'] in ('add', 'del') for o in rfm['ops']) else '計画変更'}|承認:{by}|区分:{rfm['code']}|理由:{rfm['reason']}|リクエスト:{req_id}")
+        if dotpm.project_file(os.path.join(ROOT, sv)): after_decision(sv)
         return
     for ch in rfm['changes']:
         t = next(t for t in fm['tasks'] if t['id'] == ch['task'])
@@ -203,6 +211,82 @@ def cmd_decide(req_id, decision, by, comment):
             if k in ch: t[k] = G.d(ch[k])
     open(sn['path'], 'w', encoding='utf-8').write(join_fm(fm, sn['body']))
     commit(sv, f"計画変更|承認:{by}|区分:{rfm['code']}|理由:{rfm['reason']}|リクエスト:{req_id}")
+    if dotpm.project_file(os.path.join(ROOT, sv)): after_decision(sv)
+
+# ---------- dotpm（取りまとめ役が Obsidian で直す工程表） ----------
+PLAN_KEYS = ('name', 'start', 'end', 'date', 'owner', 'after', 'est', 'alloc', 'parent', 'milestone', 'group', 'note', 'expand', 'target')
+
+def schedule_in(pvault):
+    for n in scan_vault(os.path.join(ROOT, pvault)).values():
+        if n['fm'].get('type') == 'schedule': return n
+    raise SystemExit(f'{pvault} に工程表（type: schedule）がありません')
+
+def norm(t):
+    return {k: (dotpm.ds(v) if k in ('start', 'end', 'date') else [str(x) for x in v] if isinstance(v, list) else v)
+            for k, v in t.items() if k in PLAN_KEYS and v not in ('', None, [], False)}
+
+def plan_ops(plan, proposed):
+    """承認済みの計画 → dotpm の内容 の差分を、編集画面と同じ操作（add・del・set）にする"""
+    old = {t['id']: norm(t) for t in plan}; new = {t['id']: norm(t) for t in proposed}; ops = []
+    for i, t in new.items():
+        if i not in old: ops.append({'op': 'add', 'task': {'id': i, **t}}); continue
+        f = {k: t.get(k, '') for k in set(t) | set(old[i]) if t.get(k) != old[i].get(k)}
+        if f: ops.append({'op': 'set', 'id': i, 'f': f})
+    ops += [{'op': 'del', 'id': i} for i in old if i not in new]
+    return ops
+
+def cmd_migrate(pvault):
+    sn = schedule_in(pvault); fm = sn['fm']; pid = fm['project']
+    pf = dotpm.write_plan(os.path.join(ROOT, pvault), pid, f"{pid} {reg()['projects'][pid]['name']}", fm['tasks'])
+    commit(pvault, '工程表を dotpm の形にする'); print('作成:', os.path.relpath(pf, ROOT)); return pf
+
+def cmd_sync(pvault):
+    """取りまとめ役が push した dotpm の内容を、承認済みの計画（工程表ノート）と比べて申請にする（サーバの受け取り処理）"""
+    vp = os.path.join(ROOT, pvault)
+    subprocess.run(['git', 'pull', '-q', '--rebase', 'origin', 'main'], cwd=vp, capture_output=True)
+    cmd_index()
+    sn = schedule_in(pvault); sid = sn['fm']['id']; plan = sn['fm']['tasks']
+    items = dotpm.read(vp); proposed = dotpm.to_plan(items)
+    new = [t for t in proposed if t['id'].startswith('?')]
+    if new:   # dotpm で足したタスクに番号を振る（使ったことのある番号は使わない）
+        import sqlite3
+        c = sqlite3.connect(DB); c.row_factory = sqlite3.Row
+        used = G.ids_ever(dict(c.execute('select * from notes where id=?', (sid,)).fetchone())) | {t['id'] for t in plan + proposed}
+        mapping = {}
+        for t in new:
+            k = 'M' if t.get('milestone') else 'G' if t.get('group') else 'T'; n = 1
+            fmt = (lambda n: f'G{n}') if k == 'G' else (lambda n: f'{k}{n:02d}')
+            while fmt(n) in used: n += 1
+            used.add(fmt(n)); mapping[t['id'][1:]] = fmt(n)
+        dotpm.set_task_no(vp, mapping); items = dotpm.read(vp); proposed = dotpm.to_plan(items)
+        print('番号を振りました:', mapping)
+    reqs = [n for n in scan_vault(vp).values() if n['fm'].get('type') == 'planreq' and n['fm'].get('schedule') == sid and n['fm'].get('decision') == 'requested']
+    for r in reqs:   # 申請中：dotpm がその申請どおりなら待つ。さらに直されていたら申請を出し直す
+        if norm_plan(apply_ops(plan, r['fm'].get('ops') or [])) == norm_plan(proposed):
+            print('申請中のまま（承認待ち）:', r['fm']['id']); dotpm.clear_reasons(vp); commit(pvault, '変更理由を消す（申請済み）'); return
+        r['fm']['decision'] = 'superseded'; open(r['path'], 'w', encoding='utf-8').write(join_fm(r['fm'], r['body']))
+        commit(pvault, f"計画変更の申請を出し直し|{r['fm']['id']}")
+    ops = plan_ops(plan, proposed)
+    if not ops: print('計画と同じ（変更なし）'); return
+    code, reason = dotpm.reasons(items)
+    if code not in REASONS: code = 'その他'
+    who = subprocess.run(['git', 'log', '-1', '--format=%an', '--', dotpm.TASKS], cwd=vp, capture_output=True, text=True).stdout.strip()
+    mine = next((v for v, o in reg()['vaults'].items() if o == who), pvault)
+    cmd_edit(mine, sid, ops, code, reason or '（理由が未記入。dotpm のタスクの「変更理由」に書く）')
+    dotpm.clear_reasons(vp); after_decision(pvault)
+
+def norm_plan(tasks):
+    return sorted((norm(t) | {'id': t['id']} for t in tasks), key=lambda t: t['id'])
+
+def after_decision(pvault):
+    """判断の後：dotpm を承認済みの計画にそろえる（却下・取り下げの分は戻る。申請中の分は dotpm に残す）"""
+    vp = os.path.join(ROOT, pvault); sn = schedule_in(pvault); fm = sn['fm']; sid = fm['id']
+    if not dotpm.project_file(vp): return
+    pend = [n for n in scan_vault(vp).values() if n['fm'].get('type') == 'planreq' and n['fm'].get('schedule') == sid and n['fm'].get('decision') == 'requested']
+    plan = fm['tasks']
+    for r in pend: plan = apply_ops(plan, r['fm'].get('ops') or [])
+    dotpm.write_plan(vp, fm['project'], '', plan, keep_reason=False)
+    commit(pvault, 'dotpm を承認済みの計画にそろえる' + ('（申請中の変更は残す）' if pend else ''))
 
 def cmd_gantt(sched_id, view, start=None):
     """工程表 → Excalidrawのガント図（自動生成の層だけ作り直し、書き込みは付き先に合わせて動かす）"""
@@ -238,4 +322,6 @@ if __name__ == '__main__':
     elif c == 'decide': cmd_decide(a[0], a[1], a[2], a[3])
     elif c == 'edit': print(cmd_edit(a[0], a[1], json.load(open(a[2], encoding='utf-8')), a[3], a[4]))
     elif c == 'gantt': print(cmd_gantt(a[0], a[1], a[2] if len(a) > 2 else None))
+    elif c == 'migrate': cmd_migrate(a[0])
+    elif c == 'sync': cmd_sync(a[0])
     else: print(__doc__)

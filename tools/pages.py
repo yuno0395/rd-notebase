@@ -364,7 +364,7 @@ class Site:
                '/*TAGS*/': json.dumps([t for t, g in r['tags'].items() if not g.get('hide')], ensure_ascii=False),
                '/*USERS*/': json.dumps(r['users'], ensure_ascii=False),
                '/*HOL*/': json.dumps(r.get('holidays', [])),
-               '/*EDITOR_JS*/': open(os.path.join(os.path.dirname(__file__), 'editor.js'), encoding='utf-8').read(),
+               '/*EDITOR_JS*/': '',   # 工程表の編集画面は dotpm（Obsidian）に置き換えた
                '<!--NAV-->': nav, '{{UID}}': self.user, '{{USER}}': esc(self.uname(self.user)),
                '{{TITLE}}': '開発ノート閲覧' if outname == 'index.html' else '開発ノート閲覧 一般社員表示',
                '{{BUILT}}': datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}

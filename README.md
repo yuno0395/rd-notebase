@@ -20,11 +20,12 @@ Obsidian（Markdown＋Excalidraw）で各人が考えを書き、Gitで集め、
 ```
 tools/           Pythonプログラム（索引・権限・Web閲覧・PDF・工程管理）と画面
   kv.py          ノート作成・ID採番・添付・push時の検査・索引・開示申請・コメント
-  pm.py          工程管理：週報・計画変更の申請と承認・編集の反映・Excalidrawのガント図
+  pm.py          工程管理：週報・計画変更の申請と承認・dotpm との同期（sync）・Excalidrawのガント図
   gantt.py       工程の集計（やることの数・見込み・遅れ）とガント図の描画
   pages.py ほか  Web閲覧のページ生成（render / access / pm_pages / core）
   pdf_out.py     PDF出力（日本語フォント埋め込み、ID・版・QRのフッター）
-  site_template.html, editor.js   画面（素のHTML/CSS/JavaScript）
+  site_template.html  画面（素のHTML/CSS/JavaScript）
+  dotpm.py       工程表と dotpm（Obsidian の工程管理プラグイン）の形式の行き来
   setup_demo.py  サンプルデータから試作環境を作る
   dev/           サンプルデータを作った時の台本（参考）
 sample-vault/    Obsidian vault の雛形（フォルダ・テンプレート・初期設定・LFS設定）。notebase が利用者の vault に配る
@@ -48,7 +49,7 @@ python3 tools/setup_demo.py          # 作り直す時は --reset
 | ファイル | 閲覧者 | 見どころ |
 |---|---|---|
 | `site/index.html` | 上司（鍵の管理者） | 確認待ち（公開の判断・計画変更の承認）、見せる相手の変更、工程・ロードマップ |
-| `site/yamada.html` | 開発担当（山田） | 工程表の編集画面（ドラッグ・追加・削除・分割・段階に分解）、コメント |
+| `site/yamada.html` | 開発担当（山田） | 工程・週報の経過、コメント（工程表の編集は Obsidian の dotpm） |
 | `site/staff.html` | 別チームの一般社員 | 公開された資料だけが見える。見えない資料は🔒と相談先 |
 
 ### よく使うコマンド
@@ -59,7 +60,7 @@ python3 tools/kv.py refs vault-yamada vault-suzuki     # 購読：見てよい�
 python3 tools/view.py build boss index.html            # Web閲覧を作り直す（閲覧者ごと）
 python3 tools/view.py pdf <ノートID> A4 boss            # PDF出力（A4〜A0）
 python3 tools/pm.py gantt <工程表ID> m3                 # Excalidrawのガント図（書き込みは残して作り直す）
-python3 tools/pm.py edit vault-yamada <工程表ID> ops.json <区分> <理由>   # 編集画面の申請を反映
+python3 tools/pm.py sync proj-P00001                    # dotpm の変更を工程表へ（承認が要るものは申請。サーバの受け取り処理）
 python3 tools/pm.py decide <申請ID> approved boss "コメント"               # 承認
 ```
 
@@ -170,6 +171,19 @@ workspace/              好きな場所に作る空のフォルダ
 - `_refs/` は Git に入れず、`00_分類.base` にも出さない。一覧は `_refs/参照.base`（書いた人ごと）
 - 図付きノートは、サーバがフレームごとに SVG に描いて `_refs/<vault>/_図/` に置き、スタブに埋め込む（Excalidraw のデータそのものは配らない。貼った画像も見てよいものだけ）。Obsidian でそのまま図が見える
 - 本文はサーバの索引から Web 閲覧で見る（スタブを開いて本文を取る専用プラグインは未作成）
+
+### 工程表（dotpm、取りまとめ役）
+
+工程表は案件のリポジトリ（例 `proj-P00001`）に dotpm の形で置き、**取りまとめ役**（台帳 `projects.<案件>.managers`、複数人）が Obsidian の dotpm（表・ガント・カンバン）で直します。
+
+- 取りまとめ役の vault には、notebase が案件のリポジトリを `20_工程/<案件>/` に取得し、更新・定期 push のたびに取り込み・送る。dotpm は全員に配るが、`20_工程` が空の人には何も出ない
+- 休む・辞める時は、台帳の `managers` を書き換えるだけで続く（工程表は個人の vault にない）。外れた人の `20_工程/<案件>` は同期が止まる
+- 2人が同じタスクを近い時間に直したら、先に送った人の内容に合わせ、後の人の変更は `_衝突/` に控えて `_notebase のお知らせ（工程表）.md` で知らせる
+- 承認が要る変更（実働5日超の遅れ、節目の移動、追加・削除・担当替えなど）は、dotpm のタスクの「変更理由」「理由の区分」に書いてから保存する。サーバが承認済みの計画と比べて申請にし、上司の確認待ちに並ぶ。却下されると dotpm の日程は承認済みの計画に戻る
+- 番号（`task_no`：T02 など）はサーバが振る。週報・やることの `[task:: 工程表ID#T02]` はこの番号を使う
+- 休日は台帳から dotpm に入れる。週の見出しは日付
+- **一人で使う**（セルフマネジメント）：dotpm で `20_工程/` に自分のプロジェクトを作れば、普通のノートと同じく保存・push される（Git から外すのは台帳の案件のフォルダだけ。この PC の `.git/info/exclude` に書く）
+- dotpm は `id`・`title`・`status`・`type`・`progress` をこちらと別の意味で使うので、dotpm のファイル（`pm-project`・`pm-task`）と `20_工程/` は id の付与・検査・索引・分類の対象外。こちらの番号・見積は `task_no`・`est` に持つ。プロパティの型は `.obsidian/types.json` で文字に固定（`progress` が数と判断されて検討ノートの「検討中」が型違いにならないように）
 
 ### 他人のノートをコピー（図・貼った画像ごと）
 

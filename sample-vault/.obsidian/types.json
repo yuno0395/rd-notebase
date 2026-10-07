@@ -1,0 +1,18 @@
+{
+  "types": {
+    "id": "text",
+    "title": "text",
+    "type": "text",
+    "status": "text",
+    "progress": "text",
+    "next": "text",
+    "summary": "text",
+    "owner": "text",
+    "project": "text",
+    "access": "multitext",
+    "created": "date",
+    "updated": "date",
+    "start": "date",
+    "due": "date"
+  }
+}

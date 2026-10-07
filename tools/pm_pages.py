@@ -70,28 +70,15 @@ def schedule_pages(site):
             f'<li><span class="type">{ {"requested": "申請中", "approved": "承認", "rejected": "却下", "auto": "記録のみ"}.get(json.loads(x["fm"]).get("decision"), "")}</span>'
             f'{esc(json.loads(x["fm"])["code"])}：{esc(json.loads(x["fm"])["reason"])} <span class="sub">{esc(uname(json.loads(x["fm"]).get("requested_by")))} {esc(x["updated"])}</span></li>' for x in reqs)
         sid = n['id']
-        members = set().union(*[set(site.r['tags'][t]['members']) for t in json.loads(n['access'])]) if json.loads(n['access']) else set()
-        if site.user in members:      # 編集画面（計画の下書き → 差分を申請）
-            plan = [{k: (str(v) if k in ('start', 'end', 'date') else v) for k, v in t.items() if k in ('id', 'name', 'start', 'end', 'date', 'milestone', 'group', 'parent', 'after', 'owner', 'est', 'alloc', 'note', 'expand')}
-                    for t in fm['tasks']]
-            einfo = {r['id']: {'done': r.get('done', 0), 'total': r.get('total', 0), 'weekly': len(r.get('weekly') or [])} for r in rows}
-            site.pages[f'ge-{sid}'] = (
-                f'<p class="crumb"><a href="#home">案件</a> / <a href="#p-{pid}">{pid}</a> / <a href="#g-{sid}">工程</a> / 編集</p><h1>{esc(pname)} 工程表の編集</h1>'
-                '<p class="lead">ここで作るのは計画の下書きです。「変更」に並んだ内容を申請し、承認が要るものは上司の確認待ちに並びます（名前・並び順だけなら記録のみ）。</p>'
-                f'<section class="ged" data-sid="{sid}" data-me="{site.user}" data-plan="{esc(json.dumps(plan, ensure_ascii=False))}" data-info="{esc(json.dumps(einfo))}" data-used="{esc(json.dumps(sorted(G.ids_ever(n))))}">'
-                '<div class="gebar"><button type="button" class="eview" data-v="m1">月間</button><button type="button" class="eview on" data-v="m3">3か月</button><button type="button" class="eview" data-v="m6">半年</button>'
-                '<span class="gsp"></span><button type="button" class="eadd" data-kind="t">＋ タスク</button><button type="button" class="eadd" data-kind="m">＋ 節目</button><button type="button" class="eadd" data-kind="g">＋ グループ</button>'
-                '<button type="button" class="eundo">元に戻す</button><button type="button" class="eredo">やり直し</button>'
-                '<label class="chk"><input type="checkbox" class="echain" checked> 後ろも一緒にずらす</label><span class="sub">変更<b class="ecnt"></b></span></div>'
-                '<div class="gegrid"><div class="gel"></div><div class="ger"></div></div><div class="gepanel"></div><div class="gechg"></div></section>')
+        mgrs = '、'.join(uname(u) for u in (site.r['projects'][pid].get('managers') or []))   # 日程は取りまとめ役が Obsidian の dotpm で直す
         site.pages[f'g-{sid}'] = (
             f'<p class="crumb"><a href="#home">案件</a> / <a href="#p-{pid}">{pid}</a> / 工程</p><h1>{esc(pname)} 工程表</h1>'
             f'<p class="lead"><b>{esc(site.pm_summary[pid])}</b><br>当初計画より遅れ：進行中・未着手 {len(nlate)} 件、完了 {len(late) - len(nlate)} 件 ・ 比較：当初計画（{esc((fm.get("baselines") or [{}])[0].get("at", ""))} 承認）</p>'
             f'<section class="gantt-wrap" data-sid="{sid}" data-name="{pid}_工程表" data-mgr="{1 if site.mgr else 0}" data-tasks="{esc(json.dumps(info, ensure_ascii=False))}">'
             f'<div class="gbar">{"".join(tabs)}<span class="gsp"></span>'
             + f'<span class="gscroll">横にスクロールできます →</span>'
-            + (f'<a class="btn gelink" href="#ge-{sid}">工程表を編集</a>' if site.user in members else '') + '<button type="button" class="gsave">画像を保存</button></div>'
-            '<p class="ghint" hidden>棒の中ほどをドラッグ＝ずらす、棒の端をドラッグ＝開始日・終了日を伸び縮み（月間＝1日、3か月・半年＝1週単位）。◆もドラッグできます。離すと申請画面が出ます。</p>'
+            + '<button type="button" class="gsave">画像を保存</button></div>'
+            + (f'<p class="sub">日程・タスクの変更は、取りまとめ役（{esc(mgrs)}）が Obsidian の dotpm で行います。承認が要る変更は確認待ちに並びます。</p>' if mgrs else '')
             + ''.join(svgs) + '<p class="sub">タスク名を押すと「まとめ」のノート、棒・行を押すと「タスクの経過」（週報・やること・計画変更の履歴）を表示します。</p>'
             + (('<p class="sub">書き込みのあるガント図（Excalidraw）：' + '、'.join(f'<a href="#n-{x["id"]}">{G.VIEWS[json.loads(x["fm"])["gantt"]["view"]][0]}</a>' for x in exl) + '</p>') if (exl := [x for x in site.vis.values() if x['type'] == 'drawing' and (json.loads(x['fm']).get('gantt') or {}).get('schedule') == sid]) else '')
             + '</section>'

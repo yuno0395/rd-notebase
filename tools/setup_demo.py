@@ -62,6 +62,8 @@ def main():
     open(os.path.join(SRV, 'allocated_ids.txt'), 'w').write('\n'.join(sorted(ids)) + '\n')
     py = sys.executable
     sh(f'"{py}" tools/kv.py index', ROOT)
+    for v in vaults:   # 案件の工程表は dotpm の形（取りまとめ役が Obsidian で直す）にしておく
+        if v.startswith('proj-') and not glob.glob(os.path.join(ROOT, v, '_tasks')): print(sh(f'"{py}" tools/pm.py migrate {v}', ROOT).strip().splitlines()[-1])
     for u, f in (('boss', 'index.html'), ('yamada', 'yamada.html'), ('staff', 'staff.html')):
         print(sh(f'"{py}" tools/view.py build {u} {f}', ROOT).strip())
     print('完了。site/index.html（上司）・site/yamada.html（山田）・site/staff.html（一般社員）をブラウザで開いてください')

@@ -63,6 +63,10 @@ projects:
     owner: boss
     default_tags:
     - P00001-team
+    managers:      # 取りまとめ役（工程表を dotpm で直す人。複数可。休み・異動の時はここを書き換える）
+    - boss
+    - yamada
+    repo: proj-P00001   # 案件のリポジトリ（名前ならサーバの <名前>.git、URL ならそのまま）
 customer_words:
 - A社
 holidays:

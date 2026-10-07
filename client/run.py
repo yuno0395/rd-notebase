@@ -167,6 +167,11 @@ def update_vault():
         if keys: add = {k: add[k] for k in keys}
         new = deep_merge(json.loads(json.dumps(cur)), add)
         if new != cur: write(dst, json.dumps(new, ensure_ascii=False, indent=2) + '\n'); changed.append(f)
+    # dotpm の休日は台帳（config/registry.yml の holidays）に合わせる
+    p = os.path.join(VAULT, '.obsidian', 'plugins', 'project-manager', 'data.json')
+    if os.path.exists(p):
+        cur = json.loads(read(p)); hol = [str(x) for x in (yaml.safe_load(read(os.environ['RDNB_REGISTRY'])) or {}).get('holidays') or []]
+        if cur.get('holidays') != hol: cur['holidays'] = hol; write(p, json.dumps(cur, ensure_ascii=False, indent=2) + '\n'); changed.append('.obsidian/plugins/project-manager/data.json（休日）')
     # 有効にするプラグインの一覧（雛形の分を足し、やめたものを外す。利用者が足した分は残す）
     p = os.path.join(VAULT, '.obsidian', 'community-plugins.json')
     cur = json.loads(read(p)) if os.path.exists(p) else []
@@ -199,8 +204,9 @@ def fix_ids():
     renames = {}
     for p in notes:
         rel = os.path.relpath(p, VAULT).replace(os.sep, '/')
-        if rel.startswith(('90_templates/', '_')): continue
+        if rel.startswith(('90_templates/', '20_工程/', '_')): continue   # 20_工程 は案件のリポジトリ（取りまとめ役だけ）
         fm, body = kv.read_note(p)
+        if kv.is_pm(fm): continue
         dirty = False
         if user and fm.get('id') and not fm.get('owner'): fm['owner'] = user; dirty = True
         if not fm.get('id'):
@@ -247,6 +253,65 @@ def push(quiet=False):
     if r.returncode: raise SystemExit(f'push できませんでした（ネットワーク・権限を確認）：\n{r.stderr.strip()}')
     say(f"{'定期' if quiet else ''}push しました：変更 {n} 件（{head}）")
     return n
+
+# ---------- 取りまとめ役：案件のリポジトリ（工程表）を vault/20_工程/<案件>/ で同期 ----------
+PM_NOTICE = os.path.join(VAULT, '_notebase のお知らせ（工程表）.md')
+
+def projects():
+    """台帳で取りまとめ役（projects.<案件>.managers）になっている案件のリポジトリを 20_工程/<案件>/ に置き、
+    手元の変更をコミット → 取り込み → push する。誰が休んでも辞めても、工程表は案件のリポジトリに残る。
+    2人が同じところを直して衝突したら、後の人の変更は _衝突/ に控えて、先の人の内容に合わせる（お知らせを置く）"""
+    c = cfg() or {}; user = c.get('user')
+    import kv
+    for pid, p in (kv.reg().get('projects') or {}).items():
+        try: sync_project(user, pid, p)
+        except Exception as e: say(f'工程表 {pid}：同期できませんでした（{e}）')
+
+def sync_project(user, pid, p):
+    import kv
+    if True:
+        d = os.path.join(VAULT, '20_工程', pid); repo = p.get('repo')
+        if user not in (p.get('managers') or []) or not repo:
+            if os.path.isdir(os.path.join(d, '.git')): say(f'工程表 {pid}：取りまとめ役ではなくなったので同期していません（20_工程/{pid} は消してかまいません）')
+            return
+        ex = os.path.join(VAULT, '.git', 'info', 'exclude')   # 案件のリポジトリは自分の vault の Git に入れない（この PC だけの除外）
+        if os.path.isdir(os.path.dirname(ex)) or os.path.isdir(os.path.join(VAULT, '.git')):
+            line = f'/20_工程/{pid}/'; cur = read(ex).splitlines() if os.path.exists(ex) else []
+            if line not in cur: write(ex, '\n'.join(cur + [line]) + '\n')
+        url = repo if ('://' in repo or os.path.isabs(repo) or repo.endswith('.git')) else os.path.join(kv.SRV, repo + '.git')
+        if not os.path.isdir(os.path.join(d, '.git')):
+            if os.path.isdir(d) and os.listdir(d): say(f'工程表 {pid}：20_工程/{pid} に別のファイルがあるので取得できません'); return
+            r = subprocess.run(['git', 'clone', '-q', url, d], capture_output=True, text=True, encoding='utf-8', errors='replace')
+            if r.returncode: say(f'工程表 {pid}：案件のリポジトリを取得できません（{r.stderr.strip()[:200]}）'); return
+            git('config', 'user.name', user, cwd=d); git('config', 'user.email', f'{user}@rd-notebase.local', cwd=d)
+            say(f'工程表 {pid}：20_工程/{pid} に取得しました（Obsidian の dotpm で開けます）'); return
+        git('add', '-A', cwd=d)
+        if git('status', '--porcelain', cwd=d): git('commit', '-q', '-m', f'工程表の更新（{user}）', cwd=d)
+        if subprocess.run(['git', 'fetch', '-q', 'origin'], cwd=d, capture_output=True).returncode:
+            say(f'工程表 {pid}：案件のリポジトリに届きません（変更は手元に残しています）'); return
+        br = git('rev-parse', '--abbrev-ref', 'HEAD', cwd=d)
+        if subprocess.run(['git', 'rebase', '-q', f'origin/{br}'], cwd=d, capture_output=True).returncode:
+            subprocess.run(['git', 'rebase', '--abort'], cwd=d, capture_output=True)
+            mine = git('-c', 'core.quotepath=off', 'diff', '--name-only', f'origin/{br}...HEAD', cwd=d).splitlines()
+            keep = os.path.join(VAULT, '_衝突', f'{pid}_{datetime.datetime.now():%Y%m%d_%H%M}')
+            for f in mine:
+                if os.path.exists(os.path.join(d, f)): os.makedirs(os.path.dirname(os.path.join(keep, f)), exist_ok=True); shutil.copy2(os.path.join(d, f), os.path.join(keep, f))
+            git('reset', '-q', '--hard', f'origin/{br}', cwd=d)
+            names = [os.path.basename(f)[:-3] for f in mine if f.endswith('.md')]
+            write(PM_NOTICE, f"""# 工程表 {pid} の変更が、他の取りまとめ役と重なりました
+
+{datetime.datetime.now():%Y-%m-%d %H:%M}。同じタスクを先に直した人がいたので、**先の人の内容に合わせました**。あなたの変更は消さずに控えてあります。
+
+- 重なったタスク：{'、'.join(names) or '（なし）'}
+- あなたの変更の控え：`_衝突/{os.path.basename(keep)}/`
+- 控えと今の工程表（dotpm）を見比べて、必要ならもう一度 dotpm で直してください。直せば次の同期で送られます
+
+このお知らせは、読んだら消してください（自動では消えません）。
+""")
+            say(f'工程表 {pid}：他の取りまとめ役の変更と重なったので、先の内容に合わせました（控え：_衝突/{os.path.basename(keep)}）'); return
+        if git('rev-list', '--count', f'origin/{br}..HEAD', cwd=d) != '0':
+            r = subprocess.run(['git', 'push', '-q', 'origin', f'HEAD:{br}'], cwd=d, capture_output=True, text=True, encoding='utf-8', errors='replace')
+            say(f'工程表 {pid}：' + ('送りました' if r.returncode == 0 else f'送れませんでした（{r.stderr.strip()[:200]}）'))
 
 def refs():
     """購読（.rdnb/config.yml の subscribe に vault 名を並べる）：見てよい他人のノートのスタブを _refs/ に作る"""
@@ -356,7 +421,7 @@ def main():
             if cmd == 'push':
                 try: push(quiet=True)
                 except (SystemExit, Exception) as e: notice(str(getattr(e, 'code', e))); raise
-                notice(); refs(); view()   # 控え（閲覧.html）は中身が変わった時だけ作り直す
+                notice(); projects(); refs(); view()   # 控え（閲覧.html）は中身が変わった時だけ作り直す
                 return
             if not cfg(): return setup()
             if cmd == 'view': autosave('閲覧前の自動保存'); return view(open_it=True)
@@ -377,7 +442,7 @@ def main():
                 if cmd == 'sync':
                     try: push()
                     except (SystemExit, Exception) as e: notice(str(getattr(e, 'code', e))); raise
-                    notice(); refs(); view()
+                    notice(); projects(); refs(); view()
                 status()
             else: print(__doc__)
     except SystemExit as e:

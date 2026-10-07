@@ -156,12 +156,17 @@ def parse_drawing(body):
 def embedded_files(body):
     return dict(re.findall(r'^([0-9a-f]{8,}): \[\[([^\]]+)\]\]', body, re.M))
 
+def is_pm(fm):
+    """dotpm（工程管理プラグイン）のプロジェクト・タスク。id などの名前を dotpm の意味で使うので、ノートとしては扱わない"""
+    return fm.get('pm-project') is True or fm.get('pm-task') is True
+
 def scan_vault(vp):
     notes = {}
     for p in glob.glob(os.path.join(vp, '**', '*.md'), recursive=True):
-        if '/_' in p.replace(vp, ''): continue
+        rel = p.replace(vp, '').replace(os.sep, '/')
+        if '/_' in rel or rel.lstrip('/').startswith('20_工程/'): continue   # 20_工程＝取りまとめ役の手元にある案件リポジトリ（別の正本）
         fm, body = read_note(p)
-        if not fm.get('id'): continue
+        if not fm.get('id') or is_pm(fm): continue
         notes[fm['id']] = {'path': p, 'fm': fm, 'body': body}
     return notes
 
@@ -211,8 +216,10 @@ def check(vp):
     # IDのないノート（テンプレートを使わずに作った）を見つける。テンプレート置き場と隠しフォルダは除く
     for p in glob.glob(os.path.join(vp, '**', '*.md'), recursive=True):
         rel = os.path.relpath(p, vp)
-        if rel.startswith(('90_templates', '_', '.')) or '/.' in rel: continue
-        if not read_note(p)[0].get('id'): errs.append(f"{rel}: id がありません（テンプレートから作り直すか、プラグインで付与）")
+        if rel.startswith(('90_templates', '20_工程', '_', '.')) or '/.' in rel: continue
+        fm0 = read_note(p)[0]
+        if is_pm(fm0): continue
+        if not fm0.get('id'): errs.append(f"{rel}: id がありません（テンプレートから作り直すか、プラグインで付与）")
     # 全社で重複するID（他のvaultの索引と比べる）
     try:
         con = sqlite3.connect(DB); vname = os.path.basename(vp)

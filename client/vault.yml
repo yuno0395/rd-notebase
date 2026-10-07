@@ -6,7 +6,7 @@ mirror:
   - 90_templates
 
 # 無ければ作るフォルダ
-folders: [01_daily, 01_daily/週, 10_notes, 30_calc, 40_attachments, 90_templates/excalidraw-libraries]
+folders: [01_daily, 01_daily/週, 10_notes, 20_工程, 30_calc, 40_attachments, 90_templates/excalidraw-libraries]
 
 # 雛形と同じにするファイル
 files: [00_分類.base, .gitattributes, .rdnb/schema.yml]
@@ -21,6 +21,7 @@ append_lines: [.gitignore]
 json_overlay:
   - .obsidian/app.json
   - .obsidian/hotkeys.json         # Ctrl+N ＝ テンプレートを選んで新規作成、Ctrl+Q ＝ 図と文章の切り替え
+  - .obsidian/types.json           # プロパティの型を固定（progress・status・type・id は文字。dotpm と同じ名前を別の意味で使うため）
   - .obsidian/core-plugins.json    # 使わないコア機能（グラフ・キャンバス・コアのテンプレートなど）をオフ
   - file: .obsidian/workspace.json # リボンで隠すアイコン（Excalidraw・ベースの新規作成など）。画面配置は上の initial
     keys: [left-ribbon]
@@ -30,6 +31,7 @@ json_overlay:
   - .obsidian/plugins/periodic-notes/data.json
   - .obsidian/plugins/templater-obsidian/data.json   # 空のノートには 01-base を入れる（folder_templates の "/"）
   - .obsidian/plugins/calendar/data.json
+  - .obsidian/plugins/project-manager/data.json   # dotpm：工程表の置き場 20_工程、ガントで開く、休日は台帳から
 
 # 使うのをやめたもの（見つけたら外す・消す）
 retired:
@@ -104,3 +106,10 @@ plugins:
       manifest.json: fa072ca3f66616a12a1236250c685754ba7f206cdebdecbac47ac5454f82bd3f
       main.js: d8d7ddae3f0bbc07a7c2460b6d7898e5174a29ebb4ee857fe8e744ef801fb1ad
       styles.css: d83afa6028ed6333ce3612547cf2086686f4a51565929cccbb0a516513a83077
+  project-manager:                   # dotpm（工程表。取りまとめ役が 20_工程/<案件>/ で使う）
+    url: https://github.com/StepanKropachev/obsidian-pm/releases/download/2.6.0
+    version: 2.6.0
+    files:
+      manifest.json: 59df71db0e8758328da4884c22ad4bf4d6623668937d7fa58f2556fb9d4fec42
+      main.js: 6c36da53198c47123cc4ea75604849e9e9749524eb7acd2827c5e9f8eb04ceea
+      styles.css: 3c3f9b6289f09e76c3a074877ada595799d22067b3552bedcc2c1d132f5f8edf
