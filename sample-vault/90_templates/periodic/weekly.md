@@ -9,7 +9,6 @@ const title = "Week of " + mon.format("YYYY-MM-DD");
 ---
 id: <% d %>-<% h %>
 type: weeknote
-title: "<% title %>"
 owner: ""        # your user ID (filled automatically on push)
 project: ""
 status: draft

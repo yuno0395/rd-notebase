@@ -11,7 +11,6 @@ await tp.file.rename(`${name}`);
 ---
 id: <% d %>-<% h %>
 type: report
-title: "<% title %>"
 owner: ""        # your user ID (filled automatically on push)
 project: ""      # project ID (e.g. P00001). Setting it applies the project's default keys
 status: draft
@@ -28,7 +27,7 @@ based_on: []
 <!-- 3 lines. Conclusion and requests first -->
 
 ## Slides (exported to PDF in this order)
-<!-- Embed frames from each note's drawing, e.g. ![[YYMMDD_title_hash.excalidraw#F02]] -->
+<!-- Embed frames from each note's drawing, e.g. ![[YYMMDD_title#F02]] -->
 
 ## Conclusion and requests
 

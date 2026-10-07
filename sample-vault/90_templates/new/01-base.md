@@ -15,7 +15,6 @@ tp.hooks.on_all_templates_executed(async () => {   // open again once written, s
 ---
 id: <% d %>-<% h %>
 type: ""         # empty = unsorted (see 00_分類.base). Set later: study / calc / req / memo ...
-title: "<% title %>"
 owner: ""        # your user ID (filled automatically on push)
 project: ""      # project ID (e.g. P00001). Setting it applies the project's default keys
 status: draft

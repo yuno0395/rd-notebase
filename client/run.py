@@ -167,11 +167,6 @@ def update_vault():
         if keys: add = {k: add[k] for k in keys}
         new = deep_merge(json.loads(json.dumps(cur)), add)
         if new != cur: write(dst, json.dumps(new, ensure_ascii=False, indent=2) + '\n'); changed.append(f)
-    # dotpm の休日は台帳（config/registry.yml の holidays）に合わせる
-    p = os.path.join(VAULT, '.obsidian', 'plugins', 'project-manager', 'data.json')
-    if os.path.exists(p):
-        cur = json.loads(read(p)); hol = [str(x) for x in (yaml.safe_load(read(os.environ['RDNB_REGISTRY'])) or {}).get('holidays') or []]
-        if cur.get('holidays') != hol: cur['holidays'] = hol; write(p, json.dumps(cur, ensure_ascii=False, indent=2) + '\n'); changed.append('.obsidian/plugins/project-manager/data.json（休日）')
     # 有効にするプラグインの一覧（雛形の分を足し、やめたものを外す。利用者が足した分は残す）
     p = os.path.join(VAULT, '.obsidian', 'community-plugins.json')
     cur = json.loads(read(p)) if os.path.exists(p) else []
@@ -214,7 +209,7 @@ def fix_ids():
             made = datetime.date.fromtimestamp(os.path.getmtime(p))
             nid = new_id(made.strftime('%y%m%d'), used)
             typ = 'daily' if re.match(r'^\d{4}-\d{2}-\d{2}$', stem) else 'weeknote' if re.match(r'^\d{4}-W\d{2}$', stem) else ''
-            fm = {'id': nid, 'type': typ, 'title': nfc(stem), 'owner': user, 'project': '', 'status': 'draft', 'access': [],
+            fm = {'id': nid, 'type': typ, 'owner': user, 'project': '', 'status': 'draft', 'access': [],
                   'created': str(made), 'updated': str(made), 'summary': '', **fm}
             dirty = True   # 名前はそのまま（ファイル名は自由。一意なのは id）
             say(f'id を付けました：{rel}（{nid}）')
@@ -434,6 +429,8 @@ def main():
                     n = len({v for v in moved.values()})
                     git('add', '-A'); git('commit', '-q', '-m', f'ファイル名の末尾の乱数と .excalidraw を外す（{n} 件）')
                     say(f'ファイル名の末尾の乱数と .excalidraw を外しました：{n} 件（リンクも直しました）')
+                if kv.drop_title(VAULT):   # 改名とは別のコミットにする（改名の履歴が辿れるように）
+                    git('add', '-A'); git('commit', '-q', '-m', 'プロパティ title を外す（題名はファイル名）'); say('プロパティ title を外しました（題名はファイル名）')
                 if cmd == 'sync':
                     try: push()
                     except (SystemExit, Exception) as e: notice(str(getattr(e, 'code', e))); raise

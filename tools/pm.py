@@ -11,7 +11,7 @@
 """
 import os, sys, json, glob, datetime, subprocess, yaml
 sys.path.insert(0, os.path.dirname(__file__))
-from kv import ROOT, SRV, reg, REG, read_note, join_fm, cmd_new, cmd_push, cmd_index, sh, scan_vault, parse_drawing, fname, DB
+from kv import title_of, ROOT, SRV, reg, REG, read_note, join_fm, cmd_new, cmd_push, cmd_index, sh, scan_vault, parse_drawing, fname, DB
 import gantt as G
 import dotpm
 
@@ -91,7 +91,7 @@ def cmd_request(vault, sched_id, changes, code, reason):
             late = G.wdays(G.d(t['end']), x['end'], hol)
             if late > LIMIT_DAYS: need.append(t['id']); why.append(f"{t['name']} 実働{late}日の遅れ")
     if not full: raise SystemExit('変更がありません')
-    pr = cmd_new(sv, 'planreq', f"計画変更 {fm['title']}"[:40], project=fm.get('project'), schedule=sched_id, changes=full,
+    pr = cmd_new(sv, 'planreq', f"計画変更 {title_of(sn['path'], fm)}"[:40], project=fm.get('project'), schedule=sched_id, changes=full,
                  code=code, reason=reason, needs_approval=bool(need), why=why, decision='requested' if need else 'auto',
                  requested_by=reg()['vaults'][vault], approvers=[reg()['projects'][fm['project']]['owner']])
     rfm, _ = read_note(pr); rfm['access'] = list(fm.get('access') or []); rfm['owner'] = reg()['vaults'][vault]
@@ -172,7 +172,7 @@ def cmd_edit(vault, sched_id, ops, code, reason):
         if o['id'] not in nw: summary.append(f"削除：{o['name']}"); why.append('タスクの削除')
     if [i for i in (t['id'] for t in plan) if i in nw] != [i for i in (t['id'] for t in new) if i in old]: summary.append('並び順の変更')
     why = list(dict.fromkeys(why))
-    pr = cmd_new(sv, 'planreq', f"工程表の編集 {fm['title']}"[:40], project=fm.get('project'), schedule=sched_id, ops=ops, changes=changes, lines=summary,
+    pr = cmd_new(sv, 'planreq', f"工程表の編集 {title_of(sn['path'], fm)}"[:40], project=fm.get('project'), schedule=sched_id, ops=ops, changes=changes, lines=summary,
                  code=code, reason=reason, needs_approval=bool(why), why=why, decision='requested' if why else 'auto',
                  requested_by=reg()['vaults'][vault], approvers=[reg()['projects'][fm['project']]['owner']], remap=remap)
     rfm, _ = read_note(pr); rfm['access'] = list(fm.get('access') or []); rfm['owner'] = reg()['vaults'][vault]

@@ -8,7 +8,6 @@ const title = "Daily " + day.format("YYYY-MM-DD");
 ---
 id: <% d %>-<% h %>
 type: daily
-title: "<% title %>"
 owner: ""        # your user ID (filled automatically on push)
 project: ""
 status: draft

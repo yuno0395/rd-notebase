@@ -1,7 +1,6 @@
 {
   "types": {
     "id": "text",
-    "title": "text",
     "type": "text",
     "status": "text",
     "progress": "text",

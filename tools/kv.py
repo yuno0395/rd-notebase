@@ -81,7 +81,7 @@ def cmd_new(vault, typ, title, project=None, extra=None, drawing=False, **kw):
     extra = {**(extra or {}), **kw}
     r = reg(); vp = os.path.join(ROOT, vault); owner = r['vaults'][vault]
     nid = alloc_id()
-    fm = {'id': nid, 'type': typ, 'title': nfc(title), 'owner': owner,
+    fm = {'id': nid, 'type': typ, 'owner': owner,   # 題名はファイル名（プロパティ title は持たない）
           'project': project or '', 'status': 'draft', 'access': [],
           'created': str(today()), 'updated': str(today()), 'summary': ''}
     if project and typ not in ('daily', 'memo'):
@@ -124,7 +124,7 @@ def cmd_attach(vault, src, target, origin=''):
         stem = re.sub(r'^\d{6}_(.+?)(_[' + ALPH + r']{5})?$', r'\1', stem)   # 既に命名済みのファイルは元の名前に戻す
         fn = fname(nid, stem, ext.lstrip('.').lower(), ad)
         shutil.copy(src, os.path.join(ad, fn))
-        sfm = {'id': nid, 'type': 'attachment', 'title': nfc(stem), 'file': fn, 'sha256': h,
+        sfm = {'id': nid, 'type': 'attachment', 'file': fn, 'sha256': h,
                'owner': tfm.get('owner'), 'project': tfm.get('project', ''),
                'access': list(tfm.get('access') or []), 'source': origin,
                'created': str(today()), 'updated': str(today()), 'summary': ''}
@@ -150,6 +150,29 @@ def link_key(target):
     return s or None
 
 hash_of = link_key   # 互換（以前はファイル名末尾の乱数で引いていた）
+
+def title_of(path, fm=None):
+    """ノートの題名。プロパティ title は持たず、ファイル名（先頭の「作成日_」を除く）を題名にする。
+    以前のノートで title が残っていればそれを使う"""
+    if fm and fm.get('title'): return str(fm['title'])
+    k = link_key(path) or ''
+    return re.sub(r'^\d{6}_', '', k) or k
+
+def drop_title(vp):
+    """以前のノートのプロパティ title を外す。ファイル名から分かる題名と違う時（長くて切れた等）は aliases に移す（Obsidian の検索・リンク候補に出る）。
+    返り値：外した件数"""
+    n = 0
+    for p in glob.glob(os.path.join(vp, '**', '*.md'), recursive=True):
+        rel = os.path.relpath(p, vp).replace(os.sep, '/')
+        if rel.startswith(('_', '20_工程/', '.', '90_templates/')): continue
+        fm, body = read_note(p)
+        if 'title' not in fm or is_pm(fm) or not fm.get('id'): continue
+        t = fm.pop('title')
+        if t and str(t) != title_of(p):
+            al = fm.get('aliases') or []; al = [al] if isinstance(al, str) else list(al)
+            if str(t) not in al: fm['aliases'] = al + [str(t)]
+        open(p, 'w', encoding='utf-8').write(join_fm(fm, body)); n += 1
+    return n
 
 def short_name(user, users=None):
     return str((users if users is not None else (reg().get('users') or {})).get(user, user or '')).split('（')[0]
@@ -289,7 +312,7 @@ def check(vp):
             if not bang: continue
             src = byhash.get(link_key(tgt))
             if src and not set(src['fm'].get('access') or []) <= mine and f"{src['fm']['id']}{fr}" not in ok and src['fm']['id'] not in ok:
-                lack.setdefault(src['fm']['title'], set()).add(fr.lstrip('#') or '全体')
+                lack.setdefault(title_of(src['path'], src['fm']), set()).add(fr.lstrip('#') or '全体')
         if lack:
             items = '、'.join(f"{t}（{'/'.join(sorted(f))}）" for t, f in lack.items())
             warns.append(f"{fn}: 公開範囲 {sorted(mine)} より狭い資料を埋め込んでいます：{items}\n"
@@ -345,7 +368,8 @@ def cmd_index():
         commit = sh(f'git --git-dir="{bare}" rev-parse --short main')
         olds = renames(bare)
         for nid, n in scan_vault(work).items():
-            fm = n['fm']; body = n['body']; rel = os.path.relpath(n['path'], work).replace(os.sep, '/')
+            fm = dict(n['fm']); body = n['body']; rel = os.path.relpath(n['path'], work).replace(os.sep, '/')
+            fm['title'] = title_of(rel, fm)   # 索引には題名を入れておく（ノートには書かない）
             db.execute('insert into notes values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', (
                 nid, vault, os.path.relpath(n['path'], work), fm.get('type'), fm.get('title'), fm.get('owner'),
                 fm.get('project'), fm.get('status'), json.dumps(fm.get('access') or [], ensure_ascii=False),
@@ -379,7 +403,7 @@ def cmd_index():
 
 def renames(bare):
     """Git の履歴の改名 → {今のパス: [前のパス, …]}（改名前の名前でリンクしても辿れるように）"""
-    out = subprocess.run(['git', f'--git-dir={bare}', '-c', 'core.quotepath=off', 'log', '--format=', '--name-status', '-M', 'main'],
+    out = subprocess.run(['git', f'--git-dir={bare}', '-c', 'core.quotepath=off', 'log', '--format=', '--name-status', '-M30%', 'main'],   # 改名と同時に書き換えても辿れるよう、似ている度合いは緩め
                          capture_output=True, text=True, encoding='utf-8').stdout
     prev = {}
     for line in out.splitlines():   # 新しい順
@@ -402,14 +426,13 @@ def can_see(user, access):
     return all(user in (r['tags'].get(t) or {}).get('members', []) for t in a)
 
 # ---------- 購読（他人のノートのスタブ。vault設計 6.2・6.3 レベル2） ----------
-STUB_KEYS = ['id', 'type', 'title', 'owner', 'project', 'status', 'access', 'created', 'updated', 'summary', 'progress', 'next', 'parts', 'copied_version'] + REL
+STUB_KEYS = ['id', 'type', 'owner', 'project', 'status', 'access', 'created', 'updated', 'summary', 'progress', 'next', 'parts', 'copied_version'] + REL
 REFS_BASE = '''# notebase が作る（手で直しても次の更新で戻る）。購読している他人のノートの一覧
 filters:
   and:
     - file.ext == "md"
     - file.inFolder("_refs")
 properties:
-  note.title: {displayName: タイトル}
   note.owner: {displayName: 書いた人}
   note.type: {displayName: 種類}
   note.project: {displayName: 案件}
@@ -564,14 +587,15 @@ def cmd_copy(vp, viewer, key):
                 'copied_from': f"[[{stub_name(link_key(src), fm.get('owner'))}]]", 'copied_version': n['commit_']})
     ext = 'md'
     os.makedirs(os.path.join(vp, '10_notes'), exist_ok=True)
-    out = os.path.join(vp, '10_notes', fname(nid, fm.get('title') or stem, ext, os.path.join(vp, '10_notes')))
+    new.pop('title', None)
+    out = os.path.join(vp, '10_notes', fname(nid, title_of(src, fm), ext, os.path.join(vp, '10_notes')))
     open(out, 'w', encoding='utf-8').write(join_fm(new, body))
     made = [out]
     for p, dst in copies:
         d = os.path.join(vp, '40_attachments', dst)
         if not os.path.exists(d): os.makedirs(os.path.dirname(d), exist_ok=True); shutil.copy(p, d); made.append(d)
     who = reg()['users'].get(fm.get('owner'), fm.get('owner'))
-    msg = f"コピー: {fm.get('title')}（{who} の {n['id']}@{n['commit_']} から）"
+    msg = f"コピー: {title_of(src, fm)}（{who} の {n['id']}@{n['commit_']} から）"
     return made, msg
 
 def cmd_request(vault, report_path, targets, audience, purpose):
@@ -594,7 +618,7 @@ def cmd_request(vault, report_path, targets, audience, purpose):
     for t in full: tags |= set((notes[t.split('#')[0]]['fm'].get('access')) or [])
     owners = sorted({r['tags'][t]['owner'] for t in tags})
     rfm, _ = read_note(report_path)
-    p = cmd_new(vault, 'grant', f"{rfm['title']} 開示申請", project=rfm.get('project'),
+    p = cmd_new(vault, 'grant', f"{title_of(report_path, rfm)} 開示申請", project=rfm.get('project'),
                 targets=full, audience=audience, purpose=purpose, requested_by=r['vaults'][vault],
                 approvers=owners, decision='requested', reason='', approved_targets=[], approved_version='', report=rfm['id'])
     print(f"開示申請: {len(full)}件（画像を含む） 承認者 {owners}")
@@ -615,7 +639,7 @@ def cmd_comment(vault, target, text, images=(), assignee=None, due=None):
                       if gf.get('decision') == 'approved' and {target, nid} & set(gf.get('approved_targets') or [])
                       for a in gf.get('audience') or [] if user in r['tags'][a]['members']})
         if not acc: raise SystemExit('見られない資料にはコメントできません')
-    label = tfm['title'] + (f' #{fid}' if fid else '')
+    label = title_of(t['path'], tfm) + (f' #{fid}' if fid else '')
     if fid and has_drawing(dict(t)):
         f = next((e for e in parse_drawing(t['body'])['elements'] if e['type'] == 'frame' and (e.get('customData') or {}).get('kvFrame') == fid), None)
         if f and f.get('name'): label += ' ' + f['name']
@@ -644,6 +668,8 @@ if __name__ == '__main__':
         sh('git add -A', vp); sh(f'git commit -qm "{msg}"', vp); print(msg)
     elif c == 'drop-hash':   # kv.py drop-hash <vault>：ファイル名の末尾の _hash を外す（以前の名前の形からの移行）
         print(len(drop_hash_names(os.path.join(ROOT, a[0]))), '件改名')
+    elif c == 'drop-title':   # kv.py drop-title <vault>：以前のノートのプロパティ title を外す
+        print(drop_title(os.path.join(ROOT, a[0])), '件')
     elif c == 'refs': print(cmd_refs(os.path.join(ROOT, a[0]), reg()['vaults'][a[0]], a[1:]))   # kv.py refs <自分のvault> <購読するvault>...
     elif c == 'check': print(check(os.path.join(ROOT, a[0])))
     else: print(__doc__)

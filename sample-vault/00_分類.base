@@ -14,8 +14,6 @@ filters:
 formulas:
   図: 'if(file.name.contains(".excalidraw"), "図", "")'
 properties:
-  note.title:
-    displayName: タイトル
   note.type:
     displayName: 種類
   note.project:

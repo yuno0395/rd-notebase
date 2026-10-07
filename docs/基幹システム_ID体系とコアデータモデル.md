@@ -172,7 +172,7 @@
 
 | エンティティ | 主な項目 | 正本 | 索引DBに写すか |
 |---|---|---|---|
-| **ノート** | id、type、title、owner、project、status、access、summary、parts、ext_refs、created、updated | Git（ノートのプロパティ） | ○ |
+| **ノート** | id、type、owner、project、status、access、summary、parts、ext_refs、created、updated（題名はファイル名） | Git（ノートのプロパティ） | ○ |
 | **フレーム** | フレームID、所属ノート、フレーム名、フレーム内の文字 | Git（図のJSON） | ○ |
 | **添付** | 添付ID（＝付属ノートのID）、ファイル名、機密タグ、由来、ハッシュ値 | 中身はGit LFS、属性は付属ノート（Git） | ○（属性のみ） |
 | **版** | コミット、日時、作成者 | Git | ○（必要な範囲） |

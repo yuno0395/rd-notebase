@@ -62,8 +62,11 @@ def main():
     open(os.path.join(SRV, 'allocated_ids.txt'), 'w').write('\n'.join(sorted(ids)) + '\n')
     py = sys.executable
     for v in vaults:   # サンプルデータは以前の名前の形（作成日_タイトル_hash）。利用者の PC と同じく末尾の乱数を外す（改名の履歴が残る）
-        vp = os.path.join(ROOT, v); sh(f'"{py}" tools/kv.py drop-hash {v}', ROOT); sh('git add -A', vp)
-        if sh('git status --porcelain', vp).strip(): sh('git commit -qm "ファイル名の末尾の乱数を外す"', vp); sh('git push -q origin main', vp)
+        vp = os.path.join(ROOT, v)
+        for step, msg in (('drop-hash', 'ファイル名の末尾の乱数と .excalidraw を外す'), ('drop-title', 'プロパティ title を外す（題名はファイル名）')):   # 改名と中身の変更は別のコミットに（改名の履歴が辿れるように）
+            sh(f'"{py}" tools/kv.py {step} {v}', ROOT); sh('git add -A', vp)
+            if sh('git status --porcelain', vp).strip(): sh(f'git commit -qm "{msg}"', vp)
+        sh('git push -q origin main', vp)
     sh(f'"{py}" tools/kv.py index', ROOT)
     for v in vaults:   # 案件の工程表は dotpm の形（取りまとめ役が Obsidian で直す）にしておく
         if v.startswith('proj-') and not glob.glob(os.path.join(ROOT, v, '_tasks')): print(sh(f'"{py}" tools/pm.py migrate {v}', ROOT).strip().splitlines()[-1])
