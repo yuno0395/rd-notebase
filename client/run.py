@@ -233,6 +233,8 @@ def push(quiet=False):
     if not c.get('remote'):   # 定期実行でも毎回1行残す（動いたかどうかをログで分かるように）
         say(f"{'定期' if quiet else ''}保存：変更 {n} 件（{head}）" + ('' if quiet else '。正本が未設定なので push はしていません（.rdnb/config.yml の remote に書くと push します）'))
         return n
+    cur = git('remote', 'get-url', 'origin', check=False)   # 後から config.yml の remote を書いた・変えた時も、その正本に送る
+    if cur != c['remote']: git('remote', 'set-url' if cur else 'add', 'origin', c['remote'])
     r = subprocess.run(['git', 'push', '-q', '-u', 'origin', f"HEAD:{c.get('branch', 'main')}"], cwd=VAULT, capture_output=True, text=True, encoding='utf-8', errors='replace')
     if r.returncode: raise SystemExit(f'push できませんでした（ネットワーク・権限を確認）：\n{r.stderr.strip()}')
     say(f"{'定期' if quiet else ''}push しました：変更 {n} 件（{head}）")
