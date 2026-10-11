@@ -4,7 +4,8 @@
   weekly <vault> <案件> <週の月曜> <items.json>  : 週報（1人×1週×1案件）。進捗の数は自動で記録
   request <vault> <工程表ID> <changes.json> <区分> <理由> : 計画変更のリクエスト
   edit <vault> <工程表ID> <ops.json> <区分> <理由>     : 編集画面からの申請（追加・削除・分解・担当替えなど）
-  decide <リクエストID> <approved|rejected> <承認者> <コメント> : 承認・却下（承認なら工程表に反映）
+  decide <リクエストID> <approved|rejected> <承認者> <コメント> : 承認・却下（承認者の vault に承認ノートを書き、承認なら工程表に反映）
+  apply-approvals                               : 承認ノートで判断された計画変更を工程表に反映する（サーバの取り込み）
   gantt <工程表ID> <m1|m3|m6|y5|y10> [開始日]     : Excalidrawのガント図を作る・作り直す（書き込みは残す）
   migrate <案件リポジトリ>                       : 工程表を dotpm の形（<案件>.md と _tasks/）にする
   sync <案件リポジトリ>                          : dotpm の変更を工程表へ（承認が要るものは申請、却下されたら dotpm を計画に戻す）
@@ -40,7 +41,7 @@ def find(nid):
 def commit(vault, msg):
     vp = os.path.join(ROOT, vault); sh('git add -A', vp)
     if sh('git status --porcelain', vp): sh(f'git commit -qm "{msg}"', vp)
-    sh('git push -q origin main', vp); cmd_index()
+    sh('git push -q origin main', vp); cmd_index([vault])
 
 def cmd_weekly(vault, project, week, items):
     """週報：入力は1画面、保存は案件ごと。進捗（やることの完了数／総数）は保存時に自動で記録（人は入力しない）"""
@@ -189,9 +190,20 @@ def shift(x, n, hol):
         if G.workday(x, hol): k += step
     return x
 
-def cmd_decide(req_id, decision, by, comment):
+def cmd_decide(req_id, decision, by, comment, record=True):
+    """計画変更の判断を工程表に反映する。判断そのものは、判断した人の vault の承認ノートが正（tools/approve.py）。
+    record=True：by の vault に承認ノートを書く（試作で本人の代わりに書く時）。False：承認ノートは本人が push 済み（サーバの取り込み）"""
+    import approve
     rv, rn = find(req_id); rfm = rn['fm']
     if rfm.get('decision') == 'superseded': raise SystemExit('この申請は出し直されています（新しい申請を判断してください）')
+    if by != '（承認不要）':
+        if by not in approve.authority(rfm, reg()): raise SystemExit(f'{by} にはこの計画変更を判断する権限がありません（台帳の案件の owner・deputies）')
+        if record:
+            mine = {u: v for v, u in approve.personal_vaults(reg()).items()}.get(by)
+            if not mine: raise SystemExit(f'{by} の vault が台帳にありません')
+            approve.write(os.path.join(ROOT, mine), by, {'id': req_id, 'path': rn['path'], 'fm': rfm, 'title': title_of(rn['path'], rfm), 'commit_': ''},
+                          decision, comment)
+            commit(mine, f'承認ノート|{decision}|{req_id}')
     rfm.update(decision=decision, decided_by=by, comment=comment, decided_at=datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
     open(rn['path'], 'w', encoding='utf-8').write(join_fm(rfm, rn['body'])); commit(rv, f'計画変更の判断|{decision}')
     if decision != 'approved':
@@ -275,6 +287,18 @@ def cmd_sync(pvault):
     cmd_edit(mine, sid, ops, code, reason or '（理由が未記入。dotpm のタスクの「変更理由」に書く）')
     dotpm.clear_reasons(vp); after_decision(pvault)
 
+def cmd_apply_approvals():
+    """サーバの取り込み：承認ノートで判断された計画変更のうち、まだ工程表に反映していないものを反映する → 反映した数"""
+    import sqlite3
+    c = sqlite3.connect(DB); c.row_factory = sqlite3.Row; n = 0
+    for x in c.execute("select id, fm from notes where type = 'planreq'").fetchall():
+        fm = json.loads(x['fm'])
+        if not fm.get('approval') or fm.get('decision') not in ('approved', 'rejected'): continue
+        v, rn = find(x['id'])
+        if rn['fm'].get('decision') == fm['decision'] and rn['fm'].get('decided_by') == fm.get('decided_by'): continue
+        cmd_decide(x['id'], fm['decision'], fm['decided_by'], fm.get('comment') or '', record=False); n += 1
+    return n
+
 def norm_plan(tasks):
     return sorted((norm(t) | {'id': t['id']} for t in tasks), key=lambda t: t['id'])
 
@@ -320,6 +344,7 @@ if __name__ == '__main__':
     elif c == 'weekly': print(cmd_weekly(a[0], a[1], a[2], json.load(open(a[3], encoding='utf-8'))))
     elif c == 'request': print(cmd_request(a[0], a[1], json.load(open(a[2], encoding='utf-8')), a[3], a[4]))
     elif c == 'decide': cmd_decide(a[0], a[1], a[2], a[3])
+    elif c == 'apply-approvals': print('反映:', cmd_apply_approvals())
     elif c == 'edit': print(cmd_edit(a[0], a[1], json.load(open(a[2], encoding='utf-8')), a[3], a[4]))
     elif c == 'gantt': print(cmd_gantt(a[0], a[1], a[2] if len(a) > 2 else None))
     elif c == 'migrate': cmd_migrate(a[0])

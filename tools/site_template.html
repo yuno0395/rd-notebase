@@ -303,9 +303,9 @@ document.addEventListener('click',async e=>{
   const b=e.target.closest('button[data-act]'); if(b){openModal(b.closest('section.grant'),b.dataset.act);return;}
   if(e.target.closest('.mcancel')){M.hidden=true;M.querySelector('.mok').hidden=false;M.querySelector('.mcancel').textContent='やめる';return;}
   if(e.target.closest('.mok')){const sec=M.sec,act=M.dataset.act;M.hidden=true;const reason=why(sec);const it=sel(sec);
-    const out=sec.querySelector('.gout');const txt=act==='scope'?`見せる相手の変更\n対象: ${it.map(c=>c.value).join(', ')}\n付ける: ${M.st.add.join(', ')||'—'}\n外す: ${M.st.rem.join(', ')||'—'}${M.st.baseOn?'':'\n元の鍵を外す: はい'}\n理由: ${reason}`:`公開の判断 ${sec.dataset.gid}\n判断: ${act==='approve'?'公開':'却下'}\n対象: ${act==='approve'?it.map(c=>c.value).join(', '):'—'}\n理由: ${reason}`;
+    const out=sec.querySelector('.gout');const txt=act==='scope'?`見せる相手の変更\n対象: ${it.map(c=>c.value).join(', ')}\n付ける: ${M.st.add.join(', ')||'—'}\n外す: ${M.st.rem.join(', ')||'—'}${M.st.baseOn?'':'\n元の鍵を外す: はい'}\n理由: ${reason}`:`notebase.cmd approve ${sec.dataset.gid} ${act==='approve'?'公開':'却下'} "${reason.replace(/"/g,"'")}"${act==='approve'?' --targets '+it.map(c=>c.value).join(','):''}`;
     out.textContent=txt;out.hidden=false;const st=sec.querySelector('.gstate');if(st)st.textContent='状態：'+(act==='reject'?'却下（反映待ち）':'許可（反映待ち）');
-    sec.querySelector('.gmsg').innerHTML='判断を記録しました。試作では、下の内容をチャットに貼ると反映されます。<button class="copy" type="button">コピー</button>';}
+    sec.querySelector('.gmsg').innerHTML=act==='scope'?'判断を記録しました。試作では、下の内容をチャットに貼ると反映されます。<button class="copy" type="button">コピー</button>':'判断は、あなたの PC で下のコマンドを実行すると記録されます（あなたの vault に承認ノートが残り、本人の判断として扱われます）。<button class="copy" type="button">コピー</button>';}
   const cp=e.target.closest('button.copy'); if(cp){const t=(cp.closest('section')||cp.closest('.mbox')).querySelector('.gout');try{await navigator.clipboard.writeText(t.textContent);cp.textContent='コピーしました';}catch(_){const r=document.createRange();r.selectNodeContents(t);const s=getSelection();s.removeAllRanges();s.addRange(r);cp.textContent='選択しました。長押しでコピー';}}
 });
 // コメント：誰でも書ける。対象（ノート・フレーム・添付・引用）を選び、内容・画像を付ける。「やることにする」と担当・期限が付き、担当者に届く（指摘）
@@ -413,8 +413,8 @@ document.addEventListener('click',e=>{if(!(e.target.closest('.mok')&&M.dataset.a
 document.addEventListener('click',e=>{if(e.target.closest('.mcancel')&&M.D){undrag(M.D);M.D=null;}},true);
 function planDecide(btn){const sec=btn.closest('section');const c=sec.querySelector('textarea').value.trim();const msg=sec.querySelector('.gmsg');
   if(!c){msg.textContent='コメントを入れてください。';sec.querySelector('textarea').focus();return;}
-  const ok=btn.dataset.act==='plan-ok';const out=sec.querySelector('.gout');out.textContent=`計画変更の判断 ${sec.dataset.gid}\n判断: ${ok?'承認':'却下'}\nコメント: ${c}`;out.hidden=false;
-  msg.innerHTML='判断を記録しました。試作では、この内容をチャットに貼ると反映されます。<button class="copy" type="button">コピー</button>';}
+  const ok=btn.dataset.act==='plan-ok';const out=sec.querySelector('.gout');out.textContent=`notebase.cmd approve ${sec.dataset.gid} ${ok?'承認':'却下'} "${c.replace(/"/g,"'")}"`;out.hidden=false;
+  msg.innerHTML='判断は、あなたの PC で下のコマンドを実行すると記録されます（あなたの vault に承認ノートが残り、本人の判断として扱われます）。<button class="copy" type="button">コピー</button>';}
 function saveImg(w,withReq){const v=[...w.querySelectorAll('.gview')].find(x=>!x.hidden);const svg=v.querySelector('svg').cloneNode(true);
   svg.querySelectorAll('.hit').forEach(x=>x.remove());if(!withReq)svg.querySelectorAll('.req').forEach(x=>x.remove());
   const vb=svg.getAttribute('viewBox').split(' ').map(Number);const hgt=vb[3];svg.removeAttribute('data-geo');svg.setAttribute('width','1188');svg.setAttribute('height',String(hgt));

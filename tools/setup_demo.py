@@ -67,7 +67,16 @@ def main():
             sh(f'"{py}" tools/kv.py {step} {v}', ROOT); sh('git add -A', vp)
             if sh('git status --porcelain', vp).strip(): sh(f'git commit -qm "{msg}"', vp)
         sh('git push -q origin main', vp)
+    print(sh(f'"{py}" tools/kv.py migrate-approvals', ROOT).strip())   # 判断は判断した人の vault の承認ノートに（本人の確認）
+    for v in vaults:
+        vp = os.path.join(ROOT, v); sh('git add -A', vp)
+        if sh('git status --porcelain', vp).strip(): sh('git commit -qm "承認ノート（以前の判断を判断した人の vault に）"', vp); sh('git push -q origin main', vp)
     sh(f'"{py}" tools/kv.py index', ROOT)
+    if sh(f'"{py}" tools/dev/dev_quality.py', ROOT).strip() == 'need-approval':   # 要求・試験・ゲート・不具合の例と、上司の承認ノート
+        vp = os.path.join(ROOT, 'vault-yamada'); sh('git add -A', vp); sh('git commit -qm "要求・試験・ゲート・不具合の例"', vp); sh('git push -q origin main', vp)
+        sh(f'"{py}" tools/kv.py index vault-yamada', ROOT); sh(f'"{py}" tools/dev/dev_quality.py approve', ROOT)
+        vb = os.path.join(ROOT, 'vault-boss'); sh('git add -A', vb); sh('git commit -qm "承認ノート（要求）"', vb); sh('git push -q origin main', vb)
+        sh(f'"{py}" tools/kv.py index vault-boss', ROOT)
     for v in vaults:   # 案件の工程表は dotpm の形（取りまとめ役が Obsidian で直す）にしておく
         if v.startswith('proj-') and not glob.glob(os.path.join(ROOT, v, '_tasks')): print(sh(f'"{py}" tools/pm.py migrate {v}', ROOT).strip().splitlines()[-1])
     for u, f in (('boss', 'index.html'), ('yamada', 'yamada.html'), ('staff', 'staff.html')):

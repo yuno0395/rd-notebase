@@ -30,7 +30,7 @@ class Site:
         self.owned = {t for t, g in self.r['tags'].items() if user in (g['owner'], g.get('deputy'))}
         self.vis = {}
         for i, n in self.notes.items():
-            if n['type'] in ('attachment', 'grant'): continue
+            if n['type'] in ('attachment', 'grant', 'approval'): continue
             if can_see(user, n['access']): self.vis[i] = n
             else:
                 gv = granted(user, self.notes, i)
@@ -103,6 +103,52 @@ class Site:
             + (f'<h2>未対応のやること（{len(opn)}件・期限の近い順）</h2>{li(opn)}' if opn else '')
             + f'<details class="done" open><summary>コメント・対応済み（{len(rest)}件）</summary>{li(rest)}</details>')
 
+    def approval_line(self, n):
+        """承認の状態（承認ノートで確かめたもの）。書いてあるだけの承認は無効と出す"""
+        fm = json.loads(n['fm'])
+        if fm.get('status_claimed') or fm.get('claimed_decision'):
+            return '<p class="muted">⚠ 「承認」と書いてありますが、権限のある人の承認ノートがないので、承認待ちとして扱っています</p>'
+        if fm.get('approved_changed'):
+            return (f'<p class="muted">⚠ 承認後に変更あり（再承認が必要）。承認：{esc(self.uname(fm.get("approved_by")))}・承認した版 '
+                    f'{esc(fm.get("approved_version") or "")}（{esc(str(fm.get("approved_at") or "")[:16])}）</p>')
+        if fm.get('approval') and fm.get('approved_by' if fm.get('type') != 'planreq' else 'decided_by'):
+            who = fm.get('approved_by') or fm.get('decided_by'); at = fm.get('approved_at') or fm.get('decided_at') or ''
+            ver = fm.get('approved_version') or ''
+            return f'<p class="muted">承認：{esc(self.uname(who))}（{esc(str(at)[:16])}{"・版 " + esc(ver) if ver else ""}。{esc(who)} の承認ノートで確認）</p>'
+        return ''
+
+    def gates_and_trace(self, pid):
+        """案件ページ：ゲート（DR）の準備状況と、要求の対応表へのリンク。要求の対応表のページ（t-<案件>）も作る"""
+        import quality
+        out = []; byname = by_hash(self.notes)
+        gates = sorted((g for g in self.vis.values() if g['type'] == 'gate' and g['project'] == pid), key=lambda g: json.loads(g['fm']).get('milestone') or '')
+        if gates:
+            out.append('<h2>ゲート（DR）</h2>')
+            for g in gates:
+                st, items = quality.gate_state(g, self.notes, byname); fm = json.loads(g['fm'])
+                ok_n = sum(s == '承認済み' for _, _, s in items)
+                li = ''.join(f'<li>{"☑" if s == "承認済み" else "☐"} ' + (f'<a href="#n-{n["id"]}">{esc(t)}</a>' if n and n['id'] in self.vis else esc(t)) + f' <span class="muted">{esc(s)}</span></li>' for t, n, s in items)
+                out.append(f'<div class="gate"><p><b><a href="#n-{g["id"]}">{esc(g["title"])}</a></b> {esc(fm.get("milestone") or "")} '
+                           f'<span class="prog {"p-done" if st == "通過" else "p-wait" if st == "準備完了" else "p-work"}">{st}</span> 資料 {ok_n}/{len(items)} 承認済み</p><ul>{li}</ul></div>')
+        links = [(x['src'], x['dst'], x['kind']) for x in self.c.execute('select src, dst, kind from links')]
+        rows = quality.trace(pid, self.notes, links)
+        if rows:
+            bad = sum(1 for r in rows if r['flags'])
+            out.append(f'<p><a class="btn" href="#t-{pid}">要求の対応表（要求 {len(rows)} 件{f"・気になる点 {bad} 件" if bad else ""}）</a></p>')
+            flag_html = lambda fl: ''.join('<span class="prog p-hold">' + esc(f) + '</span> ' for f in fl) or 'なし'
+            def cell(ns, extra=None):
+                return '<br>'.join((f'<a href="#n-{n["id"]}">{esc(n["title"])}</a>' if n['id'] in self.vis else lock_html(n['access'], '非公開の資料', n['title'], n['id']))
+                                   + (f'（{esc(extra[k])}）' if extra else '') for k, n in enumerate(ns)) or '—'
+            tr = ''.join(
+                f'<tr><td>{cell([r["req"]])}</td><td>{esc(json.loads(r["req"]["fm"]).get("criteria") or "")}</td><td>{cell(r["designs"])}</td>'
+                f'<td>{cell(r["tests"], r["results"])}</td><td>{cell(r["issues"])}</td>'
+                f'<td>{flag_html(r["flags"])}</td></tr>' for r in rows)
+            self.pages[f't-{pid}'] = (f'<p class="crumb"><a href="#home">案件</a> / <a href="#p-{pid}">{pid}</a> / 要求の対応表</p><h1>要求の対応表</h1>'
+                f'<p class="lead">要求 ← 設計（derived_from）・試験（verifies・test_result）・不具合（affects）。PDF は view.py trace {pid}</p>'
+                '<div class="tablewrap"><table class="cardable"><thead><tr><th>要求</th><th>合否基準</th><th>設計</th><th>試験（結果）</th><th>不具合</th><th>気になる点</th></tr></thead><tbody>'
+                + tr + '</tbody></table></div>')
+        return ''.join(out)
+
     # ---------- 部品 ----------
     def scope(self, n, frame=None):
         return scope_html(self.notes, self.notes[n['id']], frame) if self.mgr else ''
@@ -125,7 +171,7 @@ class Site:
         if self.mgr and self.todo:
             home.append(f'<a class="todo" href="#grants">確認待ちが {self.todo} 件あります</a>')
         if SELF:   # 自分の vault だけを見る時：自分のノートを全部、更新の新しい順に
-            mine = sorted([n for n in self.vis.values() if n['type'] not in ('comment', 'grant', 'attachment')], key=lambda n: (str(n['updated']), n['id']), reverse=True)
+            mine = sorted([n for n in self.vis.values() if n['type'] not in ('comment', 'grant', 'attachment', 'approval')], key=lambda n: (str(n['updated']), n['id']), reverse=True)
             unsorted = [n for n in mine if not n['type']]
             home.append(f'<h1>自分のノート</h1><p class="lead">{len(mine)} 件・更新の新しい順' + (f'（未分類 {len(unsorted)} 件）' if unsorted else '') + '。Obsidian がなくても読める控えです</p>'
                         '<div class="tablewrap"><table class="cardable"><thead><tr><th>種類</th><th>ノート</th><th>担当</th><th>状況</th><th>次にやること</th><th>更新</th></tr></thead><tbody>'
@@ -152,6 +198,7 @@ class Site:
             self.pages[f'p-{pid}'] = (f'<p class="crumb"><a href="#home">案件</a> / {pid}</p><h1>{esc(p["name"])}</h1>'
                 f'<p class="lead">状態 {esc(p["status"])} ・ 責任者 {esc(self.uname(p["owner"]))}</p>'
                 + ''.join(f'<p><a class="btn" href="#g-{s["id"]}">工程表を見る</a></p>' for s in self.vis.values() if s['type'] == 'schedule' and s['project'] == pid)
+                + self.gates_and_trace(pid)
                 + '<div class="tablewrap"><table class="cardable"><thead><tr><th>種類</th><th>ノート</th><th>担当</th><th>状況</th><th>次にやること</th><th>更新</th></tr></thead><tbody>'
                 + ''.join(rows) + '</tbody></table></div>')
         if cards or not SELF: home.append('<h1>案件</h1><div class="cards">' + ''.join(cards) + '</div>')
@@ -210,11 +257,12 @@ class Site:
                 ps = [p for p in parents(self.c, self.notes, nid) if ok(u, self.notes, p)]
                 if ps: fam = '<div class="family up">この資料を使っている報告：' + '、'.join(f'<a href="#n-{p["id"]}">{esc(p["title"])}</a>' for p in ps) + '</div>'
             bl = [self.notes.get(s) for s in dict.fromkeys(s for s, k in back.get(nid, []) if s != nid)]   # 同じノートからの複数のリンクは1つに
-            bl_html = ''.join(f'<li>{link(b["id"])}</li>' for b in bl if b and b['type'] not in ('grant', 'comment'))
+            bl_html = ''.join(f'<li>{link(b["id"])}</li>' for b in bl if b and b['type'] not in ('grant', 'comment', 'approval'))
             self.pages[f'n-{nid}'] = (
                 f'<p class="crumb"><a href="#home">案件</a> / <a href="#p-{n["project"]}">{esc(n["project"])}</a></p>'
                 f'<h1>{"<span class=badge>報告</span>" if n["type"] == "report" else ""}{esc(n["title"])} {self.scope(n)}</h1>'
                 + (f'<p class="muted">アーカイブ済み（{esc(json.loads(n["fm"]).get("archived"))}）。vault からは移しましたが、ここでは読めます</p>' if json.loads(n["fm"]).get("archived") else '')
+                + self.approval_line(n)
                 + f'<dl class="meta"><div><dt>種類</dt><dd>{TYPE_JA.get(n["type"])}</dd></div><div><dt>担当</dt><dd>{esc(self.uname(n["owner"]))}</dd></div>'
                 f'<div><dt>更新</dt><dd>{upd_html(n, n.get("granted"))}</dd></div>'
                 + (f'<div><dt>状況</dt><dd>{self.prog(n)} {esc(n["next"])}</dd></div>' if n.get('progress') else '')
@@ -346,7 +394,7 @@ class Site:
         for row in self.c.execute("select distinct ref from ext where ref like 'part:%'"):
             pn = row['ref'][5:]
             srcs = [self.notes[s['src']] for s in self.c.execute('select distinct src from ext where ref=?', (row['ref'],))
-                    if self.notes[s['src']]['type'] not in ('grant', 'attachment')]
+                    if self.notes[s['src']]['type'] not in ('grant', 'attachment', 'approval')]
             self.pages[f'part-{pn}'] = (f'<p class="crumb"><a href="#home">案件</a> / 品番</p><h1 class="mono">{esc(pn)}</h1><p class="lead">この品番を参照しているノート</p><ul>'
                 + ''.join(f'<li><span class="type">{TYPE_JA.get(n["type"])}</span><a href="#n-{n["id"]}">{esc(n["title"])}</a></li>' if ok(self.user, self.notes, n)
                           else f'<li>{lock_html(n["access"], "非公開の資料", n["title"], n["id"])}</li>' for n in srcs) + '</ul>')

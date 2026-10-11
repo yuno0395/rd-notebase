@@ -26,6 +26,9 @@ tools/           Pythonプログラム（索引・権限・Web閲覧・PDF・工
   pdf_out.py     PDF出力（日本語フォント埋め込み、ID・版・QRのフッター）
   site_template.html  画面（素のHTML/CSS/JavaScript）
   dotpm.py       工程表と dotpm（Obsidian の工程管理プラグイン）の形式の行き来
+  approve.py     承認：承認者の vault の承認ノートだけを有効にする（台帳の権限）
+  quality.py     確定の流れ（必須項目・承認後の変更・ゲート）と要求の対応表
+  server.py      サーバの取り込み（検査・差分の索引・承認の反映・工程の照合・Web 閲覧）とバックアップ・復旧の試験
   attach.py      添付の手入れ（説明の .md・重複・縮小・50_data とデータの置き場・照合）。利用者の PC で push の前に動く
   archive.py     案件ごとのアーカイブ（依存のマップ・移す／写す／残す・記録・取り消し）
   setup_demo.py  サンプルデータから試作環境を作る
@@ -64,7 +67,12 @@ python3 tools/view.py build boss index.html            # Web閲覧を作り直�
 python3 tools/view.py pdf <ノートID> A4 boss            # PDF出力（A4〜A0）
 python3 tools/pm.py gantt <工程表ID> m3                 # Excalidrawのガント図（書き込みは残して作り直す）
 python3 tools/pm.py sync proj-P00001                    # dotpm の変更を工程表へ（承認が要るものは申請。サーバの受け取り処理）
-python3 tools/pm.py decide <申請ID> approved boss "コメント"               # 承認
+python3 tools/pm.py decide <申請ID> approved boss "コメント"               # 承認（boss の vault に承認ノートを書いて反映）
+python3 tools/server.py once                            # サーバの取り込みを1回（検査→差分の索引→承認の反映→工程の照合→Web閲覧）
+python3 tools/server.py run                             # 取り込みを1分ごとに続ける
+python3 tools/server.py backup /backup/rdnb             # ミラー（LFS も）と索引・台帳の控え（30日分）
+python3 tools/server.py restore-test /backup/rdnb       # 控えだけで索引を作り直せるか試す
+python3 tools/view.py trace P00001 boss                 # 要求の対応表の PDF（A3 横）
 ```
 
 PDFの日本語フォントは自動で探します。見つからない時は環境変数 `RDNB_FONT` にTTF/TTCのパスを指定してください。
@@ -72,7 +80,7 @@ PDFの日本語フォントは自動で探します。見つからない時は�
 ### 試作の割り切り
 
 - Web閲覧は「閲覧者ごとに、見てよいものだけを入れた1枚のHTML」を事前に作る方式です
-- 画面での承認・コメント・申請は、出てきた文字を手で反映します（画面から直接保存しない）。本番はサーバに送ります
+- 画面での承認は、出てきたコマンド（`notebase.cmd approve …`）を承認者が自分の PC で実行します（自分の vault に承認ノートが残る）。コメント・申請は、出てきた文字を手で反映します。本番はログイン付きの Web から送ります
 - 利用者の PC の `閲覧.html` は自分のノートだけ（他人のノート・案件全体はサーバの Web 閲覧）。コメント・見せる相手の変更などのボタンは出るが、自分だけの控えでは使わない
 - 他人のノートの参照はスタブ（プロパティ・要約・リンク先・図の SVG）まで。スタブを開いて本文を取得する専用プラグインはまだ無く、本文は Web 閲覧で見ます
 - 工程表の履歴（計画変更の経緯）は、`setup_demo.py` で作り直すと最初の1件からになります
@@ -131,6 +139,30 @@ workspace/              好きな場所に作る空のフォルダ
 - `notebase.cmd verify`：添付とデータの置き場の本体を sha256 で照合する（差し替わり・欠けの確認）
 - Obsidian の「除外するファイル」に `40_attachments/` を入れてある（検索・グラフ・リンク候補に出さない）。除外しても、改名した時のリンクの書き換えは効く
 
+### 承認（承認ノート）と確定の流れ
+
+- **状態**：`draft`（下書き。何も強制しない）→ `review`（レビュー待ち。push の検査で種類ごとの必須項目を確かめる）→ 承認
+- **必須項目**は台帳 `config/registry.yml` の `required`。例：検討は「結論」「却下した案と理由」の節、要求は `source_kind`・`source`・`criteria`、試験は `verifies`・`test_result`（progress を レビュー待ち・完了 にした時は警告だけ）
+- **承認は、承認する人が自分の vault に承認ノート（`type: approval`）を書く**：`notebase.cmd approve <申請・ノートのid> 承認 "理由"`（却下・取り消しも同じ。開示の一部だけ許す時は `--targets id#F01,id2`）。Web 閲覧の確認待ちの画面は、このコマンドを表示する
+- 各人の vault は本人だけが書き込める（GitHub などの権限）ので、「誰の vault にあるか」が本人の証明になる。サーバの索引は、**台帳で権限のある人の vault の承認ノートだけ**を有効にする（開示＝資料の鍵の owner・deputy、計画変更・文書＝案件の owner・deputies、案件のない文書＝台帳の approvers）。申請やノートに「承認」と書いてあるだけのものは、承認待ちとして扱い Web 閲覧に ⚠ を出す
+- 承認ノートには判断した時の版が残る。**承認した後に中身を変えると「承認後に変更あり（再承認が必要）」**になり、レビュー待ちに戻る（状態・更新日の書き換えだけは変更に数えない）
+- **ゲート（DR）**：テンプレート `09-gate`。節目（`milestone: M02`）と出す資料（`items`）を並べる。案件ページに準備状況（承認済み n/m）を出し、全部が承認済みで「準備完了」、責任者がゲートを承認すると「通過」
+
+### 要求の対応表（一本の糸）
+
+- 要求（`07-req`：出所の区分・出所・合否基準・優先度）← 設計（`derived_from: [[要求]]`）・試験（`08-test`：`verifies`・`test_result`・`tested`）・不具合（`10-issue`：`affects`・`parts`・`state`）
+- 案件ページの「要求の対応表」と `view.py trace <案件>`（PDF）で、設計なし・試験なし・不合格・**試験の後に要求が変わった（再検証が必要）**・未解決の不具合を目立たせる
+- 品番（`parts`）からは品番のページで、その品番を参照する要求・設計・試験・不具合を辿れる
+
+### サーバの取り込み（tools/server.py）
+
+GitHub.com では push を拒否する仕組み（pre-receive）が使えないので、**受け取ってから、合格した版だけを有効にする**。
+
+- 1分ごと（`server.py run`、またはスケジューラから `server.py once`）に、台帳の各リポジトリを取ってくる（`registry.yml` の `remotes` に URL があれば fetch）
+- main が変わったリポジトリだけ検査する。合格なら `refs/rdnb/accepted` を進め、**変わった vault だけ索引を入れ直す（差分の索引）**。不合格なら前の合格した版のまま（索引・Web 閲覧・他の人のスタブには出ない）。本人の notebase は次の保存の時に `_notebase のお知らせ.md` で理由を知らせる
+- 承認ノートで判断された計画変更を工程表に反映し、案件リポジトリの dotpm の変更を照合し、Web 閲覧を作り直す
+- **保全**：`server.py backup <置き場>` を毎日（ミラーは消えた枝も残す。LFS の中身、索引と台帳は日付ごとに30日分）。`server.py restore-test <置き場>` を月1回（控えだけで索引を作り直し、件数を比べる）。復旧は「ミラーから戻す → `kv.py index`」の2段
+
 ### 案件のアーカイブ（notebase.cmd archive）
 
 ノートと添付が増えすぎないように、終わった案件を vault の外へ移す。台帳の案件が「完了」になると、notebase が `notebase.cmd archive P00001` を案内する。
@@ -185,6 +217,10 @@ workspace/              好きな場所に作る空のフォルダ
 | `04-daily` | 今日のデイリーノートを開く（無ければ `01_daily/2026-10-11.md` を作る） |
 | `05-weekly` | 今週の週ノートを開く（無ければ `01_daily/週/2026-W41.md` を作る） |
 | `06-project` | 案件まとめ（`type: project`）。目的・体制・節目と、案件のノートへのリンク。アーカイブの起点 |
+| `07-req` | 要求（出所の区分・出所・合否基準・優先度）。レビュー待ちで出所・合否基準が必須 |
+| `08-test` | 試験（`verifies: [[要求]]`・結果・試験日） |
+| `09-gate` | ゲート（DR）。節目と出す資料の一覧 |
+| `10-issue` | 不具合（`affects`・品番・`state`） |
 
 デイリー・週ノートの中身は `90_templates/periodic` の daily・weekly です。Ctrl+N の `04-daily`・`05-weekly`、Periodic Notes のコマンド（「Open today's daily note」など）、カレンダーのどれから開いても、`01_daily` に日付の名前で作られ、Templater がフォルダごとに中身を入れます（ファイル名が日付なので、題名を聞かれません）。ファイル一覧の「新規ノート」やコマンドパレットで作った空のノートには、Templater が 01-base を入れます（フォルダテンプレート `/`）。Excalidraw の新規作成も 01-base から作ります（図のテンプレートに指定。実機では未確認）。それでも id のないノートには、push 時に notebase が id を付けます。
 

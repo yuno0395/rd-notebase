@@ -246,7 +246,9 @@ tool env inputs result_hash promoted_to excalidraw-plugin note
 targets audience purpose requested_by approvers decision reason approved_targets approved_version approved_at report revoked
 about about_label assignee due state file sha256 source checks approved_by
 copied_version tasks baselines roadmap items week schedule changes ops lines code needs_approval why remap decided_by decided_at comment gantt
-store path size original original_sha256 archived ref_id'''.split()) | set(REL)
+store path size original original_sha256 archived ref_id
+version approval claimed_decision status_claimed approved_changed changed_at
+source_kind criteria priority test_result tested milestone items'''.split()) | set(REL)
 DATE_KEYS = ('created', 'updated', 'due')
 
 def check_props(fn, fm, r, warns, errs):
@@ -305,6 +307,7 @@ def check(vp):
     for nid, n in notes.items():
         fn = os.path.basename(n['path']); fm = n['fm']
         check_props(fn, fm, r, warns, errs)
+        import quality; e2, w2 = quality.required_errors(fn, fm, n['body'], r); errs += e2; warns += w2   # レビュー待ち・承認に進める時の必須項目
         if fn != nfc(fn): errs.append(f"{fn}: NFCでない")
         if not ID_RE.match(nid): errs.append(f"{fn}: id形式不正 {nid}")
         for t in fm.get('access') or []:
@@ -343,7 +346,7 @@ def cmd_push(vault, msg='auto'):
     if sh('git status --porcelain', vp):
         sh(f'git commit -qm "{msg}"', vp)
     sh('git push -q origin main', vp)
-    cmd_index()
+    cmd_index([vault])
     print('反映OK', sh('git rev-parse --short HEAD', vp))
 
 # ---------- LFS（サーバ側で引換券を中身に戻す） ----------
@@ -377,66 +380,103 @@ def restore_archived(work, bare):
     return out
 
 # ---------- 索引DB ----------
-def cmd_index():
-    r = reg()
-    if os.path.exists(DB): os.remove(DB)
-    db = sqlite3.connect(DB)
-    db.executescript("""create table notes(id primary key, vault, path, type, title, owner, project, status,
-        access, progress, next, updated, summary, commit_, fm, body, names);
-        create table links(src, dst, kind, frame, ver);
-        create table ext(src, ref);
-        create virtual table fts using fts5(id, title, body, tokenize='trigram');""")
-    pending = []   # リンクは全部のノートを入れてから、名前 → id に引き直す
-    for vault in r['vaults']:
-        bare = bare_of(vault); work = os.path.join(SRV, 'work', vault)
-        if os.path.exists(work): shutil.rmtree(work)
-        os.makedirs(work)
-        # main の中身を書き出す。一時の index を使い、元のリポジトリの HEAD・index には触らない（LFS は下で中身に戻す）
-        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(SRV, 'work', '.index'), GIT_LFS_SKIP_SMUDGE='1')
-        for args in (['read-tree', 'main'], ['checkout-index', '-a', '-f']):
-            subprocess.run(['git', f'--git-dir={bare}', f'--work-tree={work}', *args], env=env, check=True, capture_output=True)
-        archived = restore_archived(work, bare)   # アーカイブで vault から移したノートも、記録の版から読み出して索引に残す
-        lfs_resolve(work, bare)
-        commit = sh(f'git --git-dir="{bare}" rev-parse --short main')
-        olds = renames(bare)
-        for nid, n in scan_vault(work).items():
-            fm = dict(n['fm']); body = n['body']; rel = os.path.relpath(n['path'], work).replace(os.sep, '/')
-            fm['title'] = title_of(rel, fm)   # 索引には題名を入れておく（ノートには書かない）
-            if nid in archived: fm['archived'] = archived[nid]
-            db.execute('insert into notes values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', (
-                nid, vault, os.path.relpath(n['path'], work), fm.get('type'), fm.get('title'), fm.get('owner'),
-                fm.get('project'), fm.get('status'), json.dumps(fm.get('access') or [], ensure_ascii=False),
-                fm.get('progress'), fm.get('next'), str(fm.get('updated')), fm.get('summary'), commit,
-                json.dumps(fm, ensure_ascii=False, default=str), body,
-                json.dumps(sorted({link_key(o) for o in olds.get(rel, []) + (olds.get(os.path.dirname(rel) + '/' + file_of(fm), []) if fm.get('type') == 'attachment' and file_of(fm) else [])}
-                                  - {link_key(rel)}), ensure_ascii=False)))   # 改名前の名前（添付は本体のファイルの前の名前も）
-            text = body
-            if has_drawing(n):
-                text = text_part(body) + ' ' + ' '.join(e.get('text', '') or e.get('name', '') or '' for e in parse_drawing(body)['elements'])
-            db.execute('insert into fts values(?,?,?)', (nid, fm.get('title'), text))
-            for bang, tgt, fr, ver, _ in LINK_RE.findall(body):
-                if tgt.startswith(tuple(t + ':' for t in r['ref_types'])):
-                    db.execute('insert into ext values(?,?)', (nid, tgt)); continue
-                pending.append((vault, nid, tgt, 'cites' if bang else 'link', fr, ver))
-            for k in REL:
-                vs = fm.get(k) or []
-                for v in ([vs] if isinstance(vs, str) else vs):   # 1つだけの時は文字列でもよい（copied_from など）
-                    pending.append((vault, nid, str(v), k, '', ''))
-            for p in fm.get('parts') or []:
-                db.execute('insert into ext values(?,?)', (nid, f'part:{p}'))
-            if fm.get('project'): db.execute('insert into ext values(?,?)', (nid, f"proj:{fm['project']}"))
+SCHEMA = """create table notes(id primary key, vault, path, type, title, owner, project, status,
+    access, progress, next, updated, summary, commit_, fm, body, names);
+    create table links(src, dst, kind, frame, ver);
+    create table ext(src, ref);
+    create virtual table fts using fts5(id, title, body, tokenize='trigram');
+    create table fm_raw(id primary key, fm);
+    create table refs(vault, src, tgt, kind, frame, ver);
+    create table indexed(vault primary key, ref, commit_, at);"""
+ACCEPTED = 'refs/rdnb/accepted'   # サーバの検査を通った版（tools/server.py が付ける）。無ければ main を使う
+
+def index_ref(bare):
+    r = subprocess.run(['git', f'--git-dir={bare}', 'rev-parse', '-q', '--verify', ACCEPTED], capture_output=True)
+    return ACCEPTED if r.returncode == 0 else 'main'
+
+def cmd_index(vaults=None):
+    """索引を作る。vaults を渡すと、その vault だけを入れ直す（差分の索引。リンクと承認は全体で引き直す）"""
+    r = reg(); full = vaults is None or not os.path.exists(DB)
+    if not full:
+        db = sqlite3.connect(DB)
+        if not db.execute("select 1 from sqlite_master where name = 'refs'").fetchone(): db.close(); full = True   # 以前の形の索引
+    if full:
+        if os.path.exists(DB): os.remove(DB)
+        db = sqlite3.connect(DB); db.executescript(SCHEMA)
+    todo = list(r['vaults']) if full else [v for v in vaults if v in r['vaults']]
+    if not full:   # 台帳から外れた vault は消す
+        for (v,) in db.execute('select distinct vault from notes').fetchall():
+            if v not in r['vaults']: todo.append(v)
+    for vault in todo:
+        if not full:
+            ids = [x for (x,) in db.execute('select id from notes where vault = ?', (vault,))]
+            for i in range(0, len(ids), 500):
+                q = ','.join('?' * len(ids[i:i + 500]))
+                for tb, col in (('fts', 'id'), ('ext', 'src'), ('fm_raw', 'id')): db.execute(f'delete from {tb} where {col} in ({q})', ids[i:i + 500])
+            db.execute('delete from notes where vault = ?', (vault,)); db.execute('delete from refs where vault = ?', (vault,))
+            db.execute('delete from indexed where vault = ?', (vault,))
+            if vault not in r['vaults']: continue
+        index_vault(db, r, vault)
+    # リンク：名前 → id に引き直す（同じ vault の名前を先に、なければ全体から）。改名・削除・新しいノートにも追従する
+    db.execute('delete from links')
     db.row_factory = sqlite3.Row
     rows = {x['id']: dict(x) for x in db.execute('select id, vault, path, names, owner, fm from notes')}
     glob_ = names_index(rows); local = {}
     for v in r['vaults']: local[v] = names_index({i: x for i, x in rows.items() if x['vault'] == v})
-    for vault, src, tgt, kind, fr, ver in pending:   # 同じ vault の名前を先に、なければ全体から
-        k = link_key(tgt); dst = local.get(vault, {}).get(k) or glob_.get(k)
-        if dst: db.execute('insert into links values(?,?,?,?,?)', (src, dst, kind, fr, ver))
-    db.commit(); print('索引更新', db.execute('select count(*) from notes').fetchone()[0], '件')
+    for x in db.execute('select * from refs').fetchall():
+        k = link_key(x['tgt']); dst = local.get(x['vault'], {}).get(k) or glob_.get(k)
+        if dst: db.execute('insert into links values(?,?,?,?,?)', (x['src'], dst, x['kind'], x['frame'], x['ver']))
+    import approve   # 承認：権限のある人の vault にある承認ノートだけで判断を決め直す（対象のノートに書いてある判断は信用しない）
+    for t, a, why in approve.resolve(db, r): print('承認の確認:', t, a, why)
+    db.row_factory = sqlite3.Row
+    db.commit(); print('索引更新', db.execute('select count(*) from notes').fetchone()[0], '件' + ('' if full else f'（入れ直し：{"・".join(todo) or "なし"}）'))
 
-def renames(bare):
+def index_vault(db, r, vault):
+    bare = bare_of(vault); work = os.path.join(SRV, 'work', vault); ref = index_ref(bare)
+    if os.path.exists(work): shutil.rmtree(work)
+    os.makedirs(work)
+    # 受け入れ済みの版（無ければ main）の中身を書き出す。一時の index を使い、元のリポジトリの HEAD・index には触らない（LFS は下で中身に戻す）
+    env = dict(os.environ, GIT_INDEX_FILE=os.path.join(SRV, 'work', '.index'), GIT_LFS_SKIP_SMUDGE='1')
+    for args in (['read-tree', ref], ['checkout-index', '-a', '-f']):
+        subprocess.run(['git', f'--git-dir={bare}', f'--work-tree={work}', *args], env=env, check=True, capture_output=True)
+    archived = restore_archived(work, bare)   # アーカイブで vault から移したノートも、記録の版から読み出して索引に残す
+    lfs_resolve(work, bare)
+    commit = sh(f'git --git-dir="{bare}" rev-parse --short {ref}')
+    olds = renames(bare, ref)
+    import quality; last = quality.last_changes(bare, ref)   # 各ファイルを最後に変えた日時（要求の再検証の判定に使う）
+    for nid, n in scan_vault(work).items():
+        fm = dict(n['fm']); body = n['body']; rel = os.path.relpath(n['path'], work).replace(os.sep, '/')
+        fm['title'] = title_of(rel, fm)   # 索引には題名を入れておく（ノートには書かない）
+        if nid in archived: fm['archived'] = archived[nid]
+        if last.get(rel): fm['changed_at'] = last[rel]
+        fj = json.dumps(fm, ensure_ascii=False, default=str)
+        db.execute('insert into notes values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', (
+            nid, vault, os.path.relpath(n['path'], work), fm.get('type'), fm.get('title'), fm.get('owner'),
+            fm.get('project'), fm.get('status'), json.dumps(fm.get('access') or [], ensure_ascii=False),
+            fm.get('progress'), fm.get('next'), str(fm.get('updated')), fm.get('summary'), commit, fj, body,
+            json.dumps(sorted({link_key(o) for o in olds.get(rel, []) + (olds.get(os.path.dirname(rel) + '/' + file_of(fm), []) if fm.get('type') == 'attachment' and file_of(fm) else [])}
+                              - {link_key(rel)}), ensure_ascii=False)))   # 改名前の名前（添付は本体のファイルの前の名前も）
+        db.execute('insert or replace into fm_raw values(?,?)', (nid, fj))   # 書いてあるままの項目（承認の判定はここから毎回やり直す）
+        text = body
+        if has_drawing(n):
+            text = text_part(body) + ' ' + ' '.join(e.get('text', '') or e.get('name', '') or '' for e in parse_drawing(body)['elements'])
+        db.execute('insert into fts values(?,?,?)', (nid, fm.get('title'), text))
+        for bang, tgt, fr, ver, _ in LINK_RE.findall(body):
+            if tgt.startswith(tuple(t + ':' for t in r['ref_types'])):
+                db.execute('insert into ext values(?,?)', (nid, tgt)); continue
+            db.execute('insert into refs values(?,?,?,?,?,?)', (vault, nid, tgt, 'cites' if bang else 'link', fr, ver))
+        for k in REL:
+            vs = fm.get(k) or []
+            for v in ([vs] if isinstance(vs, str) else vs):   # 1つだけの時は文字列でもよい（copied_from など）
+                db.execute('insert into refs values(?,?,?,?,?,?)', (vault, nid, str(v), k, '', ''))
+        for p in fm.get('parts') or []:
+            db.execute('insert into ext values(?,?)', (nid, f'part:{p}'))
+        if fm.get('project'): db.execute('insert into ext values(?,?)', (nid, f"proj:{fm['project']}"))
+    db.execute('insert or replace into indexed values(?,?,?,?)', (vault, ref, commit, datetime.datetime.now().isoformat(timespec='seconds')))
+
+def renames(bare, ref='main'):
     """Git の履歴の改名 → {今のパス: [前のパス, …]}（改名前の名前でリンクしても辿れるように）"""
-    out = subprocess.run(['git', f'--git-dir={bare}', '-c', 'core.quotepath=off', 'log', '--format=', '--name-status', '-M30%', 'main'],   # 改名と同時に書き換えても辿れるよう、似ている度合いは緩め
+    out = subprocess.run(['git', f'--git-dir={bare}', '-c', 'core.quotepath=off', 'log', '--format=', '--name-status', '-M30%', ref],   # 改名と同時に書き換えても辿れるよう、似ている度合いは緩め
                          capture_output=True, text=True, encoding='utf-8').stdout
     prev = {}
     for line in out.splitlines():   # 新しい順
@@ -601,7 +641,7 @@ def cmd_copy(vp, viewer, key):
     c = core.db(); notes = core.all_notes(c); hmap = core.by_hash(notes)
     n = notes.get(key) or hmap.get(link_key(key) or '')
     if not n:
-        hits = [x for x in notes.values() if key in (x['title'] or '') and x['owner'] != viewer and x['type'] not in ('attachment', 'grant', 'comment')]
+        hits = [x for x in notes.values() if key in (x['title'] or '') and x['owner'] != viewer and x['type'] not in ('attachment', 'grant', 'comment', 'approval')]
         if len(hits) != 1: raise SystemExit(f'「{key}」に合うノートが' + ('見つかりません' if not hits else f' {len(hits)} 件あります：' + '、'.join(f"{x['title']}（{x['id']}）" for x in hits[:5])))
         n = hits[0]
     fm = json.loads(n['fm'])
@@ -694,7 +734,7 @@ if __name__ == '__main__':
         cmd_new(a[0], a[1], a[2], project=kw.pop('project', None), extra=kw or None)
     elif c == 'attach': cmd_attach(a[0], a[1], a[2], a[3] if len(a) > 3 else '')
     elif c == 'push': cmd_push(a[0], a[1] if len(a) > 1 else 'auto')
-    elif c == 'index': cmd_index()
+    elif c == 'index': cmd_index(a or None)   # kv.py index [vault…]：vault を並べるとその分だけ入れ直す
     elif c == 'copy':   # kv.py copy <自分のvault> <ノートのid・タイトルの一部>
         vp = os.path.join(ROOT, a[0]); made, msg = cmd_copy(vp, reg()['vaults'][a[0]], a[1])
         for m in made: print('作成:', os.path.relpath(m, vp))
@@ -705,4 +745,6 @@ if __name__ == '__main__':
         print(drop_title(os.path.join(ROOT, a[0])), '件')
     elif c == 'refs': print(cmd_refs(os.path.join(ROOT, a[0]), reg()['vaults'][a[0]], a[1:]))   # kv.py refs <自分のvault> <購読するvault>...
     elif c == 'check': print(check(os.path.join(ROOT, a[0])))
+    elif c == 'migrate-approvals':   # kv.py migrate-approvals：申請のノートに書いてあった判断を、判断した人の vault の承認ノートにする（試作環境の移行）
+        import approve; print(approve.migrate(ROOT, reg()))
     else: print(__doc__)

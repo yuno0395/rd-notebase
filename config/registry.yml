@@ -98,3 +98,17 @@ properties:
     scope: P00001
     stub: false
     desc: 評価した材料
+approvers:          # 案件のないノートの承認者（文書の status: approved）。案件のノートは projects.<案件>.owner・deputies
+- boss
+required:           # status を review・approved（progress を レビュー待ち・完了）にした時の必須項目。下書きは自由
+  study:
+    sections: [結論|Conclusion, 却下した案と理由|Rejected options and why]
+  report:
+    sections: [要旨|Summary]
+    props: [summary]
+  req:
+    props: [source_kind, source, criteria]
+  test:
+    props: [verifies, test_result]
+  gate:
+    props: [milestone, items]

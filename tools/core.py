@@ -28,5 +28,5 @@ def meta_row(n, r):
 def week_start():
     d = datetime.date.today(); return d - datetime.timedelta(days=d.weekday())
 
-TYPE_JA = {None: '未分類', '': '未分類', 'req': '要求', 'study': '検討', 'calc': '計算', 'report': '報告', 'meeting': '議事録', 'drawing': '図', 'attachment': '添付', 'daily': 'デイリー', 'memo': 'メモ', 'comment': 'コメント', 'weeknote': '週ノート', 'project': '案件まとめ'}
+TYPE_JA = {None: '未分類', '': '未分類', 'req': '要求', 'study': '検討', 'calc': '計算', 'report': '報告', 'meeting': '議事録', 'drawing': '図', 'attachment': '添付', 'daily': 'デイリー', 'memo': 'メモ', 'comment': 'コメント', 'weeknote': '週ノート', 'project': '案件まとめ', 'approval': '承認', 'test': '試験', 'issue': '不具合', 'gate': 'ゲート'}
 PROG = {'検討中': 'p-work', 'レビュー待ち': 'p-wait', '完了': 'p-done', '保留': 'p-hold'}

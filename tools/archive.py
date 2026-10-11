@@ -94,7 +94,7 @@ def plan(vp, key, reg, today=None, years=None):
         cut = today.replace(year=today.year - int(years))
         def old(n): return str(n['fm'].get('created') or n['fm'].get('updated') or '9999') < str(cut)
         seeds = [i for i, n in notes.items() if old(n) and (n['fm'].get('type') in KEEP_TYPES or
-                 (not n['fm'].get('project') and n['fm'].get('type') not in ('attachment', 'project', 'grant') and not inbound.get(i)))]
+                 (not n['fm'].get('project') and n['fm'].get('type') not in ('attachment', 'project', 'grant', 'approval') and not inbound.get(i)))]
         root, pid, follow = None, '', False
         name = f'日誌_{cut:%Y%m%d}より前'
     else:

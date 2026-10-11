@@ -13,6 +13,8 @@
   run.py pdf <ID>   ノートを PDF に（A4。2つ目の引数で A3〜A0。workspace/pdf/ に出す）
   run.py copy <ID>  他人のノートを図・貼った画像ごと自分の vault にコピー（コピー元と版を残す）
   run.py verify     添付とデータの置き場の本体を sha256 で照合（差し替わり・欠けがないか）
+  run.py approve <申請・ノートのid> <承認|却下|取り消し> [理由] [--targets id#F01,id2]
+                    承認・却下を自分の vault に承認ノートとして書いて push（本人の判断として扱われる）
   run.py archive <案件>  案件のアーカイブ（依存のマップをブラウザで開いて、移す・写す・残すを選ぶ）
   run.py status     状態の表示
 """
@@ -264,6 +266,23 @@ def verify():
     say(f'照合：{n} 件' + ('、問題なし' if not bad else f'、問題 {len(bad)} 件'))
     if bad: raise SystemExit(1)
 
+# ---------- 承認（自分の vault に承認ノートを書く） ----------
+def approve_cmd(args):
+    import kv, approve, sqlite3
+    tg = None
+    if '--targets' in args:
+        i = args.index('--targets'); tg = [x for x in args[i + 1].split(',') if x]; args = args[:i] + args[i + 2:]
+    if len(args) < 2: raise SystemExit('使い方：notebase.cmd approve <申請・ノートのid> <承認|却下|取り消し> [理由] [--targets id#F01,id2]')
+    if not os.path.exists(kv.DB): raise SystemExit('サーバの索引に届かないので、承認できません')
+    con = sqlite3.connect(kv.DB); t = approve.find_target(con, args[0]); user = cfg()['user']
+    con.row_factory = sqlite3.Row; rows = {x['id']: dict(x) for x in con.execute('select id, access from notes')}
+    if user not in approve.authority(json.loads(t['fm']), kv.reg(), rows):
+        raise SystemExit(f"あなた（{user}）には、この{approve.KIND_JA[approve.kind_of(json.loads(t['fm']))]}を判断する権限がありません（台帳）")
+    autosave('承認前の自動保存')
+    p = approve.write(VAULT, user, t, args[1], args[2] if len(args) > 2 else '', targets=tg)
+    say('承認ノートを作りました：', os.path.relpath(p, VAULT))
+    push()
+
 # ---------- 検査 → push ----------
 def push(quiet=False):
     c = cfg()
@@ -417,6 +436,16 @@ def open_file(p):
     if platform.system() == 'Windows': os.startfile(p)
     elif shutil.which('xdg-open'): subprocess.Popen(['xdg-open', p])
 
+def server_status():
+    """サーバの検査の結果（tools/server.py が置く status/<ID>.json）。不合格ならお知らせを置く（索引・Web 閲覧には前の合格した版が出ている）"""
+    import kv
+    c = cfg() or {}; p = os.path.join(kv.SRV, 'status', f"{c.get('user')}.json")
+    if not os.path.exists(p): return
+    d = json.loads(read(p))
+    if d.get('ok') is False:
+        msg = 'サーバの検査で止まりました（版 ' + d.get('commit', '')[:7] + '）。直すまで、索引・Web 閲覧・他の人のスタブには前の版が出ます\n' + '\n'.join('拒否: ' + e for e in d.get('errors') or [])
+        notice(msg); say(msg)
+
 # ---------- 保存できない時のお知らせ ----------
 def notice(msg=None):
     """push や検査が止まったら vault に「_notebase のお知らせ」を置く（Obsidian の一覧とデイリーの未分類に出る）。直ったら消す"""
@@ -463,11 +492,12 @@ def main():
             if cmd == 'push':
                 try: push(quiet=True)
                 except (SystemExit, Exception) as e: notice(str(getattr(e, 'code', e))); raise
-                notice(); projects(); refs(); view()   # 控え（閲覧.html）は中身が変わった時だけ作り直す
+                notice(); server_status(); projects(); refs(); view()   # 控え（閲覧.html）は中身が変わった時だけ作り直す
                 return
             if not cfg(): return setup()
             if cmd == 'view': autosave('閲覧前の自動保存'); return view(open_it=True)
             if cmd == 'verify': return verify()
+            if cmd == 'approve': return approve_cmd(args)
             if cmd == 'archive':
                 import archive
                 tend_attachments(cfg()); autosave('アーカイブ前の自動保存')
@@ -497,7 +527,7 @@ def main():
                 if cmd == 'sync':
                     try: push()
                     except (SystemExit, Exception) as e: notice(str(getattr(e, 'code', e))); raise
-                    notice(); projects(); refs(); view()
+                    notice(); server_status(); projects(); refs(); view()
                 status()
             else: print(__doc__)
     except SystemExit as e:
