@@ -1,8 +1,0 @@
-{
- "ganttSkipWeekends": true,
- "showCriticalPath": true,
- "ganttShowWarnings": true,
- "createCompanionNotes": false,
- "linkingStyle": "csv",
- "kanbanGroupBy": "status"
-}

@@ -1,7 +1,7 @@
 """描画：図（SVG）、本文、版、鍵、見せる相手の表示"""
 import sys, os, re, json, sqlite3, html, base64, datetime, subprocess, hashlib, glob, functools, yaml, markdown
 sys.path.insert(0, os.path.dirname(__file__))
-from kv import bare_of, ROOT, SRV, DB, reg, parse_drawing, embedded_files, LINK_RE, hash_of, can_see, read_note, split_fm
+from kv import bare_of, ROOT, SRV, DB, reg, parse_drawing, embedded_files, LINK_RE, hash_of, can_see, read_note, split_fm, file_of
 from core import *
 from access import *
 
@@ -100,7 +100,8 @@ def image_file(n, fn, user, notes, hmap):
     side = hmap.get(hash_of(fn or ''))
     if side:
         if user and not (can_see(user, side['access']) or granted(user, notes, side['id'])): return None
-        return os.path.join(os.path.dirname(work_path(side)), json.loads(side['fm'])['file'])
+        f = file_of(side['fm'])
+        return os.path.join(os.path.dirname(work_path(side)), f) if f and json.loads(side['fm']).get('store') != 'data' else None
     if not fn or (user and not can_see(user, n['access'])): return None
     work = os.path.join(SRV, 'work', n['vault'])
     return next((x for x in [os.path.join(work, fn)] + glob.glob(os.path.join(work, '**', os.path.basename(fn)), recursive=True) if os.path.isfile(x)), None)
@@ -131,8 +132,9 @@ def svg_frame(n, frame, els, user, notes, pad=10, mark=None):
         elif t == 'text':
             fs = e.get('fontSize', 20); al = e.get('textAlign', 'left')
             tx, ta = (X + W, 'end') if al == 'right' else (X + W / 2, 'middle') if al == 'center' else (X, 'start')
+            lh = e.get('lineHeight') or 1.25   # Excalidraw の行の高さ（文字の大きさの倍率）
             for i, line in enumerate(str(e.get('text', '')).split('\n')):
-                out.append(f'<text x="{tx}" y="{Y+fs*(i+1)}" text-anchor="{ta}" font-size="{fs}" fill="{sc}" font-family="BIZ UDPGothic, sans-serif">{esc(line)}</text>')
+                out.append(f'<text x="{tx}" y="{Y + fs * (lh * i + (lh + 0.8) / 2)}" text-anchor="{ta}" font-size="{fs}" fill="{sc}" font-family="BIZ UDPGothic, sans-serif">{esc(line)}</text>')
         elif t == 'image':
             p = image_file(n, files.get(e.get('fileId')), user, notes, hmap)
             if p:
@@ -156,8 +158,8 @@ def thumb_html(n, notes):
     for tgt in re.findall(r'^!\[\[([^\]]+)\]\]$', n['body'], re.M):
         tn = hm.get(hash_of(tgt))
         if not tn or tn['type'] != 'attachment': continue
-        fm = json.loads(tn['fm']); p = os.path.join(os.path.dirname(work_path(tn)), fm['file'])
-        if not p.lower().endswith(('.png', '.jpg', '.jpeg')): continue
+        fm = json.loads(tn['fm']); p = os.path.join(os.path.dirname(work_path(tn)), file_of(fm) or '')
+        if fm.get('store') == 'data' or not os.path.isfile(p) or not p.lower().endswith(('.png', '.jpg', '.jpeg')): continue
         tb, tm = web_image(p, 240, 0, 70)
         fb, fmime = web_image(p)
         full = asset(f'<img alt="{esc(fm["title"])}" src="data:{fmime};base64,{fb}">')   # 本文の表示と同じ画像（重複させない）
@@ -201,13 +203,14 @@ def render_body(n, user, notes):
             return lock_html(tn['access'], 'アクセス権のない資料' if bang else 'アクセス権なし', ttl, tn['id'] + (fr if bang and fr else ''))
         if bang:
             if tn['type'] == 'attachment':
-                fm = json.loads(tn['fm']); p = os.path.join(os.path.dirname(work_path(tn)), fm['file'])
-                if p.endswith(('.png', '.jpg', '.jpeg')):
+                fm = json.loads(tn['fm']); p = os.path.join(os.path.dirname(work_path(tn)), file_of(fm) or '')
+                if fm.get('store') != 'data' and os.path.isfile(p) and p.lower().endswith(('.png', '.jpg', '.jpeg')):
                     b, mime = web_image(p)
                     sb = f'<div class="scopebar">{scope_html(notes, tn)}</div>' if is_mgr(user) else ''
                     img = f'<img alt="{esc(fm["title"])}" src="data:{mime};base64,{b}">'
                     return f'<figure>{sb}{asset(img)}<figcaption>{esc(fm["title"])}</figcaption></figure>'
-                return f'<span class="chip">添付 {esc(fm["file"])}</span>'
+                if fm.get('store') == 'data': return f'<span class="chip">データ {esc(file_of(fm) or "")}（{fm.get("size", 0) / 1e6:.1f} MB・本体はデータの置き場）</span>'
+                return f'<span class="chip">添付 {esc(file_of(fm) or "")}</span>'
             if has_drawing(tn):
                 tv = at_version(tn, ver.lstrip('@') if ver else None)
                 frs, els = frames_of(tv)

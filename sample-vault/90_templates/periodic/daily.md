@@ -1,9 +1,8 @@
 <%*
-// Daily note. The file name stays the date set by Periodic Notes ("2026-10-05") so "today's note" can be opened
+// Daily note. The file name is the date ("2026-10-05", set by Periodic Notes) so "today's note" can be opened. No title property: the date is the name
 const A = 'abcdefghijkmnpqrstuvwxyz23456789'; let h = ''; for (let i = 0; i < 5; i++) h += A[Math.floor(Math.random() * A.length)];
 const d = tp.date.now("YYMMDD");
 const day = /^\d{4}-\d{2}-\d{2}$/.test(tp.file.title) ? window.moment(tp.file.title, "YYYY-MM-DD") : window.moment();   // date from the file name (today if none)
-const title = "Daily " + day.format("YYYY-MM-DD");
 -%>
 ---
 id: <% d %>-<% h %>

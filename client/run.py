@@ -12,6 +12,8 @@
   run.py view       自分の vault を Obsidian なしで見る（workspace/閲覧.html を作って開く）
   run.py pdf <ID>   ノートを PDF に（A4。2つ目の引数で A3〜A0。workspace/pdf/ に出す）
   run.py copy <ID>  他人のノートを図・貼った画像ごと自分の vault にコピー（コピー元と版を残す）
+  run.py verify     添付とデータの置き場の本体を sha256 で照合（差し替わり・欠けがないか）
+  run.py archive <案件>  案件のアーカイブ（依存のマップをブラウザで開いて、移す・写す・残すを選ぶ）
   run.py status     状態の表示
 """
 import os, sys, re, json, glob, shutil, hashlib, secrets, subprocess, datetime, time, unicodedata, urllib.request, tempfile, platform
@@ -75,14 +77,28 @@ def setup():
     while not re.match(r'^[a-z][a-z0-9_-]{1,31}$', user):
         user = ask('あなたのユーザーID（英小文字。例 yamada）')
     remote = ask('あなたの vault の正本リポジトリのURL（未定なら空のままEnter）')
-    if remote and git('ls-remote', remote, cwd=WS, check=False):
-        say('正本に既存の vault があるので取得します（2台目のPCなど）')
-        git('clone', remote, VAULT, cwd=WS)
-    else:
-        os.makedirs(VAULT, exist_ok=True)
-        git('init', '-q', '-b', 'main')
-        if remote: git('remote', 'add', 'origin', remote)
-    write(CFG, yaml.safe_dump({'user': user, 'remote': remote, 'branch': 'main'}, allow_unicode=True, sort_keys=False))
+    # 何度実行してもよいように：途中で止まった vault（.git だけ等）はそのまま使い、送り先は上書きで登録する
+    has_git = os.path.isdir(os.path.join(VAULT, '.git'))
+    others = [f for f in (os.listdir(VAULT) if os.path.isdir(VAULT) else []) if f != '.git']
+    if not has_git and others:
+        raise SystemExit(f'{VAULT} に Git でないファイルがあります。別の名前に変えるか、空にしてからもう一度実行してください')
+    if remote and not has_git:
+        say('正本を確認しています（GitHub などのログイン画面が出たら、ログインして許可してください）')
+        r = subprocess.run(['git', 'ls-remote', remote], cwd=WS, capture_output=True, text=True, encoding='utf-8', errors='replace')
+        if r.returncode: raise SystemExit(f'正本に届きません。URL・ネットワーク・ログインを確認してください：\n{r.stderr.strip()}')
+        if r.stdout.strip():
+            say('正本に既存の vault があるので取得します（2台目のPCなど）')
+            git('clone', remote, VAULT, cwd=WS); has_git = True
+    if not has_git:
+        os.makedirs(VAULT, exist_ok=True); git('init', '-q', '-b', 'main')
+    elif not git('rev-parse', '-q', '--verify', 'HEAD', check=False):
+        git('symbolic-ref', 'HEAD', 'refs/heads/main')   # 空の正本を clone した時など（まだコミットがない）は main にそろえる
+    if remote:
+        cur = git('remote', 'get-url', 'origin', check=False)
+        if cur != remote: git('remote', 'set-url' if cur else 'add', 'origin', remote)
+    credential_helper()
+    old = cfg() or {}
+    write(CFG, yaml.safe_dump({**old, 'user': user, 'remote': remote, 'branch': 'main'}, allow_unicode=True, sort_keys=False))
     if not git('config', 'user.email', check=False):
         git('config', 'user.name', user); git('config', 'user.email', f'{user}@rd-notebase.local')
     if subprocess.run(['git', 'lfs', 'version'], capture_output=True).returncode == 0:
@@ -94,6 +110,13 @@ def setup():
     push()
     say('初期設定が終わりました。Obsidian で「保管庫としてフォルダを開く」から次のフォルダを開いてください：', VAULT)
     say('開いたら一度だけ：設定 → コミュニティプラグイン →「制限モードを解除」')
+
+def credential_helper():
+    """GitHub などのログインを覚えさせる（毎回ログイン画面が出ないように）。どこにも設定がない時だけ、この vault に Git for Windows の
+    資格情報マネージャーを指定する（PC 全体の設定は変えない）"""
+    if platform.system() != 'Windows' or git('config', '--get-all', 'credential.helper', check=False): return
+    git('config', 'credential.helper', 'manager')
+    say('ログインを覚えるように設定しました（この vault の Git だけ。初回だけログイン画面が出ます）')
 
 def register_schedule():
     if platform.system() != 'Windows':
@@ -167,6 +190,11 @@ def update_vault():
         if keys: add = {k: add[k] for k in keys}
         new = deep_merge(json.loads(json.dumps(cur)), add)
         if new != cur: write(dst, json.dumps(new, ensure_ascii=False, indent=2) + '\n'); changed.append(f)
+    # dotpm の休日は台帳（config/registry.yml の holidays）に合わせる
+    p = os.path.join(VAULT, '.obsidian', 'plugins', 'project-manager', 'data.json')
+    if os.path.exists(p):
+        cur = json.loads(read(p)); hol = [str(x) for x in (yaml.safe_load(read(os.environ['RDNB_REGISTRY'])) or {}).get('holidays') or []]
+        if cur.get('holidays') != hol: cur['holidays'] = hol; write(p, json.dumps(cur, ensure_ascii=False, indent=2) + '\n'); changed.append('.obsidian/plugins/project-manager/data.json（休日）')
     # 有効にするプラグインの一覧（雛形の分を足し、やめたものを外す。利用者が足した分は残す）
     p = os.path.join(VAULT, '.obsidian', 'community-plugins.json')
     cur = json.loads(read(p)) if os.path.exists(p) else []
@@ -215,11 +243,33 @@ def fix_ids():
             say(f'id を付けました：{rel}（{nid}）')
         if dirty: write(p, kv.join_fm(fm, body))
 
+# ---------- 添付・データの置き場 ----------
+def data_dir(c=None):
+    """データの置き場（重い実験データ・画像の原寸。vault の外。.rdnb/config.yml の data_dir、無ければ workspace/data）"""
+    c = c or cfg() or {}
+    d = c.get('data_dir') or os.path.join(WS, 'data')
+    return os.path.abspath(os.path.expanduser(os.path.expandvars(d)))
+
+def tend_attachments(c):
+    import kv, attach
+    lim = (kv.reg().get('limits') or {}).get('attach_max_bytes') or 20_000_000
+    for m in attach.tend(VAULT, c.get('user', ''), data_dir(c), os.path.join(VAULT, '.rdnb', 'cache', 'sha.json'),
+                         max_bytes=lim, maxpx=int(c.get('image_max_px', 1920) or 0)):
+        say(m)
+
+def verify():
+    import attach
+    n, bad = attach.verify(VAULT, data_dir())
+    for b in bad: say('問題:', b)
+    say(f'照合：{n} 件' + ('、問題なし' if not bad else f'、問題 {len(bad)} 件'))
+    if bad: raise SystemExit(1)
+
 # ---------- 検査 → push ----------
 def push(quiet=False):
     c = cfg()
     if not c: raise SystemExit('まだ初期設定していません。notebase.cmd をダブルクリックしてください')
     import kv
+    tend_attachments(c)
     fix_ids()
     errs, warns = kv.check(VAULT)
     for w in warns: say('警告:', w)
@@ -270,6 +320,7 @@ def sync_project(user, pid, p):
             r = subprocess.run(['git', 'clone', '-q', url, d], capture_output=True, text=True, encoding='utf-8', errors='replace')
             if r.returncode: say(f'工程表 {pid}：案件のリポジトリを取得できません（{r.stderr.strip()[:200]}）'); return
             git('config', 'user.name', user, cwd=d); git('config', 'user.email', f'{user}@rd-notebase.local', cwd=d)
+            if platform.system() == 'Windows' and not git('config', '--get-all', 'credential.helper', cwd=d, check=False): git('config', 'credential.helper', 'manager', cwd=d)
             say(f'工程表 {pid}：20_工程/{pid} に取得しました（Obsidian の dotpm で開けます）'); return
         git('add', '-A', cwd=d)
         if git('status', '--porcelain', cwd=d): git('commit', '-q', '-m', f'工程表の更新（{user}）', cwd=d)
@@ -300,8 +351,13 @@ def sync_project(user, pid, p):
             say(f'工程表 {pid}：' + ('送りました' if r.returncode == 0 else f'送れませんでした（{r.stderr.strip()[:200]}）'))
 
 def refs():
-    """購読（.rdnb/config.yml の subscribe に vault 名を並べる）：見てよい他人のノートのスタブを _refs/ に作る"""
+    """購読（.rdnb/config.yml の subscribe に vault 名を並べる）：見てよい他人のノートのスタブを _refs/ に作る。
+    アーカイブで移した自分のノートのスタブ（_refs/アーカイブ/）も、記録から置き直す。完了した案件があれば知らせる"""
     c = cfg() or {}; subs = c.get('subscribe') or []
+    import archive, kv
+    archive.stubs_all(VAULT)
+    for pid in archive.done_projects(VAULT, kv.reg()):
+        say(f'案件 {pid} は完了しました。notebase.cmd archive {pid} で、依存のマップを見ながらアーカイブできます')
     if not subs: return
     import kv
     if not os.path.exists(kv.DB): say('参照：索引に届かないので、スタブは前のまま'); return
@@ -411,6 +467,11 @@ def main():
                 return
             if not cfg(): return setup()
             if cmd == 'view': autosave('閲覧前の自動保存'); return view(open_it=True)
+            if cmd == 'verify': return verify()
+            if cmd == 'archive':
+                import archive
+                tend_attachments(cfg()); autosave('アーカイブ前の自動保存')
+                return archive.run(VAULT, cfg(), args, say=say, git=git, ws=WS, data_dir=data_dir())
             if cmd == 'pdf':
                 if not args: raise SystemExit('使い方：notebase.cmd pdf <ノートのid> [A4〜A0]')
                 autosave('PDF出力前の自動保存'); return pdf(*args[:2])

@@ -18,7 +18,7 @@ ref_types:
 - tag
 - data
 limits:
-  attach_max_bytes: 100000000
+  attach_max_bytes: 20000000   # これより大きい添付は 40_attachments から「データの置き場」（Git の外）へ移す
 tags:
   P00001-team:
     owner: boss

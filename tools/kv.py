@@ -45,6 +45,18 @@ def join_fm(fm, body):
 def read_note(p):
     return split_fm(open(p, encoding='utf-8').read())
 
+def write_note(p, fm, body=''):
+    with open(p, 'w', encoding='utf-8', newline='\n') as f: f.write(join_fm(fm, body))
+
+def file_of(fm):
+    """添付の説明の .md が指す本体のファイル名。file はリンク（"[[名前.png]]"。Obsidian で改名すると一緒に直る）か名前"""
+    if isinstance(fm, str): fm = json.loads(fm or '{}')
+    f = (fm or {}).get('file')
+    if not f: return None
+    s = nfc(str(f).strip())
+    if s.startswith('[[') and s.endswith(']]'): s = s[2:-2]
+    return s.split('|')[0].replace('\\', '/').rsplit('/', 1)[-1].strip() or None
+
 # ---------- ID採番（サーバ） ----------
 def alloc_id(d=None):
     d = d or today().strftime('%y%m%d')
@@ -117,14 +129,14 @@ def cmd_attach(vault, src, target, origin=''):
     for side in glob.glob(os.path.join(ad, '*.md')):
         sfm, _ = read_note(side)
         if sfm.get('sha256') == h:
-            print(f"重複: 既存添付を再利用 {sfm['file']}")
-            fn = sfm['file']; break
+            print(f"重複: 既存添付を再利用 {file_of(sfm)}")
+            fn = file_of(sfm); break
     else:
         nid = alloc_id(); stem, ext = os.path.splitext(os.path.basename(src))
         stem = re.sub(r'^\d{6}_(.+?)(_[' + ALPH + r']{5})?$', r'\1', stem)   # 既に命名済みのファイルは元の名前に戻す
         fn = fname(nid, stem, ext.lstrip('.').lower(), ad)
         shutil.copy(src, os.path.join(ad, fn))
-        sfm = {'id': nid, 'type': 'attachment', 'file': fn, 'sha256': h,
+        sfm = {'id': nid, 'type': 'attachment', 'file': f'[[{fn}]]', 'sha256': h,
                'owner': tfm.get('owner'), 'project': tfm.get('project', ''),
                'access': list(tfm.get('access') or []), 'source': origin,
                'created': str(today()), 'updated': str(today()), 'summary': ''}
@@ -187,7 +199,7 @@ def names_index(rows):
     for i, n in rows.items():
         keys = [link_key(n['path'])] + json.loads(n.get('names') or '[]')
         fm = n['fm'] if isinstance(n['fm'], dict) else json.loads(n['fm'] or '{}')
-        if fm.get('type') == 'attachment' and fm.get('file'): keys.append(link_key(fm['file']))
+        if fm.get('type') == 'attachment' and file_of(fm): keys.append(link_key(file_of(fm)))
         for k in list(keys): keys.append(stub_name(k, n.get('owner'), users))
         for k in keys + [i]:
             if k: out.setdefault(k, i)
@@ -233,7 +245,8 @@ RESERVED = set('''id type title aliases owner project status access created upda
 tool env inputs result_hash promoted_to excalidraw-plugin note
 targets audience purpose requested_by approvers decision reason approved_targets approved_version approved_at report revoked
 about about_label assignee due state file sha256 source checks approved_by
-copied_version tasks baselines roadmap items week schedule changes ops lines code needs_approval why remap decided_by decided_at comment gantt'''.split()) | set(REL)
+copied_version tasks baselines roadmap items week schedule changes ops lines code needs_approval why remap decided_by decided_at comment gantt
+store path size original original_sha256 archived ref_id'''.split()) | set(REL)
 DATE_KEYS = ('created', 'updated', 'due')
 
 def check_props(fn, fm, r, warns, errs):
@@ -345,6 +358,24 @@ def lfs_resolve(work, bare):
         else: print('警告: LFSの中身がサーバにない', os.path.basename(p))
     return n
 
+def restore_archived(work, bare):
+    """vault の .rdnb/archives/*.json（アーカイブの記録）にある「移した」ファイルを、記録の版（移す前のコミット）から work に書き出す。
+    返り値：{ノートの id: 記録名}"""
+    out = {}
+    for mp in glob.glob(os.path.join(work, '.rdnb', 'archives', '*.json')):
+        try: man = json.load(open(mp, encoding='utf-8'))
+        except ValueError: continue
+        for e in man.get('entries') or []:
+            if e.get('act') != 'move': continue
+            for f in e.get('files') or []:
+                p = os.path.join(work, f['path'])
+                if os.path.exists(p): continue
+                r = subprocess.run(['git', f'--git-dir={bare}', 'show', f"{man['commit']}:{f['path']}"], capture_output=True)
+                if r.returncode: continue
+                os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'wb').write(r.stdout)
+            out[e['id']] = man['name']
+    return out
+
 # ---------- 索引DB ----------
 def cmd_index():
     r = reg()
@@ -364,18 +395,20 @@ def cmd_index():
         env = dict(os.environ, GIT_INDEX_FILE=os.path.join(SRV, 'work', '.index'), GIT_LFS_SKIP_SMUDGE='1')
         for args in (['read-tree', 'main'], ['checkout-index', '-a', '-f']):
             subprocess.run(['git', f'--git-dir={bare}', f'--work-tree={work}', *args], env=env, check=True, capture_output=True)
+        archived = restore_archived(work, bare)   # アーカイブで vault から移したノートも、記録の版から読み出して索引に残す
         lfs_resolve(work, bare)
         commit = sh(f'git --git-dir="{bare}" rev-parse --short main')
         olds = renames(bare)
         for nid, n in scan_vault(work).items():
             fm = dict(n['fm']); body = n['body']; rel = os.path.relpath(n['path'], work).replace(os.sep, '/')
             fm['title'] = title_of(rel, fm)   # 索引には題名を入れておく（ノートには書かない）
+            if nid in archived: fm['archived'] = archived[nid]
             db.execute('insert into notes values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', (
                 nid, vault, os.path.relpath(n['path'], work), fm.get('type'), fm.get('title'), fm.get('owner'),
                 fm.get('project'), fm.get('status'), json.dumps(fm.get('access') or [], ensure_ascii=False),
                 fm.get('progress'), fm.get('next'), str(fm.get('updated')), fm.get('summary'), commit,
                 json.dumps(fm, ensure_ascii=False, default=str), body,
-                json.dumps(sorted({link_key(o) for o in olds.get(rel, []) + (olds.get(os.path.dirname(rel) + '/' + fm['file'], []) if fm.get('type') == 'attachment' and fm.get('file') else [])}
+                json.dumps(sorted({link_key(o) for o in olds.get(rel, []) + (olds.get(os.path.dirname(rel) + '/' + file_of(fm), []) if fm.get('type') == 'attachment' and file_of(fm) else [])}
                                   - {link_key(rel)}), ensure_ascii=False)))   # 改名前の名前（添付は本体のファイルの前の名前も）
             text = body
             if has_drawing(n):
@@ -474,11 +507,11 @@ def drop_hash_names(vp):
         n = 1; d = os.path.dirname(p)
         while os.path.exists(os.path.join(d, new + (f' {n}' if n > 1 else '') + '.md')): n += 1
         new += f' {n}' if n > 1 else ''
-        if h and fm.get('type') == 'attachment' and fm.get('file'):   # 添付：本体も同じ名前の形に
-            fs, fe = os.path.splitext(fm['file'])
-            if fs.endswith(h) and os.path.exists(os.path.join(d, fm['file'])):
+        if h and fm.get('type') == 'attachment' and file_of(fm):   # 添付：本体も同じ名前の形に
+            of = file_of(fm); fs, fe = os.path.splitext(of)
+            if fs.endswith(h) and os.path.exists(os.path.join(d, of)):
                 nf = fs[:-len(h)] + (f' {n}' if n > 1 else '') + fe
-                os.rename(os.path.join(d, fm['file']), os.path.join(d, nf)); moved[fm['file']] = nf; fm['file'] = nf
+                os.rename(os.path.join(d, of), os.path.join(d, nf)); moved[of] = nf; fm['file'] = f'[[{nf}]]'
                 open(p, 'w', encoding='utf-8').write(join_fm(fm, body))
         os.rename(p, os.path.join(d, new + '.md')); moved[stem] = new
         if xd: moved[stem + '.excalidraw'] = new   # [[名前.excalidraw#F02]] と書いたリンクも
@@ -602,7 +635,7 @@ def cmd_request(vault, report_path, targets, audience, purpose):
     """開示申請：見せてよい図のフレーム・添付を選んで申請（図に埋め込まれた画像も自動で対象に加える）"""
     vp = os.path.join(ROOT, vault); r = reg(); notes = scan_vault(vp); byhash = {}
     for i, n in notes.items():
-        for k in (link_key(n['path']), link_key(n['fm'].get('file')) if n['fm'].get('type') == 'attachment' else None, i):
+        for k in (link_key(n['path']), link_key(file_of(n['fm'])) if n['fm'].get('type') == 'attachment' else None, i):
             if k: byhash.setdefault(k, n)
     full = []
     for t in targets:

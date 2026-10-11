@@ -18,3 +18,8 @@ __pycache__/
 .obsidian/plugins/*/styles.css
 .obsidian/plugins/*/manifest.json
 .rdnb/managed.json
+.rdnb/cache/
+# 50_data は説明の .md だけを Git に入れる（本体は vault の外の「データの置き場」。notebase が移す）
+/50_data/**
+!/50_data/**/
+!/50_data/**/*.md

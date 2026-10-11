@@ -44,7 +44,9 @@ def pdf(nid, size='A4', user=None):
     frs = [x[1] for x in seq]
     def hexc(s):
         from reportlab.lib.colors import HexColor
-        return HexColor(s) if s and s.startswith('#') else None
+        if not s or not s.startswith('#'): return None
+        if len(s) in (4, 5): s = '#' + ''.join(c * 2 for c in s[1:])   # #fff → #ffffff（Excalidraw は3桁も使う）
+        return HexColor(s[:7])
     for pi, (dn, fr, els) in enumerate(seq, 1):
         files = embedded_files(dn['body'])
         mx, my, fh = 28 * k, 46 * k, 30 * k
@@ -75,8 +77,12 @@ def pdf(nid, size='A4', user=None):
                     cv.drawPath(ah, stroke=0, fill=1)
             elif t == 'text':
                 fs = e.get('fontSize', 20) * s; cv.setFillColor(sc or hexc('#1e1e1e')); cv.setFont(F, fs)
+                lh = e.get('lineHeight') or 1.25; al = e.get('textAlign', 'left')   # Excalidraw の行の高さ・寄せ
                 for i, line in enumerate(str(e.get('text', '')).split('\n')):
-                    cv.drawString(X, Y - fs * (i + 1) + fs * .2, line)
+                    by = Y - fs * (lh * i + (lh + 0.8) / 2)
+                    if al == 'center': cv.drawCentredString(X + W / 2, by, line)
+                    elif al == 'right': cv.drawRightString(X + W, by, line)
+                    else: cv.drawString(X, by, line)
             elif t == 'image':
                 p = image_file(dn, files.get(e.get('fileId')), user, notes, hmap)
                 if p:

@@ -215,7 +215,12 @@
       "obsidian-day-planner:Open Timeline": false,
       "obsidian-day-planner:Open Multi-Day View": false,
       "iconic:ルールブックを開く": true,
-      "periodic-notes:Open today": false
+      "periodic-notes:Open today": false,
+      "daily-notes:Open today's daily note": true,
+      "bases:Create new base": true,
+      "iconic:Open rulebook": true,
+      "switcher:Open quick switcher": false,
+      "command-palette:Open command palette": false
     }
   }
 }

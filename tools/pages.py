@@ -214,7 +214,8 @@ class Site:
             self.pages[f'n-{nid}'] = (
                 f'<p class="crumb"><a href="#home">案件</a> / <a href="#p-{n["project"]}">{esc(n["project"])}</a></p>'
                 f'<h1>{"<span class=badge>報告</span>" if n["type"] == "report" else ""}{esc(n["title"])} {self.scope(n)}</h1>'
-                f'<dl class="meta"><div><dt>種類</dt><dd>{TYPE_JA.get(n["type"])}</dd></div><div><dt>担当</dt><dd>{esc(self.uname(n["owner"]))}</dd></div>'
+                + (f'<p class="muted">アーカイブ済み（{esc(json.loads(n["fm"]).get("archived"))}）。vault からは移しましたが、ここでは読めます</p>' if json.loads(n["fm"]).get("archived") else '')
+                + f'<dl class="meta"><div><dt>種類</dt><dd>{TYPE_JA.get(n["type"])}</dd></div><div><dt>担当</dt><dd>{esc(self.uname(n["owner"]))}</dd></div>'
                 f'<div><dt>更新</dt><dd>{upd_html(n, n.get("granted"))}</dd></div>'
                 + (f'<div><dt>状況</dt><dd>{self.prog(n)} {esc(n["next"])}</dd></div>' if n.get('progress') else '')
                 + f'<div><dt>ID</dt><dd class="mono">{nid}</dd></div></dl>' + (f'<div class="acts">{self.rv_button(n)}</div>' if n['type'] != 'comment' else '') + fam
@@ -284,7 +285,7 @@ class Site:
                 prev = svg_frame(tn, f, els, self.user, self.notes) if f else ''; label = f'{tn["title"]} #{fid} {(f or {}).get("name", "")}'
             else:
                 txt = tn['body'] if tn['type'] != 'attachment' else tn['title']; prev = ''
-                label = (f'添付 {json.loads(tn["fm"]).get("file", tn["title"])}' if tn['type'] == 'attachment' else tn['title'])
+                label = (f'添付 {(file_of(tn["fm"]) or tn["title"])}' if tn['type'] == 'attachment' else tn['title'])
             items.append(self.item(t, label, prev, caution(txt + ' ' + tn['title'])))
         aud = ' / '.join(fm.get('audience', []))
         return (f'<section class="grant" data-gid="{g["id"]}"><h2>{esc(fm["title"])}</h2>'
