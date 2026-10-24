@@ -11,7 +11,7 @@
   "templater-obsidian:_templates/_コマンド/図を開く.md": [
     {
       "modifiers": [
-        "Alt"
+        "Mod"
       ],
       "key": "D"
     }

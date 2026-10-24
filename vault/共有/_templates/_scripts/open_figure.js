@@ -1,4 +1,4 @@
-// Alt+D: 開いているノートの図を開く。なければ作る(仕様書「図とパワーポイント」)。
+// Ctrl+D: 開いているノートの図を開く。なければ作る(仕様書「図とパワーポイント」)。
 // 図は _attachments/<id>/図.excalidraw.md。ひな形は _templates/図.excalidraw.md(16:9 の枠1つ)。
 // 初めて作ったとき、カーソルの位置に1枚目のフレームを引用するウィキリンクを入れる。
 // 2回目からは図を開くだけ。2枚目からは、Excalidraw でフレームを選び「フレームへのリンクをコピー」で貼る。
@@ -11,7 +11,7 @@ async function open_figure(tp) {
   const { Notice } = tp.obsidian;
   const note = app.workspace.getActiveFile();
   if (!note || note.extension !== "md") {
-    new Notice("ノートを開いてから Alt+D を押してください");
+    new Notice("ノートを開いてから Ctrl+D を押してください");
     return;
   }
   if (note.path.endsWith(".excalidraw.md")) {
