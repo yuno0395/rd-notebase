@@ -24,8 +24,9 @@ from . import frontmatter, ids
 from .assign import LINK
 from .report import Report
 from .safety import Backup
-from .state import State, digest
-from .vault import SKIP_DIRS, box_copy_of, is_hidden, read
+from .heavy import DEFAULT_KEEP, is_heavy, to_personal, to_shared
+from .state import State, digest, digest_text
+from .vault import SKIP_DIRS, box_copy_of, is_hidden, read, write
 
 OWN_DIRS = ("01_目的", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
 DIST = "90_共有"
@@ -146,6 +147,8 @@ class Context:
     dry_run: bool
     now: float
     idle_seconds: int
+    data_root: Path | None = None  # 開発データ(F-19 のリンクの書き換えに使う)
+    keep: dict = field(default_factory=lambda: dict(DEFAULT_KEEP))  # vault に残す添付の決まり(F-17)
     by_id: dict[str, Item] = field(default_factory=dict)      # 行き先を調べるための全ノート
     by_name: dict[str, set[str]] = field(default_factory=dict)  # 名前(小文字)→ id
     projects: dict[str, Item] = field(default_factory=dict)   # プロジェクト名 → 台帳
@@ -163,7 +166,20 @@ class Context:
             return
         self.backup.save(dest_root, dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest)
+        if self.data_root and src.name.endswith(".md"):
+            # F-19: 共有では 開発データ/ からの相対パス、個人ではその PC の file:///
+            text = read(src)
+            text = to_shared(text, self.data_root) if dest_root == self.shared else to_personal(text, self.data_root)
+            write(dest, text)
+            shutil.copystat(src, dest)
+        else:
+            shutil.copy2(src, dest)
+
+    def digest(self, path: Path) -> str:
+        """中身のハッシュ。ノートは開発データへのリンクを共有の形にそろえてから比べる(F-19)。"""
+        if self.data_root and path.name.endswith(".md"):
+            return digest_text(to_shared(read(path), self.data_root))
+        return digest(path)
 
     def move(self, src: Path, dest: Path) -> None:
         if self.dry_run:
@@ -315,14 +331,14 @@ def sync_pair(ctx: Context, key: str, p: Path, s: Path, p_rel: str, s_rel: str,
         ctx.copy(p, s, ctx.shared)
         ctx.report.record(f"集約: {label} → 共有/{s_rel}")
         ctx.count("集約")
-        return done(digest(p))
+        return done(ctx.digest(p))
     if se and not pe:
         ctx.copy(s, p, ctx.personal)
         ctx.report.record(f"{'再配布' if mode == 'down' else '取り込み'}: 共有/{s_rel} → {p_rel}")
         ctx.count("再配布" if mode == "down" else "取り込み")
-        return done(digest(s))
+        return done(ctx.digest(s))
 
-    hp, hs = digest(p), digest(s)
+    hp, hs = ctx.digest(p), ctx.digest(s)
     if hp == hs:
         return done(hp)
     if mode == "down":
@@ -368,7 +384,7 @@ def sync_pair(ctx: Context, key: str, p: Path, s: Path, p_rel: str, s_rel: str,
         cpath = conflict_path(s, ctx.member, stamp)
         if not ctx.dry_run:
             cpath.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(p, cpath)
+            ctx.copy(p, cpath, ctx.shared)
         ctx.report.record(f"競合: {label} と 共有/{s_rel} の両方が変わっていたので、"
                           f"共有に {cpath.name} を置きました")
         ctx.count("競合")
@@ -389,7 +405,8 @@ def sync_attachments(ctx: Context, note_id: str, mode: str) -> None:
     rels = set()
     for d in (pdir, sdir):
         if d.exists():
-            rels |= {f.relative_to(d).as_posix() for f in d.rglob("*") if f.is_file() and not box_copy_of(f)[0]}
+            rels |= {f.relative_to(d).as_posix() for f in d.rglob("*")
+                     if f.is_file() and not box_copy_of(f)[0] and not is_heavy(f, ctx.keep)}
     if mode == "down":
         rels = {r for r in rels if (sdir / r).exists()}
     for r in sorted(rels):
@@ -495,7 +512,7 @@ def run_share(ctx: Context) -> None:
 
         # 振り分け先が変わった(project や parent を直した)ら、共有のファイルを移す
         if current != dest and (ctx.shared / current).exists() and not current.startswith(ARCHIVE + "/"):
-            if rec and digest(ctx.shared / current) == rec.get("h"):
+            if rec and ctx.digest(ctx.shared / current) == rec.get("h"):
                 ctx.move(ctx.shared / current, ctx.shared / dest)
                 ctx.report.record(f"振り分け直し: 共有/{current} → 共有/{dest}")
                 ctx.count("移動")

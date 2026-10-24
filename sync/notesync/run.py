@@ -6,6 +6,7 @@ import time
 
 from .autofill import run_autofill
 from .boxcopies import report_box_copies
+from .heavy import keep_rules, move_heavy
 from .history import record_history
 from .assign import Vault, assign_ids, collect_used, fix_links, name_index, report_same_names
 from . import ids
@@ -63,6 +64,8 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
             fix_links(v, *planned([v]), report, backup, dry)
 
     report_same_names(vaults, report)
+    # 重い添付を 開発データ/ へ移し、リンクを書き換える(F-17〜20)。個人 vault だけ
+    move_heavy(cfg.personal, cfg.shared, cfg.shared_data, cfg.member, report, backup, dry, now, cfg.idle_seconds)
     report_box_copies([(v.label, v.root) for v in vaults], report)  # F-16
 
     # おまけの自動入力(F-26・F-27・F-31)。集める前に書いて、同じ同期で共有に届ける
@@ -75,7 +78,8 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
             report.warn("前回同期の記録が壊れていたので、見比べて作り直しました(F-34)")
         ctx = Context(member=cfg.member, personal=cfg.personal, shared=cfg.shared,
                       secret=[p for p in cfg.secret if p.exists()], report=report, backup=backup,
-                      state=state, dry_run=dry, now=now, idle_seconds=cfg.idle_seconds)
+                      state=state, dry_run=dry, now=now, idle_seconds=cfg.idle_seconds,
+                      data_root=cfg.shared_data, keep=keep_rules(cfg.shared))
         run_share(ctx)
         record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now)  # F-31・F-32
         if not dry:

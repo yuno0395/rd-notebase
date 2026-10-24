@@ -16,6 +16,10 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:32]
 
 
+def digest_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+
+
 class State:
     def __init__(self, path: Path | None):
         self.path = path
