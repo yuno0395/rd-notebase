@@ -393,12 +393,41 @@ def different(a: Item, b: Item) -> bool:
     return a.name != b.name or bool(a.author and b.author and a.author != b.author)
 
 
+def project_parents(ctx: Context) -> dict[str, set[str]]:
+    """{プロジェクト: 上位のプロジェクト}。台帳の parent に書いたもの。"""
+    out: dict[str, set[str]] = {}
+    for name, item in ctx.projects.items():
+        out[name] = {plain_name(t) for t in link_targets(item.fm.get("parent"))} & set(ctx.projects)
+    return out
+
+
 def my_projects(ctx: Context) -> set[str]:
+    """配るプロジェクト。メンバーになっているものと、その上位・配下のすべて。
+
+    上位のプロジェクトは配下の案件どうしを見比べて開発するので、配下のノートも要る。
+    配下の案件の人は、上位で決まったことを知る必要がある。
+    """
+    parents = project_parents(ctx)
+    children: dict[str, set[str]] = {}
+    for child, ps in parents.items():
+        for p in ps:
+            children.setdefault(p, set()).add(child)
+
+    def walk(start: str, edges: dict[str, set[str]]) -> set[str]:
+        seen, todo = set(), [start]
+        while todo:
+            x = todo.pop()
+            for y in edges.get(x, ()):
+                if y not in seen:
+                    seen.add(y)
+                    todo.append(y)
+        return seen
+
     out = set()
     for name, item in ctx.projects.items():
         members = {plain_name(m) for m in as_list(item.fm.get("members"))}
         if ctx.member in members:
-            out.add(name)
+            out |= {name} | walk(name, parents) | walk(name, children)
     return out
 
 
