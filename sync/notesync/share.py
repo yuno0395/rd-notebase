@@ -63,8 +63,14 @@ class Item:
         return str(self.fm.get("type") or "").strip()
 
     @property
+    def authors(self) -> list[str]:
+        """書いた人。まとめたノードは [佐藤, Yu] のように並ぶ(先頭が最初に書いた人)。"""
+        return [plain_name(a).strip() for a in as_list(self.fm.get("author")) if a.strip()]
+
+    @property
     def author(self) -> str:
-        return str(self.fm.get("author") or "").strip()
+        a = self.authors
+        return a[0] if a else ""
 
     @property
     def filename(self) -> str:
@@ -145,6 +151,7 @@ class Context:
     projects: dict[str, Item] = field(default_factory=dict)   # プロジェクト名 → 台帳
     secret_names: set[str] = field(default_factory=set)
     counts: dict[str, int] = field(default_factory=dict)
+    asked: set[frozenset] = field(default_factory=set)        # F-47 で聞いている組
 
     def count(self, what: str) -> None:
         self.counts[what] = self.counts.get(what, 0) + 1
@@ -260,7 +267,7 @@ def check_conditions(ctx: Context, item: Item) -> str | None:
         return f"未入力: {link} の author が空です(共有していません)"
     if item.type in ("ナレッジ", "結果") and ctx.reaches_big_issue(item):
         others = [r for r in (plain_name(x) for x in as_list(item.fm.get("reviewed_by")))
-                  if r and r != item.author]
+                  if r and r not in item.authors]
         if not others:
             return f"確認待ち: {link} は impact 大のイシューにつながるため、作成者以外の確認者が必要です(共有していません)"
     hits = ctx.secret_links(item)
@@ -412,6 +419,8 @@ def build_index(ctx: Context, *groups: dict[str, list[Item]]) -> None:
 
 
 def run_share(ctx: Context) -> None:
+    from .merge import check_duplicates, quiet_same_names, read_choices
+
     mine = scan(ctx.personal, tops=OWN_DIRS + (ARCHIVE,))
     for items in mine.values():
         for it in items:
@@ -429,6 +438,9 @@ def run_share(ctx: Context) -> None:
                 if p.is_file() and not any(is_hidden(x) for x in p.relative_to(sec).parts):
                     ctx.secret_names.add(note_stem(p.name).lower())
                     ctx.secret_names.add(p.name.lower())
+    choices = read_choices(ctx)
+    shared_nodes = [items[0] for i, items in sorted(shared.items())
+                    if i not in mine and len(items) == 1 and items[0].type == "ノード" and items[0].top != ARCHIVE]
 
     # ---------- 集約(自分のノート) ----------
     for note_id, items in sorted(mine.items()):
@@ -460,6 +472,11 @@ def run_share(ctx: Context) -> None:
             if reason:
                 ctx.report.todo(reason)
             continue
+
+        # F-47: 初めて共有するノードの名前か別名が、共有の別のノードと重なれば聞く
+        if item.type == "ノード" and not rec and not in_shared:
+            if check_duplicates(ctx, item, shared_nodes, choices):
+                continue
 
         dest = destination(ctx, item)
         if rec and (ctx.shared / rec["s"]).exists():
@@ -519,6 +536,7 @@ def run_share(ctx: Context) -> None:
         sync_pair(ctx, key, ctx.personal / p_rel, item.path, p_rel, item.rel, "down", p_rel)
         sync_attachments(ctx, note_id, "down")
 
+    quiet_same_names(ctx)
     if ctx.counts:
         summary = " / ".join(f"{k} {v}件" for k, v in ctx.counts.items())
         ctx.report.record(f"集約と再配布: {summary}")

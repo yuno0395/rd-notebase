@@ -18,12 +18,15 @@ class Report:
         self.dry_run = dry_run
         self.now = now or datetime.now(JST)  # PC の時計の設定によらず日本時間で書く
         self.todos: list[str] = []
+        self.checked: set[str] = set()  # チェックがついたまま残す行(試し運転で答えを消さないため)
         self.warnings: list[str] = []
         self.records: list[str] = []
 
-    def todo(self, text: str) -> None:
+    def todo(self, text: str, checked: bool = False) -> None:
         if text not in self.todos:
             self.todos.append(text)
+        if checked:
+            self.checked.add(text)
 
     def warn(self, text: str) -> None:
         if text not in self.warnings:
@@ -48,7 +51,7 @@ class Report:
                 old_records.append(line)
         title = f"# 同期レポート(最終更新 {stamp}" + (" 試し運転" if self.dry_run else "") + ")"
         out = [title, "", "## 対応が必要"]
-        out += [f"- [ ] {t}" for t in self.todos] or ["(なし)"]
+        out += [f"- [{'x' if t in self.checked else ' '}] {t}" for t in self.todos] or ["(なし)"]
         out += ["", "## 警告"]
         out += [f"- {w}" for w in self.warnings] or ["(なし)"]
         out += ["", f"## 記録(新しい順、直近 {KEEP_DAYS} 日)"]

@@ -49,7 +49,11 @@ def set_values(text: str, values: dict[str, str]) -> str:
         pat = re.compile(rf"^{re.escape(key)}\s*:")
         for i, line in enumerate(lines):
             if pat.match(line):
-                lines[i] = f"{key}: {value}"
+                # 次の行から続く値(`  - 水` のような並び)も置き換える
+                end = i + 1
+                while end < len(lines) and re.match(r"^(\s+\S|-\s)", lines[end]):
+                    end += 1
+                lines[i:end] = [f"{key}: {value}"]
                 break
         else:
             head.append(f"{key}: {value}")

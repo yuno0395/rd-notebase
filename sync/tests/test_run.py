@@ -66,7 +66,8 @@ def test_does_not_touch_shared_copies_and_secret_links(cfg):
 def test_report(cfg):
     r = run_once(cfg)
     rep = text(cfg.personal / "00_同期レポート.md")
-    assert "## 対応が必要" in rep and "同じ名前: 「鉄」" in rep
+    # 共有の「鉄」と名前が重なるので、まとめるかを聞く(F-04 の「同じ名前」の代わり、F-47)
+    assert "## 対応が必要" in rep and "同じもの: [[" in rep and "|鉄]] を [[0RAYFN002_鉄|鉄]]" in rep
     assert any("行き先が 2 つ" in t for t in r.todos)
     assert "id をつけた 02_ノード/水.md" in rep
     # 2回目は記録が積み重なり、やることがなければ id はつけない
