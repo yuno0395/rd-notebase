@@ -171,3 +171,29 @@ def test_note_history(box):
     assert "due" in text(task) and "first" not in text(task)   # ノートには書かない
     assert history_path(box.shared, "Yu").read_bytes().startswith(b"\xef\xbb\xbf")  # Excel 用の BOM は先頭だけ
     assert history_path(box.shared, "Yu").read_bytes().count(b"\xef\xbb\xbf") == 1
+
+
+def test_daily_note_notice(box):
+    from notesync.daily import TITLE
+    yu = box.personal
+    daily = write(yu / "00_日誌/デイリー/2026-10-24.md", "# 2026-10-24\n\n## タイムライン\n- [ ] 09:00 打ち合わせ\n")
+    write(yu / "05_ナレッジ/0RB005001_保圧.md", "---\nid: 0RB005001\nauthor: Yu\ntype: ナレッジ\n---\n")
+    run_once(box, now=NOW)
+    t = text(daily)
+    assert t.startswith(f"# 2026-10-24\n\n{TITLE}\n> - 共有されていない: 未入力: [[0RB005001_保圧|保圧]] の")
+    assert "## タイムライン\n- [ ] 09:00 打ち合わせ" in t
+    run_once(box, now=NOW)
+    assert text(daily).count(TITLE) == 1                     # 書き換えて、重ねない
+    write(yu / "05_ナレッジ/0RB005001_保圧.md",
+          '---\nid: 0RB005001\nauthor: Yu\ntype: ナレッジ\nvisibility: 個人\n---\n')
+    run_once(box, now=NOW)
+    assert text(daily) == "# 2026-10-24\n\n## タイムライン\n- [ ] 09:00 打ち合わせ\n"   # 知らせがなくなれば消す
+
+
+def test_friday_outlook_reminder(box):
+    yu = box.personal
+    friday = datetime(2026, 10, 30, 8, 0, tzinfo=ids.JST).timestamp()
+    daily = write(yu / "00_日誌/デイリー/2026-10-30.md", "# 2026-10-30\n")
+    run_once(box, now=friday)
+    assert "見込みを更新してください: [[0RA00A001_試しPJ|試しPJ]]" in text(daily)
+    assert "見込みを更新してください" in report(box)

@@ -9,6 +9,7 @@ from .boxcopies import report_box_copies
 from .heavy import keep_rules, move_heavy
 from .history import record_history
 from .weekly import maybe_weekly
+from .daily import update_daily
 from .assign import Vault, assign_ids, collect_used, fix_links, name_index, report_same_names
 from . import ids
 from .config import Config
@@ -89,6 +90,7 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
     elif cfg.shared:
         report.warn(f"共有 vault が見つかりません: {cfg.shared}(Box Drive が止まっていないか確かめてください)")
 
+    update_daily(cfg.personal, cfg.shared, cfg.member, report, backup, dry, now, cfg.idle_seconds)  # F-30・F-33
     report.write(cfg.personal)
     if not dry:
         backup.prune()
