@@ -10,6 +10,7 @@ from .heavy import keep_rules, move_heavy
 from .history import record_history
 from .weekly import maybe_weekly
 from .daily import update_daily
+from .recover import report_pending
 from .assign import Vault, assign_ids, collect_used, fix_links, name_index, report_same_names
 from . import ids
 from .config import Config
@@ -85,6 +86,7 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
         run_share(ctx)
         record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now)  # F-31・F-32
         maybe_weekly(cfg.member, cfg.shared, cfg.report_dir, now, report, dry)  # F-29
+        report_pending(cfg.shared, cfg.shared_data, report)  # F-35
         if not dry:
             state.save()
     elif cfg.shared:

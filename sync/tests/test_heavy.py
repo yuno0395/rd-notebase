@@ -157,3 +157,33 @@ def test_link_forms():
     t = "![[成形条件.xlsx]] と ![[_仕組み/attachments/0RB001001/成形条件.xlsx|条件表]]"
     assert relink(t, "0RB001001", "成形条件.xlsx", "U", True) == "[成形条件.xlsx](U) と [条件表](U)"
     assert relink(t, "0RB001001", "成形条件.xlsx", "U", False) == "![[成形条件.xlsx]] と [条件表](U)"
+
+
+def test_recover_shared(box, capsys):
+    from notesync.__main__ import main
+    import yaml
+    shared, data, yu = box["shared"], box["data"], box["yu"]
+    write(shared / f"{PJ}/03_イシュー/直接書いた.md", "---\ntype: イシュー\n---\n[[参考メモ]] を見る\n")
+    write(shared / f"{PJ}/03_イシュー/0RB009002_古い.md",
+          "---\nid: 0RB009002\nauthor: 佐藤\ntype: イシュー\n---\n![[_仕組み/attachments/0RB009002/測定.csv]]\n")
+    write(shared / "_仕組み/attachments/0RB009002/測定.csv", "a,b\n")
+    write(shared / "共通/02_ノード/参考メモ.md", "---\ntype: ノード\n---\n")
+    run_once(yu, now=NOW)
+    r = report(yu)
+    assert "拾い直し: 共有 vault に id のないノートが 2 件あります" in r
+    assert "拾い直し: 共有 vault の _仕組み/attachments/ に重い添付が 1 件あります" in r
+    cfg_path = write(yu.personal.parent / "config.yaml", yaml.safe_dump({
+        "member": "Yu", "personal": str(yu.personal), "shared": str(shared), "shared_data": str(data),
+        "backup_dir": str(yu.backup_dir), "state_dir": str(yu.state_dir)}, allow_unicode=True))
+    assert main(["recover", "--config", str(cfg_path)]) == 0          # 試し運転では変えない
+    assert (shared / f"{PJ}/03_イシュー/直接書いた.md").exists()
+    assert main(["recover", "--config", str(cfg_path), "--run"]) == 0
+    [issue] = (shared / f"{PJ}/03_イシュー").glob("*_直接書いた.md")
+    [memo] = (shared / "共通/02_ノード").glob("*_参考メモ.md")
+    assert f"[[{memo.stem}|参考メモ]]" in issue.read_text(encoding="utf-8")
+    assert (data / PJ / "0RB009002/測定.csv").exists()
+    assert not (shared / "_仕組み/attachments/0RB009002/測定.csv").exists()
+    old = (shared / f"{PJ}/03_イシュー/0RB009002_古い.md").read_text(encoding="utf-8")
+    assert f"[測定.csv](開発データ/{PJ}/0RB009002/測定.csv)" in old
+    run_once(yu, now=NOW + 60)
+    assert "拾い直し" not in report(yu)
