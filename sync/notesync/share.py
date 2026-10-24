@@ -155,6 +155,7 @@ class Context:
     secret_names: set[str] = field(default_factory=set)
     counts: dict[str, int] = field(default_factory=dict)
     asked: set[frozenset] = field(default_factory=set)        # F-47 で聞いている組
+    fresh: set[str] = field(default_factory=set)              # F-28: 作ったばかりでテンプレートのままのノート
 
     def count(self, what: str) -> None:
         self.counts[what] = self.counts.get(what, 0) + 1
@@ -483,6 +484,10 @@ def run_share(ctx: Context) -> None:
                     continue
             if rec:
                 sync_pair(ctx, key, item.path, ctx.shared / rec["s"], item.rel, rec["s"], "both", item.rel)
+            continue
+
+        if note_id in ctx.fresh and not rec and not in_shared:
+            ctx.report.record(f"作ったばかりでテンプレートのままなので、まだ集めていません: {item.rel}")
             continue
 
         reason = check_conditions(ctx, item)

@@ -49,7 +49,27 @@ async function make_id(tp) {
   const used = new Set(app.vault.getFiles().map((f) => f.basename.split("_")[0].toUpperCase()));
   let sec = Math.floor((Date.now() - EPOCH_MS) / 1000);
   while (used.has(encodeTime(sec) + code)) sec++;
-  return encodeTime(sec) + code;
+  const id = encodeTime(sec) + code;
+  await logCreated(app, id, tp);
+  return id;
+}
+
+// F-28: 個人 vault では、作ったノートを _仕組み/記録/作成履歴.csv に1行残す。
+// 同期プログラムは、作って10分以内でテンプレートのままのノートを共有に集めない(取り消しを邪魔しないため)。
+// 書けなくてもノートは作る。
+const CREATED_LOG = "_仕組み/記録/作成履歴.csv";
+
+async function logCreated(app, id, tp) {
+  try {
+    const fs = app.vault.adapter;
+    if (!(await fs.exists("_仕組み/記録/私.yaml"))) return;
+    const tpl = (tp && tp.config && tp.config.template_file && tp.config.template_file.name) || "";
+    const row = `${new Date().toISOString()},${id},${tpl.replace(/[,\r\n]/g, " ")}\r\n`;
+    if (await fs.exists(CREATED_LOG)) await fs.append(CREATED_LOG, row);
+    else await fs.write(CREATED_LOG, "\ufeff日時,id,テンプレート\r\n" + row);
+  } catch (e) {
+    console.warn("作成履歴に書けませんでした", e);
+  }
 }
 
 module.exports = make_id;

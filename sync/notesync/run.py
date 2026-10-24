@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 
 from .attachfix import fix_attachments
+from .fresh import fresh_ids
 from .autofill import run_autofill
 from .boxcopies import report_box_copies
 from .heavy import keep_rules, move_heavy
@@ -43,12 +44,19 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
         if not p.exists():
             report.warn(f"機密フォルダが見つかりません: {p}(権限か設定を確かめてください)")
 
+    # F-28: 作ったばかりでテンプレートのままのノートには触らない(取り消しを邪魔しないため)
+    try:
+        fresh = fresh_ids(cfg.personal, cfg.shared, now)
+    except Exception as e:  # おまけが壊れても、核の同期は続ける
+        fresh = set()
+        report.warn(f"作成履歴の読み取りで止まりました({type(e).__name__}: {e})")
     used = collect_used(vaults)
     renamed: dict[str, dict[str, str]] = {}
     for v in vaults:
         if v.assign:
             renamed[v.label + str(v.root)] = assign_ids(
-                v, cfg.member, cfg.code, used, report, backup, dry, now, cfg.idle_seconds)
+                v, cfg.member, cfg.code, used, report, backup, dry, now, cfg.idle_seconds,
+                fresh if v.label == "個人" else frozenset())
 
     # リンクを直すのは、個人と機密の中だけ。機密のノートは機密の中のノートにだけつなぐ(F-40)
     def planned(vs):
@@ -76,7 +84,7 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
     report_box_copies([(v.label, v.root) for v in vaults], report)  # F-16
 
     # おまけの自動入力(F-26・F-27・F-31)。集める前に書いて、同じ同期で共有に届ける
-    run_autofill(cfg.personal, cfg.shared, report, backup, dry, now, cfg.idle_seconds)
+    run_autofill(cfg.personal, cfg.shared, report, backup, dry, now, cfg.idle_seconds, fresh)
 
     # 集約と再配布(F-05〜11、F-14、F-15)
     if cfg.shared and cfg.shared.exists():
@@ -86,7 +94,7 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
         ctx = Context(member=cfg.member, personal=cfg.personal, shared=cfg.shared,
                       secret=[p for p in cfg.secret if p.exists()], report=report, backup=backup,
                       state=state, dry_run=dry, now=now, idle_seconds=cfg.idle_seconds,
-                      data_root=cfg.shared_data, keep=keep_rules(cfg.shared))
+                      data_root=cfg.shared_data, keep=keep_rules(cfg.shared), fresh=fresh)
         run_share(ctx)
         record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now)  # F-31・F-32
         maybe_weekly(cfg.member, cfg.shared, cfg.report_dir, now, report, dry)  # F-29

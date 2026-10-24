@@ -136,8 +136,9 @@ class Writer:
     """自分のノートの属性を書き換える。試し運転では書かず、記録だけ残す。"""
 
     def __init__(self, personal: Path, report: Report, backup: Backup, dry_run: bool,
-                 now: float, idle_seconds: int):
+                 now: float, idle_seconds: int, fresh: set[str] = frozenset()):
         self.personal = personal
+        self.fresh = fresh  # F-28: 作ったばかりでテンプレートのままのノートは触らない
         self.report = report
         self.backup = backup
         self.dry_run = dry_run
@@ -145,6 +146,8 @@ class Writer:
         self.idle_seconds = idle_seconds
 
     def busy(self, doc: Doc) -> bool:
+        if doc.id in self.fresh:
+            return True
         return self.idle_seconds > 0 and self.now - doc.path.stat().st_mtime < self.idle_seconds
 
     def set(self, doc: Doc, values: dict[str, str], what: str) -> bool:
@@ -452,14 +455,14 @@ def fill_references(docs: list[Doc], index: Index, w: Writer) -> None:
 # ---------- まとめて ----------
 
 def run_autofill(personal: Path, shared: Path | None, report: Report, backup: Backup,
-                 dry_run: bool, now: float, idle_seconds: int) -> None:
+                 dry_run: bool, now: float, idle_seconds: int, fresh: set[str] = frozenset()) -> None:
     try:
         docs = load_docs(personal, own=True, tops=OWN_DIRS + ("99_archive",))
         docs += load_docs(personal / DIST, own=False)
         if shared and shared.exists():
             docs += load_docs(shared, own=False, skip={"00_inbox", "00_週報"})
         index = Index(docs)
-        w = Writer(personal, report, backup, dry_run, now, idle_seconds)
+        w = Writer(personal, report, backup, dry_run, now, idle_seconds, fresh)
         today = datetime.fromtimestamp(now, tz=ids.JST).date()
         fill_previous(docs, index, w)
         fill_generation(docs, index, w)
