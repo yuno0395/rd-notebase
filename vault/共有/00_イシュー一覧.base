@@ -1,0 +1,40 @@
+filters:
+  and:
+    - type == "イシュー"
+views:
+  - type: table
+    name: priority 順
+    filters:
+      and:
+        - status != "解消"
+        - status != "中止"
+    order:
+      - file.name
+      - priority
+      - impact
+      - speed
+      - status
+      - resolution
+      - project
+    sort:
+      - property: priority
+        direction: ASC
+  - type: table
+    name: impact 未判定(金曜の定例で直す)
+    filters:
+      and:
+        - impact == "未判定"
+    order:
+      - file.name
+      - speed
+      - status
+      - project
+  - type: table
+    name: すべて
+    order:
+      - file.name
+      - priority
+      - impact
+      - status
+      - resolution
+      - project
