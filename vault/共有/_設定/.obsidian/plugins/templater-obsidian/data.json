@@ -39,5 +39,12 @@
   ],
   "auto_jump_to_cursor": true,
   "syntax_highlighting": true,
-  "command_timeout": 5
+  "command_timeout": 5,
+  "enabled_templates_hotkeys": [
+    {
+      "template": "_templates/_コマンド/図を開く.md",
+      "insert_enabled": true,
+      "create_enabled": false
+    }
+  ]
 }
