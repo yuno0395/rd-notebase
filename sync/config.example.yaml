@@ -1,0 +1,9 @@
+# 置き場所: %APPDATA%\知見同期\config.yaml
+member: Yu                       # メンバー.csv の名前
+personal: C:\Users\yunos\Box\開発ノート_個人_Yu
+shared: C:\Users\yunos\Box\開発ノート_共有
+secret:                          # 機密フォルダ(いくつでも、名前は自由)
+  - C:\Users\yunos\Box\顧客A
+dry_run: true                    # 最初は試し運転(レポートだけ書く)
+idle_seconds: 10                 # 最後の編集からこの秒数たつまで触らない
+# backup_dir: 省略時は config.yaml と同じ場所の backup\

@@ -1,0 +1,22 @@
+name: sync-tests
+on:
+  push:
+    paths: ["sync/**", ".github/workflows/sync-tests.yml"]
+  pull_request:
+    paths: ["sync/**", ".github/workflows/sync-tests.yml"]
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: sync
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml pytest
+      - run: python -m pytest -q
