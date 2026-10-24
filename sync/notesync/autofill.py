@@ -163,6 +163,21 @@ class Writer:
         return True
 
 
+    def set_text(self, doc: Doc, new: str, what: str) -> bool:
+        if new == doc.text:
+            return False
+        if self.busy(doc):
+            self.report.record(f"{doc.rel} は書いている途中なので、{what}は次の同期で入れます")
+            return False
+        self.report.record(f"{what}: {doc.rel}")
+        if not self.dry_run:
+            self.backup.save(self.personal, doc.path)
+            write(doc.path, new)
+        doc.text = new
+        doc.fm = frontmatter.load(new)
+        return True
+
+
 # ---------- F-31: priority ----------
 
 def to_date(value) -> date | None:
@@ -340,6 +355,100 @@ def fill_generation(docs: list[Doc], index: Index, w: Writer) -> None:
                           "どちらかを直してください")
 
 
+# ---------- F-36: 類似・参考ナレッジ ----------
+
+REF_SECTION = "類似・参考ナレッジ"
+REF_DAYS = 7      # 作ってからこの日数のあいだだけ足す(消したリンクを何度も戻さないため)
+REF_MAX = 5
+
+
+def nodes_of(d: Doc, index: Index) -> set[str]:
+    out = {n.id for n in (index.resolve(t) for t in targets(d.fm.get("friend"))) if n and n.type == "ノード"}
+    if d.type != "イシュー":
+        for p in (index.resolve(t) for t in targets(d.fm.get("parent"))):
+            if p and p.type == "イシュー":
+                out |= nodes_of(p, index)
+    return out
+
+
+def projects_of(d: Doc, index: Index) -> set[str]:
+    if d.type == "イシュー":
+        return {plain(p) for p in as_list(d.fm.get("project"))}
+    out = set()
+    for p in (index.resolve(t) for t in targets(d.fm.get("parent"))):
+        if p and p.type == "イシュー":
+            out |= projects_of(p, index)
+    return out
+
+
+def knowledge_issues(k: Doc, index: Index) -> list[Doc]:
+    found = [index.resolve(m.group(1).strip()) for v in as_list(k.fm.get("risk_reduction")) for m in LINK.finditer(v)]
+    level = [index.resolve(t) for t in targets(k.fm.get("parent"))]
+    seen = set()
+    while level:
+        nxt = []
+        for p in level:
+            if not p or p.id in seen:
+                continue
+            seen.add(p.id)
+            if p.type == "イシュー":
+                found.append(p)
+            else:
+                nxt += [index.resolve(t) for t in targets(p.fm.get("parent"))]
+        level = nxt
+    return [f for f in found if f]
+
+
+def insert_refs(text: str, lines: list[str]) -> str | None:
+    nl = "\r\n" if "\r\n" in text else "\n"
+    rows = text.replace("\r\n", "\n").split("\n")
+    start = next((i for i, r in enumerate(rows) if re.match(rf"^#{{1,6}}\s+{REF_SECTION}\s*$", r)), None)
+    if start is None:
+        return None
+    end = next((i for i in range(start + 1, len(rows)) if re.match(r"^#{1,6}\s", rows[i])), len(rows))
+    while end > start + 1 and not rows[end - 1].strip():
+        end -= 1
+    rows[end:end] = lines
+    return nl.join(rows)
+
+
+def fill_references(docs: list[Doc], index: Index, w: Writer) -> None:
+    for d in docs:
+        if not d.own or d.type not in ("イシュー", "タスク") or d.rel.startswith("99_"):
+            continue
+        made = ids.decode_time(d.id).timestamp()
+        if w.now - made > REF_DAYS * 86400:
+            continue
+        nodes = nodes_of(d, index)
+        if not nodes:
+            continue
+        mine = projects_of(d, index)
+        have = {index.resolve(m.group(1).strip()).id for m in LINK.finditer(d.text)
+                if index.resolve(m.group(1).strip())}
+        issues, knowledge = [], []
+        for o in index.by_id.values():
+            if o.id == d.id or o.id in have or o.rel.startswith("99_"):
+                continue
+            if o.type == "イシュー" and nodes_of(o, index) & nodes and not (projects_of(o, index) & mine):
+                issues.append(o)
+            elif o.type == "ナレッジ" and str(o.fm.get("usefulness") or "").strip().upper() in ("A", "B"):
+                related = set()
+                for i in knowledge_issues(o, index):
+                    related |= nodes_of(i, index)
+                related |= {x.id for x in (index.resolve(m.group(1).strip()) for m in LINK.finditer(o.text)) if x}
+                if related & nodes:
+                    knowledge.append(o)
+        lines = [f"- {k.link}(ナレッジ、有用性 {str(k.fm.get('usefulness')).strip().upper()})"
+                 for k in sorted(knowledge, key=lambda k: str(k.fm.get("usefulness")))[:REF_MAX]]
+        lines += [f"- {i.link}({'・'.join(sorted(projects_of(i, index))) or '別のプロジェクト'} のイシュー)"
+                  for i in sorted(issues, key=lambda i: i.name)[:REF_MAX]]
+        if not lines:
+            continue
+        new = insert_refs(d.text, lines)
+        if new:
+            w.set_text(d, new, f"類似・参考ナレッジを {len(lines)} 件足した")
+
+
 # ---------- まとめて ----------
 
 def run_autofill(personal: Path, shared: Path | None, report: Report, backup: Backup,
@@ -355,6 +464,7 @@ def run_autofill(personal: Path, shared: Path | None, report: Report, backup: Ba
         fill_previous(docs, index, w)
         fill_generation(docs, index, w)
         fill_priority(docs, index, w, today)
+        fill_references(docs, index, w)
     except Exception as e:  # おまけが壊れても、核の同期は続ける
         report.warn(f"priority・previous・generation の自動入力で止まりました({type(e).__name__}: {e})。"
                     "id 付けと共有はそのまま行いました")

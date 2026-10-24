@@ -197,3 +197,32 @@ def test_friday_outlook_reminder(box):
     run_once(box, now=friday)
     assert "見込みを更新してください: [[0RA00A001_試しPJ|試しPJ]]" in text(daily)
     assert "見込みを更新してください" in report(box)
+
+
+def test_similar_references(box):
+    yu, shared = box.personal, box.shared
+    write(shared / "別PJ/0RA00B001_別PJ.md", "---\nid: 0RA00B001\ntype: プロジェクト\nmembers: [Yu]\n---\n")
+    write(shared / "共通/02_ノード/0RA100001_ヒケ量.md", "---\nid: 0RA100001\ntype: ノード\nauthor: 佐藤\n---\n")
+    write(shared / "別PJ/03_イシュー/0RA200001_前のヒケ.md",
+          '---\nid: 0RA200001\nauthor: 佐藤\ntype: イシュー\nproject: [別PJ]\nfriend: ["[[0RA100001_ヒケ量]]"]\n---\n')
+    write(shared / "別PJ/05_ナレッジ/0RA300001_保圧で減る.md",
+          '---\nid: 0RA300001\nauthor: 佐藤\ntype: ナレッジ\nusefulness: A\n'
+          'risk_reduction:\n  - "[[0RA200001_前のヒケ]] 出荷→小"\n---\n')
+    write(shared / "別PJ/05_ナレッジ/0RA400001_役に立たない.md",
+          '---\nid: 0RA400001\nauthor: 佐藤\ntype: ナレッジ\nusefulness: C\n'
+          'risk_reduction:\n  - "[[0RA200001_前のヒケ]] 出荷→小"\n---\n')
+    nid = ids.encode_time(ids.seconds_since_epoch(datetime.fromtimestamp(NOW, tz=ids.JST)) - 3600) + "001"
+    p = write(yu / f"03_イシュー/{nid}_今のヒケ.md",
+              f'---\nid: {nid}\nauthor: Yu\ntype: イシュー\nimpact: 出荷\nspeed: すぐ\nproject: [{PJ}]\n'
+              'friend: ["[[0RA100001_ヒケ量]]"]\n---\n## リスク\n## 類似・参考ナレッジ\n説明の行\n\n## 次\n')
+    old = write(yu / "03_イシュー/0A0000001_古いヒケ.md",
+                f'---\nid: 0A0000001\nauthor: Yu\ntype: イシュー\nimpact: 出荷\nspeed: すぐ\nproject: [{PJ}]\n'
+                'friend: ["[[0RA100001_ヒケ量]]"]\n---\n## 類似・参考ナレッジ\n')
+    run_once(box, now=NOW)
+    t = text(p)
+    assert ("## 類似・参考ナレッジ\n説明の行\n- [[0RA300001_保圧で減る|保圧で減る]](ナレッジ、有用性 A)\n"
+            "- [[0RA200001_前のヒケ|前のヒケ]](別PJ のイシュー)\n\n## 次\n") in t
+    assert "役に立たない" not in t
+    assert "前のヒケ" not in text(old)                       # 作ってから日がたったノートには足さない
+    run_once(box, now=NOW + 60)
+    assert text(p).count("[[0RA200001_") == 1              # 重ねない
