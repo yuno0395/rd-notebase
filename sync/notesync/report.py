@@ -6,6 +6,8 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from .ids import JST
+
 REPORT_NAME = "00_同期レポート.md"
 KEEP_DAYS = 30
 RECORD_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2}) ")
@@ -14,7 +16,7 @@ RECORD_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2}) ")
 class Report:
     def __init__(self, dry_run: bool = False, now: datetime | None = None):
         self.dry_run = dry_run
-        self.now = now or datetime.now()
+        self.now = now or datetime.now(JST)  # PC の時計の設定によらず日本時間で書く
         self.todos: list[str] = []
         self.warnings: list[str] = []
         self.records: list[str] = []

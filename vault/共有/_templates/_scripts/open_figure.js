@@ -36,10 +36,16 @@ async function open_figure(tp) {
 }
 
 // カーソルの位置に引用を入れる(図は説明の途中につける)。
+// 引用は独立した1行にする。同じ行に文字や見出しがあると、改行をはさむ。
 function addEmbed(app, note, line) {
   const view = app.workspace.activeEditor;
   if (view?.file === note && view.editor) {
-    view.editor.replaceSelection(line);
+    const ed = view.editor;
+    const from = ed.getCursor("from");
+    const to = ed.getCursor("to");
+    const before = ed.getLine(from.line).slice(0, from.ch);
+    const after = ed.getLine(to.line).slice(to.ch);
+    ed.replaceSelection((before.trim() ? "\n" : "") + line + (after.trim() ? "\n" : ""));
     return;
   }
   return app.vault.process(note, (text) => text.replace(/\s*$/, "\n\n" + line + "\n"));
