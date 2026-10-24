@@ -53,6 +53,11 @@
       "template": "_templates/_コマンド/ノードにする.md",
       "insert_enabled": true,
       "create_enabled": false
+    },
+    {
+      "template": "_templates/_コマンド/保存.md",
+      "insert_enabled": true,
+      "create_enabled": false
     }
   ]
 }
