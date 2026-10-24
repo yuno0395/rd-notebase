@@ -290,7 +290,8 @@ def conflict_path(path: Path, member: str, now: datetime) -> Path:
 
 def recent(ctx: Context, path: Path) -> bool:
     """最後の保存から idle_seconds たっていない(書いている途中かもしれない)。"""
-    return path.exists() and time.time() - path.stat().st_mtime < ctx.idle_seconds
+    # idle_seconds が 0 なら待たない(Windows ではファイルの時刻が今より少し先になることがある)
+    return ctx.idle_seconds > 0 and path.exists() and time.time() - path.stat().st_mtime < ctx.idle_seconds
 
 
 def sync_pair(ctx: Context, key: str, p: Path, s: Path, p_rel: str, s_rel: str,
