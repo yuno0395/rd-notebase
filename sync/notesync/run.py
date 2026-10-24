@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+from .attachfix import fix_attachments
 from .autofill import run_autofill
 from .boxcopies import report_box_copies
 from .heavy import keep_rules, move_heavy
@@ -66,6 +67,9 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
         if v.label == "機密":
             fix_links(v, *planned([v]), report, backup, dry)
 
+    # id を振ったノートの添付を _仕組み/attachments/<id>/ へ移し、リンクの形をそろえる(F-17b)
+    fix_attachments(cfg.personal, renamed.get(vaults[0].label + str(vaults[0].root), {}),
+                    report, backup, dry, now, cfg.idle_seconds)
     report_same_names(vaults, report)
     # 重い添付を 開発データ/ へ移し、リンクを書き換える(F-17〜20)。個人 vault だけ
     move_heavy(cfg.personal, cfg.shared, cfg.shared_data, cfg.member, report, backup, dry, now, cfg.idle_seconds)
