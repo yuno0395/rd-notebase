@@ -26,6 +26,7 @@ class Config:
     personal: Path
     shared: Path | None = None
     shared_data: Path | None = None  # 開発データ(重い添付の置き場所。F-17〜20)
+    report_dir: Path | None = None   # 開発ノート_報告(管理者向けの週報。F-29)
     secret: list[Path] = field(default_factory=list)
     dry_run: bool = False
     idle_seconds: int = 10
@@ -56,6 +57,7 @@ def load(path: Path) -> Config:
         personal=Path(data["personal"]),
         shared=Path(data["shared"]) if data.get("shared") else None,
         shared_data=Path(data["shared_data"]) if data.get("shared_data") else None,
+        report_dir=Path(data["report"]) if data.get("report") else None,
         secret=[Path(p) for p in (data.get("secret") or [])],
         dry_run=bool(data.get("dry_run", False)),
         idle_seconds=int(data.get("idle_seconds", 10)),

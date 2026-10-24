@@ -2,6 +2,8 @@
 member: Yu                       # メンバー.csv の名前
 personal: C:\Users\yunos\Box\開発ノート_個人_Yu
 shared: C:\Users\yunos\Box\開発ノート_共有
+shared_data: C:\Users\yunos\Box\開発データ     # 重い添付の置き場所(F-17〜20)
+report: C:\Users\yunos\Box\開発ノート_報告      # 管理者向けの週報(F-29。report_runner の PC だけ使う)
 secret:                          # 機密フォルダ(いくつでも、名前は自由)
   - C:\Users\yunos\Box\顧客A
 dry_run: true                    # 最初は試し運転(レポートだけ書く)

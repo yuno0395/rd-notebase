@@ -8,6 +8,7 @@ from .autofill import run_autofill
 from .boxcopies import report_box_copies
 from .heavy import keep_rules, move_heavy
 from .history import record_history
+from .weekly import maybe_weekly
 from .assign import Vault, assign_ids, collect_used, fix_links, name_index, report_same_names
 from . import ids
 from .config import Config
@@ -82,6 +83,7 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
                       data_root=cfg.shared_data, keep=keep_rules(cfg.shared))
         run_share(ctx)
         record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now)  # F-31・F-32
+        maybe_weekly(cfg.member, cfg.shared, cfg.report_dir, now, report, dry)  # F-29
         if not dry:
             state.save()
     elif cfg.shared:

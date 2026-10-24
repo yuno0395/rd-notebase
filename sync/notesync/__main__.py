@@ -2,8 +2,9 @@
 
     python -m notesync once [--config 個人設定.yaml] [--dry-run]
     python -m notesync watch [--config 個人設定.yaml] [--interval 3]
+    python -m notesync weekly [--config 個人設定.yaml]
 
-once は1回だけ同期する。watch は interval 分ごとに繰り返す。
+once は1回だけ同期する。watch は interval 分ごとに繰り返す。weekly は今週の週報を今すぐ作り直す(F-29)。
 --dry-run は書き込まず、やる予定だけを _仕組み/同期レポート.md に書く(F-23)。
 """
 
@@ -20,7 +21,7 @@ from .run import run_once
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="notesync", description="知見同期プログラム")
-    ap.add_argument("command", choices=["once", "watch"])
+    ap.add_argument("command", choices=["once", "watch", "weekly"])
     ap.add_argument("--config", type=Path, default=config.default_config_path())
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--interval", type=float, default=3.0, help="watch のときの間隔(分)")
@@ -31,6 +32,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"止めました: {e}", file=sys.stderr)
         return 2
     dry = True if args.dry_run else None
+    if args.command == "weekly":
+        from datetime import datetime
+
+        from .ids import JST
+        from .report import Report
+        from .weekly import make_weekly
+        if not cfg.shared or not cfg.report_dir:
+            print("止めました: 個人設定に shared と report を書いてください", file=sys.stderr)
+            return 2
+        r = Report(dry_run=bool(dry))
+        made = make_weekly(cfg.shared, cfg.report_dir, datetime.now(JST).date(), r, bool(dry), force=True)
+        print(f"週報を作りました: {len(made)} 件({cfg.report_dir})")
+        return 0
     while True:
         report = run_once(cfg, dry_run=dry)
         print(f"同期しました: 記録 {len(report.records)} 件、対応が必要 {len(report.todos)} 件、警告 {len(report.warnings)} 件")
