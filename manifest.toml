@@ -53,6 +53,7 @@ src = "vault/機密"
 include = [
   { from = "vault/共有/_templates/図.excalidraw.md", to = "_templates/図.excalidraw.md" },
   { from = "vault/共有/_templates/_scripts", to = "_templates/_scripts" },
+  { from = "vault/共有/_templates/_コマンド", to = "_templates/_コマンド" },
   { from = "vault/共有/_tools/同期プログラム/メンバー.csv", to = "_tools/メンバー.csv" },
 ]
 system = [
