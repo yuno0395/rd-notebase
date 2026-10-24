@@ -38,6 +38,8 @@ BIG_IMPACT = {"方針", "絞込", "出荷", "大"}  # 「大」は v0.22 まで�
 TYPE_DIR = {"目的": "01_目的", "仮説": "01_目的", "ノード": "02_ノード",
             "イシュー": "03_イシュー", "タスク": "04_タスク"}
 CONFLICT_MARK = "_競合_"
+WINDOW = "窓口"           # 機密の窓口(機密フォルダごとに1つ。見てよい人と社内の当事者だけを書く)
+WINDOW_DIR = "機密の窓口"
 MD_LINK = re.compile(r"\]\(([^)\s]+)")
 
 
@@ -153,6 +155,7 @@ class Context:
     by_name: dict[str, set[str]] = field(default_factory=dict)  # 名前(小文字)→ id
     projects: dict[str, Item] = field(default_factory=dict)   # プロジェクト名 → 台帳
     secret_names: set[str] = field(default_factory=set)
+    secret_words: set[str] = field(default_factory=set)       # 機密フォルダと事実ノートの名前(小文字)
     counts: dict[str, int] = field(default_factory=dict)
     asked: set[frozenset] = field(default_factory=set)        # F-47 で聞いている組
     fresh: set[str] = field(default_factory=set)              # F-28: 作ったばかりでテンプレートのままのノート
@@ -206,7 +209,7 @@ class Context:
             return None
         seen.add(item.id)
         t = item.type
-        if t == "ノード":
+        if t in ("ノード", WINDOW):
             return COMMON
         if t == "プロジェクト":
             return item.name
@@ -240,6 +243,29 @@ class Context:
                 return True
         return False
 
+    def secret_leaks(self, item: Item) -> list[str]:
+        """機密の窓口の全文と secret_refs に、機密フォルダか事実ノートの名前が入っていないか。"""
+        if item.type == WINDOW:
+            text = item.text
+        else:
+            text = "\n".join(as_list(item.fm.get("secret_refs")))
+        low = text.lower()
+        return sorted(w for w in self.secret_words if w in low)
+
+    def bad_secret_refs(self, item: Item) -> list[str]:
+        """secret_refs のうち、機密の窓口へのリンクでないもの。"""
+        bad = []
+        for v in as_list(item.fm.get("secret_refs")):
+            targets = [m.group(1).strip() for m in LINK.finditer(v)]
+            if not targets:
+                bad.append(v.strip())
+                continue
+            for t in targets:
+                found = self.resolve(t)
+                if not found or found.type != WINDOW:
+                    bad.append(t)
+        return bad
+
     def secret_links(self, item: Item) -> list[str]:
         """F-40: 機密フォルダの中のファイルへのリンク・画像。"""
         hits = []
@@ -266,6 +292,8 @@ def destination(ctx: Context, item: Item) -> str | None:
         return f"{project}/{item.filename}"
     if item.type == "ノード":
         return f"{COMMON}/02_ノード/{item.filename}"
+    if item.type == WINDOW:
+        return f"{COMMON}/{WINDOW_DIR}/{item.filename}"
     return f"{project}/{folder}/{item.filename}" if folder else f"{project}/{item.filename}"
 
 
@@ -290,7 +318,16 @@ def check_conditions(ctx: Context, item: Item) -> str | None:
     hits = ctx.secret_links(item)
     if hits:
         return (f"機密へのリンク: {link} に機密フォルダの中へのリンクがあります"
-                f"({'、'.join(hits)})。secret_refs に id だけを書いてください(共有していません)")
+                f"({'、'.join(hits)})。secret_refs に機密の窓口へのリンクを書いてください(共有していません)")
+    leaks = ctx.secret_leaks(item)
+    if leaks:
+        where = "本文か属性欄" if item.type == WINDOW else "secret_refs"
+        return (f"機密へのリンク: {link} の {where} に、機密フォルダか事実ノートの名前({'、'.join(leaks)})が"
+                "入っています。顧客名を使わない呼び名にしてください(共有していません)")
+    bad = ctx.bad_secret_refs(item)
+    if bad:
+        ctx.report.todo(f"secret_refs: {link} の {'、'.join(bad)} は機密の窓口へのリンクではありません。"
+                        "`[[案件A]]` のように、共有の 共通/機密の窓口/ のノートへのリンクにしてください")
     if ctx.project_of(item) is None:
         return f"project 不明: {link} の振り分け先が決まりません。project か parent を書いてください(共有していません)"
     project = ctx.project_of(item)
@@ -457,6 +494,13 @@ def run_share(ctx: Context) -> None:
                 if p.is_file() and not any(is_hidden(x) for x in p.relative_to(sec).parts):
                     ctx.secret_names.add(note_stem(p.name).lower())
                     ctx.secret_names.add(p.name.lower())
+                    rel = p.relative_to(sec)
+                    if p.suffix == ".md" and rel.parts[0] not in SKIP_DIRS and not p.name.startswith("00_"):
+                        word = ids.split_filename(note_stem(p.name))[1].strip().lower()
+                        if len(word) >= 2:
+                            ctx.secret_words.add(word)
+            if len(sec.name) >= 2:
+                ctx.secret_words.add(sec.name.lower())
     choices = read_choices(ctx)
     shared_nodes = [items[0] for i, items in sorted(shared.items())
                     if i not in mine and len(items) == 1 and items[0].type == "ノード" and items[0].top != ARCHIVE]

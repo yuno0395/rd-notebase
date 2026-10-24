@@ -102,6 +102,39 @@
           }
         },
         {
+          "id": "12c75a3a-1104-53de-9308-83fa9d60b685",
+          "name": "機密の窓口",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/機密の窓口.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [
+              "共通/機密の窓口"
+            ],
+            "chooseWhenCreatingNote": false,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
           "id": "c2f5ba6d-42da-584a-9070-89fb1fe5fdb0",
           "name": "イシュー",
           "type": "Template",
