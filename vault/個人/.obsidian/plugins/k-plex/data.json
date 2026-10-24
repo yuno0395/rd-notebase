@@ -78,5 +78,239 @@
     "hidden": [
       "hidden"
     ]
+  },
+  "noteTypeField": "priority",
+  "noteTypeStyles": {
+    "1": {
+      "backgroundColor": "#e5484dff",
+      "textColor": "#ffffffff"
+    },
+    "2": {
+      "backgroundColor": "#f08c00ff",
+      "textColor": "#ffffffff"
+    },
+    "3": {
+      "backgroundColor": "#f5d90a99",
+      "textColor": "#000000ff"
+    },
+    "4": {
+      "backgroundColor": "#8b8d9866",
+      "textColor": "#000000ff"
+    }
+  },
+  "graphLenses": [
+    {
+      "id": "rdn-fade-closed",
+      "name": "終わったものを薄く(解消・中止・不採用・外れた)",
+      "enabled": true,
+      "scope": "node",
+      "mode": "style",
+      "expression": "note.status == \"解消\" || note.status == \"中止\" || note.status == \"不採用\" || note.status == \"外れた\"",
+      "style": {
+        "node": {
+          "backgroundColor": "#80808022",
+          "textColor": "#9a9a9aff",
+          "borderColor": "#9a9a9a66",
+          "strokeStyle": "dashed"
+        }
+      }
+    }
+  ],
+  "appearanceThemes": {
+    "version": 1,
+    "migrationComplete": true,
+    "selectedId": "rdn",
+    "themes": [
+      {
+        "id": "default",
+        "name": "既定のテーマ",
+        "appearance": {
+          "base": {
+            "baseNodeStyle": {
+              "prefix": "",
+              "fillStyle": "solid",
+              "fontSize": 20,
+              "fontFamily": 3,
+              "maxLabelLength": 30,
+              "maxWidth": 286,
+              "roughness": 0,
+              "strokeShaprness": "round",
+              "strokeWidth": 1,
+              "strokeStyle": "solid",
+              "padding": 10,
+              "gateRadius": 5,
+              "gateOffset": 15,
+              "gateFillStyle": "solid"
+            },
+            "centralNodeStyle": {
+              "fontSize": 30,
+              "maxWidth": 370
+            },
+            "inferredNodeStyle": {},
+            "virtualNodeStyle": {
+              "fillStyle": "hachure"
+            },
+            "siblingNodeStyle": {
+              "fontSize": 15
+            },
+            "urlNodeStyle": {
+              "icon": "globe"
+            },
+            "attachmentNodeStyle": {
+              "icon": "paperclip"
+            },
+            "folderNodeStyle": {
+              "icon": "folder",
+              "strokeShaprness": "sharp"
+            },
+            "tagNodeStyle": {
+              "icon": "tag",
+              "strokeShaprness": "sharp"
+            },
+            "baseLinkStyle": {
+              "strokeWidth": 1,
+              "strokeStyle": "solid",
+              "roughness": 0,
+              "startArrowHead": "none",
+              "endArrowHead": "none",
+              "showLabel": false,
+              "fontSize": 10,
+              "fontFamily": 3
+            },
+            "inferredLinkStyle": {
+              "strokeStyle": "dashed"
+            },
+            "folderLinkStyle": {},
+            "tagLinkStyle": {},
+            "standardStyleDefaults": "native"
+          },
+          "semantic": {
+            "noteTypeStyles": {},
+            "tagNodeStyles": {},
+            "tagStyleList": [],
+            "hierarchyLinkStyles": {},
+            "colorPreferences": {
+              "version": 1,
+              "palette": [],
+              "semantic": {},
+              "compass": {
+                "enabled": false,
+                "fills": {}
+              }
+            },
+            "lensColors": {}
+          }
+        }
+      },
+      {
+        "id": "rdn",
+        "name": "開発ノート",
+        "appearance": {
+          "base": {
+            "baseNodeStyle": {
+              "prefix": "",
+              "fillStyle": "solid",
+              "fontSize": 20,
+              "fontFamily": 3,
+              "maxLabelLength": 30,
+              "maxWidth": 286,
+              "roughness": 0,
+              "strokeShaprness": "round",
+              "strokeWidth": 1,
+              "strokeStyle": "solid",
+              "padding": 10,
+              "gateRadius": 5,
+              "gateOffset": 15,
+              "gateFillStyle": "solid"
+            },
+            "centralNodeStyle": {
+              "fontSize": 30,
+              "maxWidth": 370
+            },
+            "inferredNodeStyle": {},
+            "virtualNodeStyle": {
+              "fillStyle": "hachure"
+            },
+            "siblingNodeStyle": {
+              "fontSize": 15
+            },
+            "urlNodeStyle": {
+              "icon": "globe"
+            },
+            "attachmentNodeStyle": {
+              "icon": "paperclip"
+            },
+            "folderNodeStyle": {
+              "icon": "folder",
+              "strokeShaprness": "sharp"
+            },
+            "tagNodeStyle": {
+              "icon": "tag",
+              "strokeShaprness": "sharp"
+            },
+            "baseLinkStyle": {
+              "strokeWidth": 1,
+              "strokeStyle": "solid",
+              "roughness": 0,
+              "startArrowHead": "none",
+              "endArrowHead": "none",
+              "showLabel": false,
+              "fontSize": 10,
+              "fontFamily": 3
+            },
+            "inferredLinkStyle": {
+              "strokeStyle": "dashed"
+            },
+            "folderLinkStyle": {},
+            "tagLinkStyle": {},
+            "standardStyleDefaults": "native"
+          },
+          "semantic": {
+            "noteTypeStyles": {
+              "1": {
+                "backgroundColor": "#e5484dff",
+                "textColor": "#ffffffff"
+              },
+              "2": {
+                "backgroundColor": "#f08c00ff",
+                "textColor": "#ffffffff"
+              },
+              "3": {
+                "backgroundColor": "#f5d90a99",
+                "textColor": "#000000ff"
+              },
+              "4": {
+                "backgroundColor": "#8b8d9866",
+                "textColor": "#000000ff"
+              }
+            },
+            "tagNodeStyles": {},
+            "tagStyleList": [],
+            "hierarchyLinkStyles": {},
+            "colorPreferences": {
+              "version": 1,
+              "palette": [],
+              "semantic": {},
+              "compass": {
+                "enabled": false,
+                "fills": {}
+              }
+            },
+            "lensColors": {
+              "rdn-fade-closed": {
+                "node": {
+                  "backgroundColor": "#80808022",
+                  "textColor": "#9a9a9aff",
+                  "borderColor": "#9a9a9a66"
+                },
+                "edge": {}
+              }
+            }
+          }
+        }
+      }
+    ],
+    "migrationNotice": false,
+    "nativeBaseMigration": 1
   }
 }

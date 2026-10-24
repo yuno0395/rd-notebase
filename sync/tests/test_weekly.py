@@ -49,7 +49,12 @@ def shared(tmp_path):
         note(s, f"{PJ}/04_タスク", f"0RB10{i}001", f"対策{i}",
              f'author: Yu\ntype: タスク\nstatus: {st}\ndue: 2026-10-20\nparent: ["[[0RB001001_ヒケ]]"]\n')
     note(s, f"{PJ}/04_タスク", "0RB200002", "待ち", 'author: 佐藤\ntype: タスク\nstatus: 待ち\nparent: ["[[0RB002001_寸法]]"]\n')
-    note(s, f"{PJ}/議事録", "0RB300001", "DR0", "type: 議事録\ndate: 2026-10-01\n")
+    note(s, f"{PJ}/04_タスク", "0RB201001", "見てほしい",
+         'author: Yu\ntype: タスク\nstatus: 確認待ち\nreview_request: [佐藤]\nparent: ["[[0RB001001_ヒケ]]"]\n')
+    note(s, f"{PJ}/議事録", "0RB300001", "DR0", "type: 議事録\ndate: 2026-09-20\n")
+    # kind: DR なら名前に DR がなくても DR とみなす
+    note(s, f"{PJ}/議事録", "0RB301001", "仕様の見直し", "type: 議事録\nkind: DR\ndate: 2026-10-01\n")
+    note(s, f"{PJ}/議事録", "0RB302001", "打ち合わせ", "type: 議事録\ndate: 2026-10-05\n")
     for i, st in enumerate(["候補", "不採用", "候補"]):
         note(s, f"{PJ}/設計記録", f"0RB40{i}001", f"センサー案{i}",
              f'type: 設計記録\nstatus: {st}\nparent: ["[[0RB001001_ヒケ]]"]\n')
@@ -83,7 +88,7 @@ def test_weekly_report(shared, tmp_path):
     assert "DR(2026-10-01)のあと対策 2 件完了、resolution は 未把握 のまま" in md
     assert "原因が組み立て値のまま(ヒケ量)" in md
     assert "| 対策2 | Yu | 期限を 2 回延ばした |" in md
-    assert "| Yu | 1 | 0 | 1 | 0 |" in md and "| 佐藤 | 0 | 1 | 0 | 0 |" in md
+    assert "| Yu | 1 | 0 | 1 | 1 | 0 |" in md and "| 佐藤 | 0 | 1 | 0 | 0 | 1 |" in md
     assert "| ヒケ | 2 |" in md                                     # センサー案 3 つのうち不採用でない 2 つ
     wb = openpyxl.load_workbook(out / PJ / "2026-W44.xlsx")
     assert "担当者" in wb.sheetnames and wb["見込み"]["B2"].value == "△"

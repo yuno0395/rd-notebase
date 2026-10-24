@@ -43,6 +43,11 @@ def status(doc: Doc) -> str:
     return str(doc.fm.get("status") or "").strip()
 
 
+def is_dr(doc: Doc) -> bool:
+    """DR の議事録: kind: DR(DR 議事録のテンプレート)。前からのものは名前に DR を含むもの。"""
+    return str(doc.fm.get("kind") or "").strip().upper() == "DR" or "DR" in doc.name.upper()
+
+
 def owner(doc: Doc) -> str:
     o = as_list(doc.fm.get("owner")) or as_list(doc.fm.get("author"))
     return plain(o[0]) if o else "(不明)"
@@ -189,7 +194,7 @@ class Builder:
 
     def last_dr(self, pj: str) -> date | None:
         days = [to_date(d.fm.get("date")) for d in self.in_project(pj)
-                if d.type == "議事録" and "DR" in d.name.upper()]
+                if d.type == "議事録" and is_dr(d)]
         days = [x for x in days if x and x <= self.today]
         return max(days) if days else None
 
@@ -241,11 +246,12 @@ class Builder:
         return "、".join(out)
 
     def people(self, docs: list[Doc]) -> list[list[str]]:
+        # 確認を頼まれた: 確認待ちのタスクの review_request に名前があるもの(仕様書「確認待ち」)
         counts: dict[str, list[int]] = {}
         for t in docs:
             if t.type != "タスク" or status(t) not in OPEN_TASK:
                 continue
-            c = counts.setdefault(owner(t), [0, 0, 0, 0])
+            c = counts.setdefault(owner(t), [0, 0, 0, 0, 0])
             s = status(t)
             if s == "進行中":
                 c[0] += 1
@@ -253,6 +259,8 @@ class Builder:
                 c[1] += 1
             elif s == "確認待ち":
                 c[3] += 1
+                for who in {plain(r) for r in as_list(t.fm.get("review_request"))}:
+                    counts.setdefault(who, [0, 0, 0, 0, 0])[4] += 1
             due = to_date(t.fm.get("due"))
             if due and due < self.today:
                 c[2] += 1
@@ -300,7 +308,7 @@ class Builder:
         L += ["## 行き詰まりの候補", ""]
         r.table("行き詰まり", ["名前", "担当", "様子"], self.stuck(pj, docs))
         L += ["## 担当者ごとのタスク", ""]
-        r.table("担当者", ["担当", "進行中", "待ち", "期限切れ", "確認待ち"], self.people(docs))
+        r.table("担当者", ["担当", "進行中", "待ち", "期限切れ", "確認待ち", "確認を頼まれた"], self.people(docs))
         refs = sum(len(as_list(d.fm.get("secret_refs"))) for d in docs)
         L += ["## 機密", "", f"機密の事実への参照: {refs} 件(中身は載せません)", ""]
         return r

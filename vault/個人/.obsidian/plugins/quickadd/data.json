@@ -238,6 +238,39 @@
           }
         },
         {
+          "id": "b763a643-b424-5198-9a7a-1fa4a393bf70",
+          "name": "DR 議事録",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/DR議事録.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [
+              "04_タスク"
+            ],
+            "chooseWhenCreatingNote": false,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
           "id": "d41bbe39-7ebd-52e7-a455-51ba53a906a0",
           "name": "実験・試作記録",
           "type": "Template",
