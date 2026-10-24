@@ -34,6 +34,9 @@ class State:
     def set(self, key: str, value: dict) -> None:
         self.items[key] = value
 
+    def starting(self, prefix: str) -> dict[str, dict]:
+        return {k: v for k, v in self.items.items() if k.startswith(prefix)}
+
     def save(self) -> None:
         if not self.path:
             return

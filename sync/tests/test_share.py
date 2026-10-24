@@ -240,3 +240,78 @@ def test_lost_state_is_rebuilt_without_overwriting(box):
     run_once(box["yu"])
     assert "x\n" in text(shared_water)
     assert any("_競合_" in p.name for p in shared_water.parent.iterdir())
+
+
+# ---------- F-47: 名前か別名が重なるノード ----------
+
+def add_h2o(box):
+    """佐藤の「蒸留水」(別名 H2O)が共有にあり、Yu が別に「H2O」を作った。"""
+    sato = box["sato"].personal
+    write(sato / "02_ノード/0RB102002_蒸留水.md",
+          "---\nid: 0RB102002\ntype: ノード\naliases:\n  - 蒸留水\n  - H2O\n---\n## これは何か\n佐藤のメモ\n")
+    run_once(box["sato"])
+    yu = box["yu"].personal
+    write(yu / "02_ノード/0RB008001_H2O.md",
+          "---\nid: 0RB008001\ntype: ノード\naliases: [H2O, 純水]\n---\n## これは何か\n"
+          "Yuのメモ ![[写真.png]]\n## 何に影響するか\n")
+    write(yu / "_attachments/0RB008001/写真.png", "png")
+    write(yu / "03_イシュー/0RB009001_濁り.md",
+          f"---\nid: 0RB009001\ntype: イシュー\nproject: [{PJ}]\n---\n[[0RB008001_H2O|H2O]] と [[0RB008001_H2O]]\n")
+
+
+def tick(c, word):
+    p = c.personal / "00_同期レポート.md"
+    lines = [l.replace("- [ ]", "- [x]", 1) if l.startswith(f"- [ ] {word}:") and "0RB008001" in l else l
+             for l in text(p).splitlines()]
+    write(p, "\n".join(lines) + "\n")
+
+
+def test_overlapping_node_is_asked_not_collected(box):
+    add_h2o(box)
+    run_once(box["yu"])
+    assert not any("0RB008001" in f for f in files(box["shared"]))
+    r = report(box["yu"])
+    assert "- [ ] 同じもの: [[0RB008001_H2O|H2O]] を [[0RB102002_蒸留水|蒸留水]](佐藤) にまとめる" in r
+    assert "- [ ] 別もの: [[0RB008001_H2O|H2O]] と [[0RB102002_蒸留水|蒸留水]](佐藤)" in r
+    assert "同じ名前:" not in r                           # F-04 と二重に聞かない
+
+
+def test_same_merges_into_shared_node(box):
+    add_h2o(box)
+    run_once(box["yu"])
+    tick(box["yu"], "同じもの")
+    run_once(box["yu"], dry_run=True)                     # 試し運転では答えを消さない
+    assert "- [x] 同じもの:" in report(box["yu"])
+    run_once(box["yu"])
+    yu, shared = box["yu"].personal, box["shared"]
+    water = text(shared / "共通/02_ノード/0RB102002_蒸留水.md")
+    assert 'aliases: ["蒸留水", "H2O", "純水"]' in water
+    assert "  - H2O" not in water                      # 縦に並んだ別名を残さない
+    assert 'author: ["佐藤", "Yu"]' in water
+    assert "## まとめたメモ(H2O、Yu、" in water
+    assert "- [ ] Yu: 「H2O」のメモを上の本文に書き直して、この章を消す 📅 " in water
+    assert "### これは何か\nYuのメモ" in water and "何に影響するか" not in water
+    assert (shared / "_attachments/0RB102002/写真.png").exists()
+    # 自分のノードは archive へ、リンクは付け替え
+    assert not (yu / "02_ノード/0RB008001_H2O.md").exists()
+    assert 'merged_into: "[[0RB102002_蒸留水|蒸留水]]"' in text(yu / "99_archive/0RB008001_H2O.md")
+    issue = text(yu / "03_イシュー/0RB009001_濁り.md")
+    assert "[[0RB102002_蒸留水|H2O]] と [[0RB102002_蒸留水|H2O]]" in issue
+    assert "同じもの:" not in report(box["yu"])
+    # Yu も author に入ったが、最初に書いたのは佐藤なので Yu にも配られる。佐藤の手元にも入る
+    run_once(box["yu"])
+    assert "## まとめたメモ" in text(yu / "90_共有/共通/02_ノード/0RB102002_蒸留水.md")
+    run_once(box["sato"])
+    assert "## まとめたメモ" in text(box["sato"].personal / "02_ノード/0RB102002_蒸留水.md")
+    assert "同じ名前:" not in report(box["yu"])
+
+
+def test_other_keeps_both_and_stops_asking(box):
+    add_h2o(box)
+    run_once(box["yu"])
+    tick(box["yu"], "別もの")
+    run_once(box["yu"])
+    assert "共通/02_ノード/0RB008001_H2O.md" in files(box["shared"])
+    run_once(box["yu"])
+    r = report(box["yu"])
+    assert "別もの:" not in r and "同じもの:" not in r and "同じ名前:" not in r
