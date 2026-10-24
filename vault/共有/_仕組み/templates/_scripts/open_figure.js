@@ -29,7 +29,7 @@ async function open_figure(tp) {
   if (!fig) {
     if (!app.vault.getAbstractFileByPath(dir)) await app.vault.createFolder(dir);
     fig = await app.vault.create(path, await app.vault.adapter.read(FIG_TEMPLATE));
-    addEmbed(app, note, `![[${dir}/図.excalidraw#^frame=${FIRST_FRAME}]]`);
+    addEmbed(app, note, `![[${dir}/図.excalidraw#^clippedframe=${FIRST_FRAME}]]`);
   }
   const leaf = app.workspace.getLeaf("split", "vertical");
   await leaf.setViewState({ type: "excalidraw", state: { file: fig.path }, active: true });
