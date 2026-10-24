@@ -147,3 +147,27 @@ def test_box_conflict_copies(box):
     assert "Box の競合の複製: 共有/試しPJ/03_イシュー/メモ (競合 Yu).md があります。中身を確かめて" in r
     # 複製には id をつけず、共有にも集めない
     assert not list(box.shared.rglob("*conflicted*"))
+
+
+def test_note_history(box):
+    from notesync.history import done_date, extensions, first_due, history_path, read_rows
+    yu = box.personal
+    task = write(yu / "04_タスク/0RB002001_試作.md",
+                 "---\nid: 0RB002001\nauthor: Yu\ntype: タスク\nstatus: 進行中\ndue: 2026-10-30\n---\n")
+    run_once(box, now=NOW)
+    t = text(task)
+    write(task, t.replace("due: 2026-10-30", "due: 2026-11-06"))
+    run_once(box, now=NOW + 86400)
+    write(task, text(task).replace("status: 進行中", "status: 完了"))
+    run_once(box, now=NOW + 2 * 86400)
+    run_once(box, now=NOW + 3 * 86400)              # 変わらなければ足さない
+    rows = read_rows(history_path(box.shared, "Yu"))
+    assert [(r["項目"], r["前"], r["後"]) for r in rows] == [
+        ("due", "", "2026-10-30"), ("status", "", "進行中"),
+        ("due", "2026-10-30", "2026-11-06"), ("status", "進行中", "完了")]
+    assert first_due(rows, "0RB002001") == "2026-10-30"
+    assert extensions(rows, "0RB002001") == 1
+    assert done_date(rows, "0RB002001") == "2026-10-26"
+    assert "due" in text(task) and "first" not in text(task)   # ノートには書かない
+    assert history_path(box.shared, "Yu").read_bytes().startswith(b"\xef\xbb\xbf")  # Excel 用の BOM は先頭だけ
+    assert history_path(box.shared, "Yu").read_bytes().count(b"\xef\xbb\xbf") == 1

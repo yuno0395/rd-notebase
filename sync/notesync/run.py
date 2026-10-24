@@ -6,6 +6,7 @@ import time
 
 from .autofill import run_autofill
 from .boxcopies import report_box_copies
+from .history import record_history
 from .assign import Vault, assign_ids, collect_used, fix_links, name_index, report_same_names
 from . import ids
 from .config import Config
@@ -76,6 +77,7 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
                       secret=[p for p in cfg.secret if p.exists()], report=report, backup=backup,
                       state=state, dry_run=dry, now=now, idle_seconds=cfg.idle_seconds)
         run_share(ctx)
+        record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now)  # F-31・F-32
         if not dry:
             state.save()
     elif cfg.shared:
