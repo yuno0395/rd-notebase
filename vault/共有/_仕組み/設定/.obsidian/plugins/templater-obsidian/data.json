@@ -55,6 +55,31 @@
       "template": "_仕組み/templates/_コマンド/保存.md",
       "insert_enabled": true,
       "create_enabled": false
+    },
+    {
+      "template": "_仕組み/templates/_コマンド/イシューにする.md",
+      "insert_enabled": true,
+      "create_enabled": false
+    },
+    {
+      "template": "_仕組み/templates/_コマンド/タスクにする.md",
+      "insert_enabled": true,
+      "create_enabled": false
+    },
+    {
+      "template": "_仕組み/templates/_コマンド/仮説にする.md",
+      "insert_enabled": true,
+      "create_enabled": false
+    },
+    {
+      "template": "_仕組み/templates/_コマンド/目的にする.md",
+      "insert_enabled": true,
+      "create_enabled": false
+    },
+    {
+      "template": "_仕組み/templates/_コマンド/ナレッジにする.md",
+      "insert_enabled": true,
+      "create_enabled": false
     }
   ]
 }

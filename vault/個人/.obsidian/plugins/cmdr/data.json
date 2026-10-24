@@ -7,6 +7,36 @@
       "mode": "any"
     },
     {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/イシューにする.md",
+      "icon": "alert-triangle",
+      "name": "イシューにする(Ctrl+I)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/タスクにする.md",
+      "icon": "check-circle",
+      "name": "タスクにする(Ctrl+T)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/仮説にする.md",
+      "icon": "lightbulb",
+      "name": "仮説にする(Ctrl+H)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/目的にする.md",
+      "icon": "target",
+      "name": "目的にする",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/ナレッジにする.md",
+      "icon": "book-open",
+      "name": "ナレッジにする",
+      "mode": "any"
+    },
+    {
       "id": "templater-obsidian:_仕組み/templates/_コマンド/図を開く.md",
       "icon": "pencil",
       "name": "図を開く(Ctrl+D)",

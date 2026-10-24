@@ -33,5 +33,32 @@
       "key": "S"
     }
   ],
-  "editor:save-file": []
+  "editor:save-file": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/イシューにする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "I"
+    }
+  ],
+  "editor:toggle-italics": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/タスクにする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "T"
+    }
+  ],
+  "workspace:new-tab": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/仮説にする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "H"
+    }
+  ],
+  "editor:open-search-replace": []
 }
