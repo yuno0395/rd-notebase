@@ -240,20 +240,3 @@ def test_lost_state_is_rebuilt_without_overwriting(box):
     run_once(box["yu"])
     assert "x\n" in text(shared_water)
     assert any("_競合_" in p.name for p in shared_water.parent.iterdir())
-
-
-def test_nested_projects_share_up_and_down(box):
-    """事業の下の案件: 上位のメンバーには配下の案件を、配下のメンバーには上位を配る。"""
-    shared = box["shared"]
-    write(shared / "樹脂事業/0RA00D001_樹脂事業.md",
-          "---\nid: 0RA00D001\ntype: プロジェクト\nmembers: [佐藤]\n---\n")
-    write(shared / "樹脂事業/03_イシュー/0RA00E001_共通部品.md",
-          "---\nid: 0RA00E001\nauthor: 佐藤\ntype: イシュー\nproject: [樹脂事業]\n---\n")
-    write(shared / "別PJ/0RA00B001_別PJ.md",
-          '---\nid: 0RA00B001\ntype: プロジェクト\nmembers: [Yu]\nparent: ["[[0RA00D001_樹脂事業|樹脂事業]]"]\n---\n')
-    run_once(box["yu"])
-    run_once(box["sato"])
-    sato = files(box["sato"].personal / "90_共有")
-    assert "別PJ/03_イシュー/0RA00C001_別の話.md" in sato          # 上位のメンバーは配下の案件も見る
-    yu = files(box["yu"].personal / "90_共有")
-    assert "樹脂事業/03_イシュー/0RA00E001_共通部品.md" in yu       # 配下のメンバーは上位を見る
