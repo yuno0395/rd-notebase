@@ -3,7 +3,7 @@
   "templates_folder": "_仕組み/templates",
   "user_scripts_folder": "_仕組み/templates/_scripts",
   "trigger_on_file_creation_mode": "regex",
-  "file_仕組み/templates": [
+  "file_templates": [
     {
       "regex": "(^|/)01_目的/",
       "template": "_仕組み/templates/目的.md"
@@ -25,7 +25,7 @@
       "template": "_仕組み/templates/ナレッジ.md"
     }
   ],
-  "folder_仕組み/templates": [],
+  "folder_templates": [],
   "ignore_folders_on_creation": [
     {
       "folder": "_仕組み/templates"
@@ -40,7 +40,7 @@
   "auto_jump_to_cursor": true,
   "syntax_highlighting": true,
   "command_timeout": 5,
-  "enabled_仕組み/templates_hotkeys": [
+  "enabled_templates_hotkeys": [
     {
       "template": "_仕組み/templates/_コマンド/図を開く.md",
       "insert_enabled": true,

@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 from datetime import datetime
@@ -53,9 +54,10 @@ TEXT_SUFFIXES = {".md", ".base", ".yaml", ".csv", ".js"}
 
 
 def rewrite(text: str) -> str:
-    # 新しい言葉は古い言葉を含まないので、2回当てても変わらない
+    # 新しい言葉は古い言葉を含まないので、2回当てても変わらない。
+    # 英数字のすぐ後ろは置き換えない(Templater の設定名 file_templates などを壊さないため)
     for a, b in TEXT:
-        text = text.replace(a, b)
+        text = re.sub(r"(?<![A-Za-z0-9])" + re.escape(a), lambda m: b, text)
     return text
 
 
