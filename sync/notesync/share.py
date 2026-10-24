@@ -25,7 +25,7 @@ from .assign import LINK
 from .report import Report
 from .safety import Backup
 from .state import State, digest
-from .vault import SKIP_DIRS, is_hidden, read
+from .vault import SKIP_DIRS, box_copy_of, is_hidden, read
 
 OWN_DIRS = ("01_目的", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
 DIST = "90_共有"
@@ -99,7 +99,7 @@ def scan(root: Path, tops: tuple[str, ...] | None = None, skip_tops: set[str] = 
         if parts[0] in skip_tops:
             continue
         stem = note_stem(p.name)
-        if CONFLICT_MARK in stem:
+        if CONFLICT_MARK in stem or box_copy_of(p)[0]:
             continue
         file_id, name = ids.split_filename(stem)
         if not file_id:
@@ -389,7 +389,7 @@ def sync_attachments(ctx: Context, note_id: str, mode: str) -> None:
     rels = set()
     for d in (pdir, sdir):
         if d.exists():
-            rels |= {f.relative_to(d).as_posix() for f in d.rglob("*") if f.is_file()}
+            rels |= {f.relative_to(d).as_posix() for f in d.rglob("*") if f.is_file() and not box_copy_of(f)[0]}
     if mode == "down":
         rels = {r for r in rels if (sdir / r).exists()}
     for r in sorted(rels):

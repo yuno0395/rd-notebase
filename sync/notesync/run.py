@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import time
 
+from .autofill import run_autofill
+from .boxcopies import report_box_copies
 from .assign import Vault, assign_ids, collect_used, fix_links, name_index, report_same_names
 from . import ids
 from .config import Config
@@ -60,6 +62,10 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
             fix_links(v, *planned([v]), report, backup, dry)
 
     report_same_names(vaults, report)
+    report_box_copies([(v.label, v.root) for v in vaults], report)  # F-16
+
+    # おまけの自動入力(F-26・F-27・F-31)。集める前に書いて、同じ同期で共有に届ける
+    run_autofill(cfg.personal, cfg.shared, report, backup, dry, now, cfg.idle_seconds)
 
     # 集約と再配布(F-05〜11、F-14、F-15)
     if cfg.shared and cfg.shared.exists():
