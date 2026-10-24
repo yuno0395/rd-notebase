@@ -8,7 +8,7 @@
     }
   ],
   "file-explorer:new-file": [],
-  "templater-obsidian:_templates/_コマンド/図を開く.md": [
+  "templater-obsidian:_仕組み/templates/_コマンド/図を開く.md": [
     {
       "modifiers": [
         "Mod"
@@ -16,7 +16,7 @@
       "key": "D"
     }
   ],
-  "templater-obsidian:_templates/_コマンド/ノードにする.md": [
+  "templater-obsidian:_仕組み/templates/_コマンド/ノードにする.md": [
     {
       "modifiers": [
         "Mod"
@@ -25,7 +25,7 @@
     }
   ],
   "editor:insert-link": [],
-  "templater-obsidian:_templates/_コマンド/保存.md": [
+  "templater-obsidian:_仕組み/templates/_コマンド/保存.md": [
     {
       "modifiers": [
         "Mod"

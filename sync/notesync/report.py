@@ -1,4 +1,4 @@
-"""F-21: 00_同期レポート.md(要件書「同期レポート」)。"""
+"""F-21: _仕組み/同期レポート.md(要件書「同期レポート」)。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .ids import JST
 
-REPORT_NAME = "00_同期レポート.md"
+REPORT_NAME = "_仕組み/同期レポート.md"
 KEEP_DAYS = 30
 RECORD_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2}) ")
 
@@ -61,5 +61,6 @@ class Report:
     def write(self, personal: Path) -> Path:
         path = personal / REPORT_NAME
         old = path.read_text(encoding="utf-8") if path.exists() else ""
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(self.render(old), encoding="utf-8", newline="\n")
         return path

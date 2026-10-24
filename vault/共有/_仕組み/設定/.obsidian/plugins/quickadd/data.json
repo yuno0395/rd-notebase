@@ -1,0 +1,349 @@
+{
+  "choices": [
+    {
+      "id": "647bd632-18f8-527d-85fd-697db9610b75",
+      "name": "新しいノート",
+      "type": "Multi",
+      "command": true,
+      "choices": [
+        {
+          "id": "e6b3deea-2a04-5a21-be64-f56047ef75a6",
+          "name": "目的",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/目的.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "4cd5859d-6e1d-5096-89ef-30c95f5cdbdb",
+          "name": "価値の仮説",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/価値の仮説.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "6af94f01-510e-5ca2-bca5-15b069f4dcbd",
+          "name": "ノード",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/ノード.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [
+              "共通/02_ノード"
+            ],
+            "chooseWhenCreatingNote": false,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "c2f5ba6d-42da-584a-9070-89fb1fe5fdb0",
+          "name": "イシュー",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/イシュー.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "b8bd7aba-8b42-50e7-9661-cfb3f386a991",
+          "name": "タスク",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/タスク.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "beabe2e0-3b28-5429-8f88-d9fa955d76fe",
+          "name": "議事録",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/議事録.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "bf55b000-518d-5e25-bf48-158cf8884441",
+          "name": "実験・試作記録",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/実験・試作記録.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "8f073beb-cd77-5d8b-a368-bd8150184ef7",
+          "name": "設計記録",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/設計記録.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "4085237f-84e5-533b-9802-66cad5fd1d14",
+          "name": "ナレッジ",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/ナレッジ.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "8b4532a9-a6c9-5b1b-82aa-da1af5be1b23",
+          "name": "プロジェクト",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/プロジェクト.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        }
+      ],
+      "collapsed": false,
+      "placeholder": "種類を選ぶ"
+    }
+  ],
+  "inputPrompt": "single-line",
+  "searchNestedChoices": true,
+  "announceUpdates": "none",
+  "version": "2.32.1",
+  "disableOnlineFeatures": true,
+  "enableRibbonIcon": false,
+  "migrations": {
+    "useQuickAddTemplateFolder": true,
+    "incrementFileNameSettingMoveToDefaultBehavior": true,
+    "consolidateFileExistsBehavior": true,
+    "repairTemplateFileExistsBehavior": true,
+    "mutualExclusionInsertAfterAndWriteToBottomOfFile": true,
+    "setVersionAfterUpdateModalRelease": true,
+    "addDefaultAIProviders": true,
+    "removeMacroIndirection": true,
+    "migrateFileOpeningSettings": true,
+    "backfillFileOpeningDefaults": true,
+    "setProviderModelDiscoveryMode": true,
+    "migrateProviderApiKeysToSecretStorage": true,
+    "migrateToMultipleTemplateFolders": true,
+    "refreshStaleDefaultModelSeeds": true,
+    "pinAiModelRefs": true
+  }
+}

@@ -20,30 +20,30 @@ system = [
   "00_同期プログラム要件.md",
   "00_現場向け1枚.md",
   "00_*.base",
-  "_templates/*",
-  "_設定/*",
+  "_仕組み/templates/*",
+  "_仕組み/設定/*",
 ]
 seed = [
-  "00_同期設定.yaml",
-  "_tools/同期プログラム/メンバー.csv",
+  "_仕組み/同期設定.yaml",
+  "_仕組み/tools/同期プログラム/メンバー.csv",
 ]
 
 [[vault]]
 name = "個人"
 src = "vault/個人"
 include = [
-  { from = "vault/共有/_templates", to = "_templates" },
+  { from = "vault/共有/_仕組み/templates", to = "_仕組み/templates" },
   { from = "vault/共有/00_イシュー一覧.base", to = "00_イシュー一覧.base" },
   { from = "vault/共有/00_タスク一覧.base", to = "00_タスク一覧.base" },
 ]
 system = [
   "00_README.md",
   "00_*.base",
-  "_templates/*",
+  "_仕組み/templates/*",
 ]
 seed = [
-  "00_同期レポート.md",
-  "_記録/私.yaml",
+  "_仕組み/同期レポート.md",
+  "_仕組み/記録/私.yaml",
   ".obsidian/*",
 ]
 
@@ -51,16 +51,16 @@ seed = [
 name = "機密"
 src = "vault/機密"
 include = [
-  { from = "vault/共有/_templates/図.excalidraw.md", to = "_templates/図.excalidraw.md" },
-  { from = "vault/共有/_templates/_scripts", to = "_templates/_scripts" },
-  { from = "vault/共有/_templates/_コマンド", to = "_templates/_コマンド" },
-  { from = "vault/共有/_tools/同期プログラム/メンバー.csv", to = "_tools/メンバー.csv" },
+  { from = "vault/共有/_仕組み/templates/図.excalidraw.md", to = "_仕組み/templates/図.excalidraw.md" },
+  { from = "vault/共有/_仕組み/templates/_scripts", to = "_仕組み/templates/_scripts" },
+  { from = "vault/共有/_仕組み/templates/_コマンド", to = "_仕組み/templates/_コマンド" },
+  { from = "vault/共有/_仕組み/tools/同期プログラム/メンバー.csv", to = "_仕組み/tools/メンバー.csv" },
 ]
 system = [
-  "_templates/*",
-  "_設定/*",
+  "_仕組み/templates/*",
+  "_仕組み/設定/*",
 ]
 seed = [
   "00_README.md",
-  "_tools/メンバー.csv",
+  "_仕組み/tools/メンバー.csv",
 ]

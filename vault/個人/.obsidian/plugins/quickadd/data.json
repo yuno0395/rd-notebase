@@ -11,7 +11,7 @@
           "name": "目的",
           "type": "Template",
           "command": false,
-          "templatePath": "_templates/目的.md",
+          "templatePath": "_仕組み/templates/目的.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -44,7 +44,7 @@
           "name": "価値の仮説",
           "type": "Template",
           "command": false,
-          "templatePath": "_templates/価値の仮説.md",
+          "templatePath": "_仕組み/templates/価値の仮説.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -77,7 +77,7 @@
           "name": "ノード",
           "type": "Template",
           "command": false,
-          "templatePath": "_templates/ノード.md",
+          "templatePath": "_仕組み/templates/ノード.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -110,7 +110,7 @@
           "name": "イシュー",
           "type": "Template",
           "command": false,
-          "templatePath": "_templates/イシュー.md",
+          "templatePath": "_仕組み/templates/イシュー.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -143,7 +143,7 @@
           "name": "タスク",
           "type": "Template",
           "command": false,
-          "templatePath": "_templates/タスク.md",
+          "templatePath": "_仕組み/templates/タスク.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -176,7 +176,7 @@
           "name": "議事録",
           "type": "Template",
           "command": false,
-          "templatePath": "_templates/議事録.md",
+          "templatePath": "_仕組み/templates/議事録.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -209,7 +209,7 @@
           "name": "実験・試作記録",
           "type": "Template",
           "command": false,
-          "templatePath": "_templates/実験・試作記録.md",
+          "templatePath": "_仕組み/templates/実験・試作記録.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -242,7 +242,7 @@
           "name": "設計記録",
           "type": "Template",
           "command": false,
-          "templatePath": "_templates/設計記録.md",
+          "templatePath": "_仕組み/templates/設計記録.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -275,7 +275,7 @@
           "name": "ナレッジ",
           "type": "Template",
           "command": false,
-          "templatePath": "_templates/ナレッジ.md",
+          "templatePath": "_仕組み/templates/ナレッジ.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -284,7 +284,7 @@
           "folder": {
             "enabled": true,
             "folders": [
-              "05_結果"
+              "05_ナレッジ"
             ],
             "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,

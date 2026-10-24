@@ -1,0 +1,37 @@
+{
+  "quickadd:choice:647bd632-18f8-527d-85fd-697db9610b75": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "N"
+    }
+  ],
+  "file-explorer:new-file": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/図を開く.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "D"
+    }
+  ],
+  "templater-obsidian:_仕組み/templates/_コマンド/ノードにする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "K"
+    }
+  ],
+  "editor:insert-link": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/保存.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "S"
+    }
+  ],
+  "editor:save-file": []
+}

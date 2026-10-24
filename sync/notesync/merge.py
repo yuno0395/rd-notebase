@@ -134,8 +134,8 @@ def merge_into(ctx: Context, item: Item, other: Item) -> bool:
         if changed != text:
             relinked.append((path, changed))
 
-    pdir = ctx.personal / "_attachments" / item.id
-    sdir = ctx.shared / "_attachments" / other.id
+    pdir = ctx.personal / "_仕組み/attachments" / item.id
+    sdir = ctx.shared / "_仕組み/attachments" / other.id
     attachments = [f for f in pdir.rglob("*") if f.is_file()] if pdir.exists() else []
 
     ctx.report.record(f"まとめた: {item.rel} を 共有/{other.rel} にまとめ、「{item.name}」を別名に足しました。"

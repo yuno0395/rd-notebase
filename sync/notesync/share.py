@@ -27,7 +27,7 @@ from .safety import Backup
 from .state import State, digest
 from .vault import SKIP_DIRS, is_hidden, read
 
-OWN_DIRS = ("01_目的", "02_ノード", "03_イシュー", "04_タスク", "05_結果")
+OWN_DIRS = ("01_目的", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
 DIST = "90_共有"
 ARCHIVE = "99_archive"
 COMMON = "共通"
@@ -265,7 +265,7 @@ def check_conditions(ctx: Context, item: Item) -> str | None:
             return f"未入力: {link} の {'・'.join(missing)} が空です(共有していません)"
     if item.type == "ノード" and not item.author:
         return f"未入力: {link} の author が空です(共有していません)"
-    if item.type in ("ナレッジ", "結果") and ctx.reaches_big_issue(item):
+    if item.type in ("ナレッジ", "ナレッジ図", "結果") and ctx.reaches_big_issue(item):
         others = [r for r in (plain_name(x) for x in as_list(item.fm.get("reviewed_by")))
                   if r and r not in item.authors]
         if not others:
@@ -382,9 +382,9 @@ def sync_pair(ctx: Context, key: str, p: Path, s: Path, p_rel: str, s_rel: str,
 
 
 def sync_attachments(ctx: Context, note_id: str, mode: str) -> None:
-    """F-07: _attachments/<id>/ を同じパスのまま同期する。ファイル名は変えない。"""
-    pdir = ctx.personal / "_attachments" / note_id
-    sdir = ctx.shared / "_attachments" / note_id
+    """F-07: _仕組み/attachments/<id>/ を同じパスのまま同期する。ファイル名は変えない。"""
+    pdir = ctx.personal / "_仕組み/attachments" / note_id
+    sdir = ctx.shared / "_仕組み/attachments" / note_id
     rels = set()
     for d in (pdir, sdir):
         if d.exists():
@@ -392,7 +392,7 @@ def sync_attachments(ctx: Context, note_id: str, mode: str) -> None:
     if mode == "down":
         rels = {r for r in rels if (sdir / r).exists()}
     for r in sorted(rels):
-        rel = f"_attachments/{note_id}/{r}"
+        rel = f"_仕組み/attachments/{note_id}/{r}"
         sync_pair(ctx, f"att:{note_id}/{r}", pdir / r, sdir / r, rel, rel, mode, rel)
 
 

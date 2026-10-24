@@ -1,6 +1,6 @@
 filters:
   and:
-    - '!file.inFolder("_templates")'
+    - '!file.inFolder("_仕組み/templates")'
     - type == "タスク"
 views:
   - type: table

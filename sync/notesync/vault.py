@@ -8,9 +8,11 @@ from pathlib import Path
 from . import frontmatter, ids
 
 # ノートとして扱わないフォルダ(vault の一番上からの名前)
-SKIP_DIRS = {"_templates", "_attachments", "_tools", "_記録", "_設定", ".trash"}
+# あまり開かない仕組みのもの(添付・記録・テンプレート・設定・同期レポート)は _仕組み/ にまとめる
+SYSTEM_DIR = "_仕組み"
+SKIP_DIRS = {SYSTEM_DIR, ".trash"}
 # id をつけないフォルダ(デイリー・週報・inbox。仕様書「id をつけないもの」)
-NO_ID_DIRS = {"00_daily", "00_weekly", "00_inbox", "00_週報", "90_共有", "99_archive"}
+NO_ID_DIRS = {"00_日誌", "00_inbox", "00_週報", "90_共有", "99_archive"}
 
 
 @dataclass

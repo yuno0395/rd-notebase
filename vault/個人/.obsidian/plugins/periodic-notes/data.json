@@ -2,8 +2,8 @@
   "showGettingStartedBanner": false,
   "hasMigratedDailyNoteSettings": true,
   "hasMigratedWeeklyNoteSettings": true,
-  "daily": {"enabled": true, "folder": "00_daily", "format": "YYYY-MM-DD", "template": "_templates/デイリー"},
-  "weekly": {"enabled": true, "folder": "00_weekly", "format": "GGGG-[W]WW", "template": "_templates/週報"},
+  "daily": {"enabled": true, "folder": "00_日誌/デイリー", "format": "YYYY-MM-DD", "template": "_仕組み/templates/デイリー"},
+  "weekly": {"enabled": true, "folder": "00_日誌/週報", "format": "GGGG-[W]WW", "template": "_仕組み/templates/週報"},
   "monthly": {"enabled": false, "folder": "", "format": "", "template": ""},
   "quarterly": {"enabled": false, "folder": "", "format": "", "template": ""},
   "yearly": {"enabled": false, "folder": "", "format": "", "template": ""}
