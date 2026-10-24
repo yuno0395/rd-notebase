@@ -5,7 +5,7 @@
 //   - [[ ]] の上で使う: そのリンクの名前で作る(まだファイルがないときだけ)。
 //   - 何も選ばずに使う: カーソルのある行の文を名前にする(行頭の - や - [ ]、末尾の 📅 などは残す)。
 // 同じ種類・同じ名前(か別名)のノートがあれば、作らずにそれにつなぐ。
-// 質問はしない。parent には今のノートが入る。作ったノートは開かない。
+// 質問はしない。parent には今のノートが入る(仮説だけは、今のノートから parent をたどった先の目的)。作ったノートは開かない。
 
 const T = "_仕組み/templates/";
 const ID_PREFIX = /^[0-9A-Z]{6}[0-9A-Z]+_/i;
@@ -75,13 +75,43 @@ function flow(values) {
   return "[" + values.map((v) => JSON.stringify(v)).join(", ") + "]";
 }
 
+function typeOf(app, file) {
+  return String(app.metadataCache.getFileCache(file)?.frontmatter?.type || "").trim();
+}
+
+// 今のノートか、その parent をたどった先にある目的(近いものから。5段まで)
+function findPurpose(app, note) {
+  let level = [note];
+  const seen = new Set();
+  for (let depth = 0; depth <= 5 && level.length; depth++) {
+    const next = [];
+    for (const f of level) {
+      if (seen.has(f.path)) continue;
+      seen.add(f.path);
+      if (typeOf(app, f) === "目的") return f;
+      const fm = app.metadataCache.getFileCache(f)?.frontmatter || {};
+      for (const p of asList(fm.parent)) {
+        const target = (p.match(/\[\[([^\]]+)\]\]/) || [])[1];
+        const dest = target && resolve(app, target, f.path);
+        if (dest) next.push(dest);
+      }
+    }
+    level = next;
+  }
+  return null;
+}
+
 // 作ったノートに最初から入れる値
 function initialValues(app, kind, note) {
   const fm = app.metadataCache.getFileCache(note)?.frontmatter || {};
   const here = linkOf(note);
   const project = asList(fm.project);
   const out = {};
-  if (kind !== "目的") out.parent = flow([here]);
+  if (kind === "仮説") {
+    // 仮説の parent は目的。今のノートからたどって見つからなければ空けておく
+    const purpose = findPurpose(app, note);
+    if (purpose) out.parent = flow([linkOf(purpose)]);
+  } else if (kind !== "目的") out.parent = flow([here]);
   if (kind === "イシュー") {
     out.impact = "未判定";
     out.speed = "すぐ";
@@ -137,6 +167,30 @@ async function createNote(tp, kind, name, note) {
   return file;
 }
 
+// ノートを作っている間に、Obsidian がリンクを書き換えることがある
+// (まだない [[名前]] が、作ったファイルの名前が id_名前 に変わったときに付け替えられる)。
+// 置き換える前に、行の中をもう一度見て、正しい場所を探す。
+function placeLink(app, ed, note, file, text, from, to, orig) {
+  const line = ed.getLine(from.line);
+  if (line.slice(from.ch, to.ch) !== orig) {
+    let best = null;
+    for (const m of line.matchAll(/\[\[([^\[\]\n]+?)\]\]/g)) {
+      const dest = app.metadataCache.getFirstLinkpathDest(m[1].split("|")[0].trim(), note.path);
+      if (dest?.path !== file.path) continue;
+      if (!best || Math.abs(m.index - from.ch) < Math.abs(best.index - from.ch)) best = m;
+    }
+    if (best) {
+      from = { line: from.line, ch: best.index };
+      to = { line: from.line, ch: best.index + best[0].length };
+    } else {
+      to = from; // 見つからなければ、元の場所に足す
+    }
+  }
+  ed.replaceRange(text, from, to);
+  ed.setCursor({ line: from.line, ch: from.ch + text.length });
+  ed.focus();
+}
+
 async function make_note(tp, kind) {
   const app = tp.app;
   const { Notice } = tp.obsidian;
@@ -149,11 +203,6 @@ async function make_note(tp, kind) {
   }
   const ed = view.editor;
   const note = view.file;
-  const noteType = String(app.metadataCache.getFileCache(note)?.frontmatter?.type || "").trim();
-  if (kind === "仮説" && noteType !== "目的") {
-    new Notice("仮説は、目的のノートの中で作ります(parent に目的が入るため)");
-    return;
-  }
 
   let from = ed.getCursor("from");
   let to = ed.getCursor("to");
@@ -205,6 +254,7 @@ async function make_note(tp, kind) {
     return;
   }
 
+  const orig = ed.getRange(from, to);
   let file;
   const same = findSame(app, k.type, name);
   if (same.length === 1) {
@@ -215,12 +265,10 @@ async function make_note(tp, kind) {
   } else {
     file = await createNote(tp, kind, name, note);
     if (!file) return;
-    new Notice(`${kind}「${name}」を作りました`);
+    const noParent = kind === "仮説" && !findPurpose(app, note);
+    new Notice(`${kind}「${name}」を作りました` + (noParent ? "。目的が見つからなかったので、parent に目的を書いてください" : ""), noParent ? 8000 : undefined);
   }
-  const text = linkOf(file, name);
-  ed.replaceRange(text, from, to);
-  ed.setCursor({ line: from.line, ch: from.ch + text.length });
-  ed.focus();
+  placeLink(app, ed, note, file, linkOf(file, name), from, to, orig);
 }
 
 module.exports = make_note;
