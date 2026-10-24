@@ -1,0 +1,82 @@
+{
+  "standardStyleDefaults": "native",
+  "ontologyPairingVersion": 1,
+  "hierarchy": {
+    "exclusions": [
+      "excalidraw-font",
+      "excalidraw-font-color",
+      "excalidraw-css",
+      "excalidraw-plugin",
+      "excalidraw-link-brackets",
+      "excalidraw-link-prefix",
+      "excalidraw-border-color",
+      "excalidraw-default-mode",
+      "excalidraw-export-dark",
+      "excalidraw-export-transparent",
+      "excalidraw-export-svgpadding",
+      "excalidraw-export-pngscale",
+      "excalidraw-url-prefix",
+      "excalidraw-linkbutton-opacity",
+      "excalidraw-onload-script",
+      "kanban-plugin"
+    ],
+    "parents": [
+      "Parent/Child",
+      "Parents/Children",
+      "up/down",
+      "u/d",
+      "North/South",
+      "origin",
+      "inception",
+      "source",
+      "parent domain"
+    ],
+    "children": [
+      "Children",
+      "Child",
+      "down",
+      "d",
+      "South",
+      "leads to",
+      "contributes to",
+      "nurtures",
+      "parts"
+    ],
+    "leftFriends": [
+      "Friends",
+      "Friend",
+      "Jump",
+      "Jumps",
+      "j",
+      "similar",
+      "supports",
+      "alternatives",
+      "advantages",
+      "pros"
+    ],
+    "rightFriends": [
+      "Challenger",
+      "opposes",
+      "disadvantages",
+      "missing",
+      "cons"
+    ],
+    "previous": [
+      "Previous/Next",
+      "Prev",
+      "West/East",
+      "w/e",
+      "Before/After"
+    ],
+    "next": [
+      "Next",
+      "n",
+      "East",
+      "e",
+      "After"
+    ],
+    "hidden": [
+      "hidden"
+    ]
+  }
+}

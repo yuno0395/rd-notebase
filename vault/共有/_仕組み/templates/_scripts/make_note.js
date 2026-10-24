@@ -5,7 +5,11 @@
 //   - [[ ]] の上で使う: そのリンクの名前で作る(まだファイルがないときだけ)。
 //   - 何も選ばずに使う: カーソルのある行の文を名前にする(行頭の - や - [ ]、末尾の 📅 などは残す)。
 // 同じ種類・同じ名前(か別名)のノートがあれば、作らずにそれにつなぐ。
-// 質問はしない。parent には今のノートが入る(仮説だけは、今のノートから parent をたどった先の目的)。作ったノートは開かない。
+// 質問はしない。作ったノートは開かない。parent には今のノートが入る。ただし、
+//   - 仮説: 今のノートから parent をたどった先の目的。
+//   - イシュー: 今のノートから parent をたどった先の価値の仮説(目的は越えない)。今のノートが
+//     タスク・設計記録・実験・試作記録なら、previous に今のノート、generation に元のイシュー＋1 を入れる。
+//     今のノートがノードなら、friend に今のノートを入れる。仮説が見つからなければ parent は空けて知らせる。
 
 const T = "_仕組み/templates/";
 const ID_PREFIX = /^[0-9A-Z]{6}[0-9A-Z]+_/i;
@@ -14,6 +18,9 @@ const MAX_NAME = 80;
 // 行頭の印(- / - [ ] / 1. / # )と、Tasks の日付などの印
 const LINE_HEAD = /^(\s*(?:[-*+]\s+(?:\[.\]\s+)?|\d+[.)]\s+|#{1,6}\s+)?)/;
 const TASK_MARKS = /\s*(?:📅|⏳|🛫|✅|➕|🔁|⏫|🔼|🔽|❌|🆔|⛔).*$/u;
+
+// イシューを生む対策(仕様書「対策から新しいイシューが生まれるとき」)
+const COUNTERMEASURES = ["タスク", "設計記録", "実験・試作記録"];
 
 const KINDS = {
   イシュー: { type: "イシュー", template: T + "イシュー.md", folder: "03_イシュー" },
@@ -101,6 +108,71 @@ function findPurpose(app, note) {
   return null;
 }
 
+// parent の行き先のノート
+function parentsOf(app, f) {
+  const fm = app.metadataCache.getFileCache(f)?.frontmatter || {};
+  return asList(fm.parent)
+    .map((p) => (p.match(/\[\[([^\]]+)\]\]/) || [])[1])
+    .filter((t) => t)
+    .map((t) => resolve(app, t, f.path))
+    .filter((d) => d);
+}
+
+// 今のノートから parent をたどって、いちばん近い段にある type のノートを全部返す。
+// stop の種類のノートより上へはたどらない。5段まで。
+function findNearest(app, note, type, stop = []) {
+  let level = [note];
+  const seen = new Set();
+  for (let depth = 0; depth <= 5 && level.length; depth++) {
+    const hit = [];
+    const next = [];
+    for (const f of level) {
+      if (seen.has(f.path)) continue;
+      seen.add(f.path);
+      const t = typeOf(app, f);
+      if (t === type) { hit.push(f); continue; }
+      if (depth > 0 && stop.includes(t)) continue;
+      next.push(...parentsOf(app, f));
+    }
+    if (hit.length) return hit;
+    level = next;
+  }
+  return [];
+}
+
+// イシューの世代。同期プログラム(F-27)と同じ数え方: previous がなければ 1、
+// あれば previous の先の元のイシュー(対策ならその parent のイシュー)の世代＋1。循環していれば null
+function generationOf(app, issue, path) {
+  if (path.includes(issue.path)) return null;
+  const fm = app.metadataCache.getFileCache(issue)?.frontmatter || {};
+  const prev = asList(fm.previous)
+    .map((p) => (p.match(/\[\[([^\]]+)\]\]/) || [])[1])
+    .filter((t) => t)
+    .map((t) => resolve(app, t, issue.path))
+    .filter((d) => d);
+  if (!prev.length) return 1;
+  let best = 0;
+  for (const p of prev) {
+    const origin = typeOf(app, p) === "イシュー" ? p : findNearest(app, p, "イシュー", [])[0];
+    if (!origin) continue;
+    const g = generationOf(app, origin, path.concat([issue.path]));
+    if (g === null) return null;
+    best = Math.max(best, g);
+  }
+  return best + 1;
+}
+
+// イシューに入れる project: 今のノート、なければ元のイシュー、なければたどった先の目的のもの
+function projectFor(app, note) {
+  const own = asList(app.metadataCache.getFileCache(note)?.frontmatter?.project);
+  if (own.length) return own;
+  for (const f of [...findNearest(app, note, "イシュー", ["目的"]), findPurpose(app, note)]) {
+    const p = f && asList(app.metadataCache.getFileCache(f)?.frontmatter?.project);
+    if (p && p.length) return p;
+  }
+  return [];
+}
+
 // 作ったノートに最初から入れる値
 function initialValues(app, kind, note) {
   const fm = app.metadataCache.getFileCache(note)?.frontmatter || {};
@@ -111,12 +183,23 @@ function initialValues(app, kind, note) {
     // 仮説の parent は目的。今のノートからたどって見つからなければ空けておく
     const purpose = findPurpose(app, note);
     if (purpose) out.parent = flow([linkOf(purpose)]);
-  } else if (kind !== "目的") out.parent = flow([here]);
-  if (kind === "イシュー") {
+  } else if (kind === "イシュー") {
+    // イシューの parent は価値の仮説。対策から生まれたものは previous と generation でたどれるようにする
+    const here_type = typeOf(app, note);
+    const hyps = findNearest(app, note, "仮説", ["目的"]);
+    if (hyps.length) out.parent = flow(hyps.map((f) => linkOf(f)));
     out.impact = "未判定";
     out.speed = "すぐ";
-    if (project.length) out.project = `[${project.join(", ")}]`;
-  }
+    const proj = projectFor(app, note);
+    if (proj.length) out.project = `[${proj.join(", ")}]`;
+    if (COUNTERMEASURES.includes(here_type)) {
+      out.previous = flow([here]);
+      const source = findNearest(app, note, "イシュー", ["目的"])[0];
+      const g = source && generationOf(app, source, []);
+      if (g) out.generation = String(g + 1);
+    }
+    if (here_type === "ノード") out.friend = flow([here]);
+  } else if (kind !== "目的") out.parent = flow([here]);
   if (kind === "目的" && project.length) out.project = `[${project.join(", ")}]`;
   if (kind === "ナレッジ") {
     // 今のノート(タスク)の parent のイシュー。変化は「出荷→?」のように空けておく
@@ -140,8 +223,7 @@ async function placeFor(app, kind, note) {
   const folder = KINDS[kind].folder;
   if (await app.vault.adapter.exists("_仕組み/記録/私.yaml")) return folder; // 個人 vault
   // 共有 vault で仮運用しているとき: 今のノートのプロジェクト、なければ 共通
-  const fm = app.metadataCache.getFileCache(note)?.frontmatter || {};
-  const project = asList(fm.project)[0];
+  const project = (kind === "イシュー" ? projectFor(app, note) : asList(app.metadataCache.getFileCache(note)?.frontmatter?.project))[0];
   const top = note.path.split("/")[0];
   for (const p of [project, top, "共通"]) {
     if (p && app.vault.getAbstractFileByPath(`${p}/${folder}`)) return `${p}/${folder}`;
@@ -265,8 +347,10 @@ async function make_note(tp, kind) {
   } else {
     file = await createNote(tp, kind, name, note);
     if (!file) return;
-    const noParent = kind === "仮説" && !findPurpose(app, note);
-    new Notice(`${kind}「${name}」を作りました` + (noParent ? "。目的が見つからなかったので、parent に目的を書いてください" : ""), noParent ? 8000 : undefined);
+    const noParent =
+      (kind === "仮説" && !findPurpose(app, note) && "目的") ||
+      (kind === "イシュー" && !findNearest(app, note, "仮説", ["目的"]).length && "価値の仮説");
+    new Notice(`${kind}「${name}」を作りました` + (noParent ? `。${noParent}が見つからなかったので、parent に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
   }
   placeLink(app, ed, note, file, linkOf(file, name), from, to, orig);
 }
