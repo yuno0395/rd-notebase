@@ -45,6 +45,11 @@
       "template": "_templates/_コマンド/図を開く.md",
       "insert_enabled": true,
       "create_enabled": false
+    },
+    {
+      "template": "_templates/_コマンド/ノードにする.md",
+      "insert_enabled": true,
+      "create_enabled": false
     }
   ]
 }

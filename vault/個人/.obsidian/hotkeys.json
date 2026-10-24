@@ -11,9 +11,18 @@
   "templater-obsidian:_templates/_コマンド/図を開く.md": [
     {
       "modifiers": [
-        "Alt"
+        "Mod"
       ],
       "key": "D"
     }
-  ]
+  ],
+  "templater-obsidian:_templates/_コマンド/ノードにする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "K"
+    }
+  ],
+  "editor:insert-link": []
 }
