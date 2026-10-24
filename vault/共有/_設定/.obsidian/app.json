@@ -1,0 +1,8 @@
+{
+  "useMarkdownLinks": false,
+  "newLinkFormat": "shortest",
+  "alwaysUpdateLinks": true,
+  "trashOption": "local",
+  "newFileLocation": "folder",
+  "newFileFolderPath": "共通/02_ノード"
+}

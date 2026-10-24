@@ -1,0 +1,27 @@
+{
+  "data_version": 2,
+  "templates_folder": "_templates",
+  "user_scripts_folder": "_templates/_scripts",
+  "trigger_on_file_creation_mode": "regex",
+  "file_templates": [
+    {
+      "regex": "(^|/)06_事実/",
+      "template": "_templates/事実.md"
+    }
+  ],
+  "folder_templates": [],
+  "ignore_folders_on_creation": [
+    {
+      "folder": "_templates"
+    },
+    {
+      "folder": "_attachments"
+    },
+    {
+      "folder": "99_archive"
+    }
+  ],
+  "auto_jump_to_cursor": true,
+  "syntax_highlighting": true,
+  "command_timeout": 5
+}
