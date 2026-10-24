@@ -37,7 +37,7 @@ def newline_of(text: str) -> str:
 
 
 def set_values(text: str, values: dict[str, str]) -> str:
-    """属性欄の key の行を値に書き換える。なければ属性欄の先頭に足す。属性欄がなければ作る。"""
+    """属性欄の key の行を値に書き換える。なければ属性欄の先頭(id の行があればその下)に足す。属性欄がなければ作る。"""
     nl = newline_of(text)
     fm, body = split(text)
     if fm is None:
@@ -53,5 +53,7 @@ def set_values(text: str, values: dict[str, str]) -> str:
                 break
         else:
             head.append(f"{key}: {value}")
-    lines = head + lines
+    # 新しい行は先頭に足す。id の行があれば、その下に足す
+    at = next((i + 1 for i, line in enumerate(lines) if re.match(r"^id\s*:", line)), 0)
+    lines = lines[:at] + head + lines[at:]
     return "---" + nl + nl.join(lines) + nl + "---" + nl + body

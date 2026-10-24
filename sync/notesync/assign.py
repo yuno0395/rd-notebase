@@ -12,7 +12,7 @@ from pathlib import Path
 from . import frontmatter, ids
 from .report import Report
 from .safety import Backup
-from .vault import Note, iter_md, needs_id, notes, read, write
+from .vault import NO_ID_DIRS, Note, is_root_doc, iter_md, needs_id, notes, read, write
 
 LINK = re.compile(r"\[\[([^\[\]|#^\n]+)(\|[^\[\]\n]*)?\]\]")
 NO_LINK_FIX_DIRS = {"90_共有"}  # 他の人のノートの写しは書き換えない
@@ -53,6 +53,8 @@ def assign_ids(v: Vault, member: str, code: str, used: set[str], report: Report,
     renamed: dict[str, str] = {}
     for n in notes(v.root):
         if not needs_id(n):
+            if has_id_without_author(n):
+                fill_author(v, n, member, report, backup, dry_run, now, idle_seconds)
             continue
         if now - n.path.stat().st_mtime < idle_seconds:
             report.record(f"{v.label}: {n.rel} は書いている途中なので、次の同期で id をつけます")
@@ -79,6 +81,25 @@ def assign_ids(v: Vault, member: str, code: str, used: set[str], report: Report,
         when = ids.decode_time(new_id).strftime("%Y-%m-%d %H:%M:%S")
         report.record(f"{v.label}: id をつけた {n.rel} → {new_stem}.md({when} 作成)")
     return renamed
+
+
+def has_id_without_author(n: Note) -> bool:
+    """テンプレートで作ったノートは id だけを持ち、author がない。"""
+    return bool(n.file_id) and n.top not in NO_ID_DIRS and not is_root_doc(n)
+
+
+def fill_author(v: Vault, n: Note, member: str, report: Report, backup: Backup,
+                dry_run: bool, now: float, idle_seconds: int) -> None:
+    """F-03: id はテンプレートが入れるので、author は同期プログラムが書く。"""
+    text = read(n.path)
+    if "author" in frontmatter.load(text):
+        return
+    if now - n.path.stat().st_mtime < idle_seconds:
+        return
+    if not dry_run:
+        backup.save(v.root, n.path)
+        write(n.path, frontmatter.set_values(text, {"author": member}))
+    report.record(f"{v.label}: author を書いた {n.rel}")
 
 
 def name_index(vaults: list[Vault]) -> tuple[dict[str, set[str]], set[str]]:

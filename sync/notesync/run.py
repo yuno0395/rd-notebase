@@ -9,6 +9,8 @@ from . import ids
 from .config import Config
 from .report import Report
 from .safety import Backup
+from .share import Context, run_share
+from .state import State
 
 
 def split_name(stem: str) -> str:
@@ -58,6 +60,21 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
             fix_links(v, *planned([v]), report, backup, dry)
 
     report_same_names(vaults, report)
+
+    # 集約と再配布(F-05〜11、F-14、F-15)
+    if cfg.shared and cfg.shared.exists():
+        state = State(cfg.state_path)
+        if state.broken:
+            report.warn("前回同期の記録が壊れていたので、見比べて作り直しました(F-34)")
+        ctx = Context(member=cfg.member, personal=cfg.personal, shared=cfg.shared,
+                      secret=[p for p in cfg.secret if p.exists()], report=report, backup=backup,
+                      state=state, dry_run=dry, now=now, idle_seconds=cfg.idle_seconds)
+        run_share(ctx)
+        if not dry:
+            state.save()
+    elif cfg.shared:
+        report.warn(f"共有 vault が見つかりません: {cfg.shared}(Box Drive が止まっていないか確かめてください)")
+
     report.write(cfg.personal)
     if not dry:
         backup.prune()

@@ -29,7 +29,12 @@ class Config:
     dry_run: bool = False
     idle_seconds: int = 10
     backup_dir: Path | None = None
+    state_dir: Path | None = None  # 前回同期の記録(F-14)の置き場所
     code: str = ""
+
+    @property
+    def state_path(self) -> Path | None:
+        return self.state_dir / f"state_{self.member}.json" if self.state_dir else None
 
 
 def default_config_path() -> Path:
@@ -53,6 +58,7 @@ def load(path: Path) -> Config:
         dry_run=bool(data.get("dry_run", False)),
         idle_seconds=int(data.get("idle_seconds", 10)),
         backup_dir=Path(data["backup_dir"]) if data.get("backup_dir") else path.parent / "backup",
+        state_dir=Path(data["state_dir"]) if data.get("state_dir") else path.parent,
     )
     cfg.code = member_code(cfg)
     return cfg
