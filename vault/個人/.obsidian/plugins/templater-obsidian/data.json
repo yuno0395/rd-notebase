@@ -98,6 +98,11 @@
       "template": "_仕組み/templates/_コマンド/反論としてつなぐ.md",
       "insert_enabled": true,
       "create_enabled": false
+    },
+    {
+      "template": "_仕組み/templates/_コマンド/今すぐ共有へ.md",
+      "insert_enabled": true,
+      "create_enabled": false
     }
   ]
 }
