@@ -5,7 +5,7 @@
     python -m notesync weekly [--config 個人設定.yaml]
     python -m notesync recover [--config 個人設定.yaml] [--run]
 
-once は1回だけ同期する。watch は interval 分ごとに繰り返す。weekly は今週の週報を今すぐ作り直す(F-29)。--hide / --only で今回だけ載せる節を変えられる。
+once は1回だけ同期する。watch は interval 分ごとに繰り返し、合間に Obsidian の「今すぐ共有へ」(Ctrl+Shift+S)を受けるとすぐ同期する(F-48)。weekly は今週の週報を今すぐ作り直す(F-29)。--hide / --only で今回だけ載せる節を変えられる。
 recover は共有 vault に直接書かれたノートに id をつけ、たまった重い添付を移す(F-35)。--run がなければ試し運転。
 --dry-run は書き込まず、やる予定だけを _仕組み/同期レポート.md に書く(F-23)。
 """
@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-import time
 from pathlib import Path
 
 from . import config
@@ -77,7 +76,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"同期しました: 記録 {len(report.records)} 件、対応が必要 {len(report.todos)} 件、警告 {len(report.warnings)} 件")
         if args.command == "once":
             return 0
-        time.sleep(args.interval * 60)
+        # 3分待つ合間に「今すぐ共有へ」の合図を見る(F-48)
+        from .now import wait
+        wait(cfg, args.interval * 60, lambda c: run_once(c, dry_run=dry))
 
 
 if __name__ == "__main__":
