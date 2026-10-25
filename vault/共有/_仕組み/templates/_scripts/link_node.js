@@ -91,6 +91,30 @@ async function createNode(tp, name) {
   return await tp.file.create_new(template, name, false, app.vault.getAbstractFileByPath(folder));
 }
 
+// ノートを作っている間に、Obsidian がリンクを書き換えることがある
+// (まだない [[名前]] が、作ったファイルの名前が id_名前 に変わったときに付け替えられる)。
+// 置き換える前に、行の中をもう一度見て、正しい場所を探す。
+function placeLink(app, ed, note, file, text, from, to, orig) {
+  const line = ed.getLine(from.line);
+  if (line.slice(from.ch, to.ch) !== orig) {
+    let best = null;
+    for (const m of line.matchAll(/\[\[([^\[\]\n]+?)\]\]/g)) {
+      const dest = app.metadataCache.getFirstLinkpathDest(m[1].split("|")[0].trim(), note.path);
+      if (dest?.path !== file.path) continue;
+      if (!best || Math.abs(m.index - from.ch) < Math.abs(best.index - from.ch)) best = m;
+    }
+    if (best) {
+      from = { line: from.line, ch: best.index };
+      to = { line: from.line, ch: best.index + best[0].length };
+    } else {
+      to = from; // 見つからなければ、元の場所に足す
+    }
+  }
+  ed.replaceRange(text, from, to);
+  ed.setCursor({ line: from.line, ch: from.ch + text.length });
+  ed.focus();
+}
+
 async function link_node(tp) {
   const app = tp.app;
   const { Notice } = tp.obsidian;
@@ -165,6 +189,7 @@ async function link_node(tp) {
     }
   }
 
+  const orig = ed.getRange(from, to);
   let file;
   if (newName) {
     file = await createNode(tp, newName);
@@ -173,10 +198,7 @@ async function link_node(tp) {
   } else {
     file = node.file;
   }
-  const text = `[[${file.basename}|${shown}]]`;
-  ed.replaceRange(text, from, to);
-  ed.setCursor({ line: from.line, ch: from.ch + text.length });
-  ed.focus();
+  placeLink(app, ed, note, file, `[[${file.basename}|${shown}]]`, from, to, orig);
 }
 
 module.exports = link_node;
