@@ -46,6 +46,7 @@ python -m notesync once --dry-run      # 試し運転。_仕組み/同期レポ�
 python -m notesync once                # 本番を1回
 python -m notesync watch --interval 3  # 常駐(3分ごと)
 python -m notesync weekly              # 今週の週報(ブラウザで開く HTML)を今すぐ作り直す
+python -m notesync weekly --hide 同じノード,機密   # 今回だけ節を外す(--only で載せる節だけにもできる)
 ```
 
 重い添付(画像・PDF・20MB 未満の動画以外)は `shared_data` の 開発データ/ へ移し、リンクを書き換えます。

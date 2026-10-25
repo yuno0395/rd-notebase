@@ -30,6 +30,12 @@ WORK_TYPES = {"タスク", "イシュー", "実験・試作記録"}
 STALE_DAYS = 14
 CANDIDATE_CSV = "候補の数.csv"
 
+# 週報に載せる節(チーム設定 report_sections で選ぶ。Yu 2026-10-25)。見込みはいつも載せる。
+# 値: true(載せる)/ false(外す)/ 自動(同じノード: ほかのプロジェクトがあるときだけ)
+SECTIONS = ["出荷準備度", "候補の数", "マイルストーン", "目的に沿わない", "反論のついた仮説",
+            "同じノード", "行き詰まり", "担当者", "機密"]
+DEFAULT_SECTIONS = {k: True for k in SECTIONS} | {"同じノード": "自動"}
+
 
 def stage(doc: Doc) -> int:
     r = str(doc.fm.get("resolution") or "").strip() or "未把握"
@@ -317,9 +323,22 @@ class Builder:
 
     # ---------- まとめ ----------
 
-    def build(self, proj: Doc, trend: dict[str, list[int]]) -> ProjectReport:
+    def shown(self, sections: dict) -> set[str]:
+        """載せる節。同じノードの「自動」は、進めているプロジェクトが2つ以上あるときだけ載せる。"""
+        live = [d for d in self.index.projects().values() if status(d) not in ("完了", "中断")]
+        out = set()
+        for k in SECTIONS:
+            v = sections.get(k, DEFAULT_SECTIONS[k])
+            if isinstance(v, str) and v.strip() == "自動":
+                v = len(live) >= 2
+            if v is True or (isinstance(v, str) and v.strip().lower() in ("true", "yes", "載せる")):
+                out.add(k)
+        return out
+
+    def build(self, proj: Doc, trend: dict[str, list[int]], sections: dict | None = None) -> ProjectReport:
         pj = proj.name
         docs = self.in_project(pj)
+        show = self.shown(sections or DEFAULT_SECTIONS)
         r = ProjectReport(pj, f"週報 {pj}({Week.of(self.today).label}、{self.today.isoformat()} 作成)")
         outlook = str(proj.fm.get("outlook") or "").strip() or "(未記入)"
         r.section("見込み")
@@ -329,27 +348,36 @@ class Builder:
         age = self.outlook_age(proj)
         if age is None or age > STALE_DAYS:
             r.note("見込み未更新(2週間以上更新されていません)", warn=True)
-        r.section("出荷準備度(目的ごと)", "impact 大のイシューのうち、DR で段階2(設計空間)以上と決まったものの割合")
-        r.table("出荷準備度", ["目的", "出荷準備度", "段階0 未把握", "段階1 現象", "段階2 設計空間", "段階3 原理"],
-                self.readiness([d for d in docs if d.type == "イシュー"]))
-        r.section("残っている候補の数", "開発の前半は、出荷準備度より候補が絞れていく様子で進み具合を見る")
-        r.table("候補の数", ["候補の組", "推移"],
-                [[k, "→".join(str(x) for x in v)] for k, v in sorted(trend.items())])
-        r.section("マイルストーン")
-        r.table("マイルストーン", ["名前", "計画日", "見込み日", "ずれ"], self.milestones(proj))
-        r.section("目的に沿っていない仕事", "価値の仮説につながっていないもの、外れた仮説につながったまま動いているもの")
-        r.table("目的に沿わない", ["種類", "名前", "担当", "理由"], self.off_purpose(docs))
-        r.section("反論のついた仮説(検証中のまま)", "前提を覆す事実がついたのに、まだ検証中の仮説")
-        r.table("反論のついた仮説", ["仮説", "反論", "すぐ下の仮説・イシュー"], self.challenged(docs))
-        r.section("他のプロジェクトと同じノードを使うもの", "同じことを別々に試していないか")
-        r.table("同じノード", ["このプロジェクト", "相手のプロジェクト", "相手", "同じノード"], self.same_nodes(pj, docs))
-        r.section("行き詰まりの候補", "動いているのに前に進んでいないもの")
-        r.table("行き詰まり", ["名前", "担当", "様子"], self.stuck(pj, docs))
-        r.section("担当者ごとのタスク")
-        r.table("担当者", ["担当", "進行中", "待ち", "期限切れ", "確認待ち", "確認を頼まれた"], self.people(docs))
-        refs = sum(len(as_list(d.fm.get("secret_refs"))) for d in docs)
-        r.section("機密")
-        r.note(f"機密の事実への参照: {refs} 件(中身は載せません)")
+        if "出荷準備度" in show:
+            r.section("出荷準備度(目的ごと)", "impact 大のイシューのうち、DR で段階2(設計空間)以上と決まったものの割合")
+            r.table("出荷準備度", ["目的", "出荷準備度", "段階0 未把握", "段階1 現象", "段階2 設計空間", "段階3 原理"],
+                    self.readiness([d for d in docs if d.type == "イシュー"]))
+        if "候補の数" in show:
+            r.section("残っている候補の数", "開発の前半は、出荷準備度より候補が絞れていく様子で進み具合を見る")
+            r.table("候補の数", ["候補の組", "推移"],
+                    [[k, "→".join(str(x) for x in v)] for k, v in sorted(trend.items())])
+        if "マイルストーン" in show:
+            r.section("マイルストーン")
+            r.table("マイルストーン", ["名前", "計画日", "見込み日", "ずれ"], self.milestones(proj))
+        if "目的に沿わない" in show:
+            r.section("目的に沿っていない仕事", "価値の仮説につながっていないもの、外れた仮説につながったまま動いているもの")
+            r.table("目的に沿わない", ["種類", "名前", "担当", "理由"], self.off_purpose(docs))
+        if "反論のついた仮説" in show:
+            r.section("反論のついた仮説(検証中のまま)", "前提を覆す事実がついたのに、まだ検証中の仮説")
+            r.table("反論のついた仮説", ["仮説", "反論", "すぐ下の仮説・イシュー"], self.challenged(docs))
+        if "同じノード" in show:
+            r.section("他のプロジェクトと同じノードを使うもの", "同じことを別々に試していないか")
+            r.table("同じノード", ["このプロジェクト", "相手のプロジェクト", "相手", "同じノード"], self.same_nodes(pj, docs))
+        if "行き詰まり" in show:
+            r.section("行き詰まりの候補", "動いているのに前に進んでいないもの")
+            r.table("行き詰まり", ["名前", "担当", "様子"], self.stuck(pj, docs))
+        if "担当者" in show:
+            r.section("担当者ごとのタスク")
+            r.table("担当者", ["担当", "進行中", "待ち", "期限切れ", "確認待ち", "確認を頼まれた"], self.people(docs))
+        if "機密" in show:
+            refs = sum(len(as_list(d.fm.get("secret_refs"))) for d in docs)
+            r.section("機密")
+            r.note(f"機密の事実への参照: {refs} 件(中身は載せません)")
         return r
 
 
@@ -388,19 +416,35 @@ def all_history(shared: Path) -> list[dict]:
     return rows
 
 
-def runner_of(shared: Path) -> str:
+def team_settings(shared: Path) -> dict:
     p = shared / "_仕組み" / "同期設定.yaml"
     if not p.exists():
-        return ""
+        return {}
     try:
-        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        return yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError:
-        return ""
-    return str(data.get("report_runner") or "").strip()
+        return {}
+
+
+def runner_of(shared: Path) -> str:
+    return str(team_settings(shared).get("report_runner") or "").strip()
+
+
+def sections_of(shared: Path, hide: list[str] | None = None, only: list[str] | None = None) -> dict:
+    """チーム設定の report_sections に、今回だけの指定(weekly --hide / --only)を重ねる。"""
+    got = team_settings(shared).get("report_sections") or {}
+    sec = dict(DEFAULT_SECTIONS) | {k: v for k, v in got.items() if k in DEFAULT_SECTIONS} if isinstance(got, dict) \
+        else dict(DEFAULT_SECTIONS)
+    if only:
+        sec = {k: (k in only) for k in SECTIONS}
+    for k in hide or []:
+        if k in sec:
+            sec[k] = False
+    return sec
 
 
 def make_weekly(shared: Path, out_dir: Path, today: date, report: Report, dry_run: bool = False,
-                force: bool = False) -> list[Path]:
+                force: bool = False, sections: dict | None = None) -> list[Path]:
     """全プロジェクトの週報を作る。今週の分がもうあれば作らない(force なら作り直す)。
 
     週報はプロジェクトごとに1つの HTML(ブラウザで開く)。報告フォルダの直下に、全プロジェクトの
@@ -409,6 +453,7 @@ def make_weekly(shared: Path, out_dir: Path, today: date, report: Report, dry_ru
     from .weekly_html import write_index, write_report
     week = Week.of(today).label
     b = Builder(shared, today, all_history(shared))
+    sections = sections or sections_of(shared)
     made = []
     for proj in sorted(b.index.projects().values(), key=lambda d: d.name):
         if status(proj) in ("完了", "中断"):
@@ -421,7 +466,7 @@ def make_weekly(shared: Path, out_dir: Path, today: date, report: Report, dry_ru
         trend = ({k: [n for _, n in seq][-5:] + [now[k]] for k, seq in read_trend(trend_path).items() if k in now}
                  | {k: [v] for k, v in now.items() if k not in read_trend(trend_path)}) if dry_run \
             else write_trend(trend_path, week, now)
-        r = b.build(proj, trend)
+        r = b.build(proj, trend, sections)
         report.record(f"週報を作った: {proj.name}/{week}.html")
         if not dry_run:
             write_report(path, r)

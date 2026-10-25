@@ -5,7 +5,7 @@
     python -m notesync weekly [--config 個人設定.yaml]
     python -m notesync recover [--config 個人設定.yaml] [--run]
 
-once は1回だけ同期する。watch は interval 分ごとに繰り返す。weekly は今週の週報を今すぐ作り直す(F-29)。
+once は1回だけ同期する。watch は interval 分ごとに繰り返す。weekly は今週の週報を今すぐ作り直す(F-29)。--hide / --only で今回だけ載せる節を変えられる。
 recover は共有 vault に直接書かれたノートに id をつけ、たまった重い添付を移す(F-35)。--run がなければ試し運転。
 --dry-run は書き込まず、やる予定だけを _仕組み/同期レポート.md に書く(F-23)。
 """
@@ -28,6 +28,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--run", action="store_true", help="recover を試し運転でなく実行する")
     ap.add_argument("--interval", type=float, default=3.0, help="watch のときの間隔(分)")
+    ap.add_argument("--hide", default="", help="weekly で今回だけ外す節(例: 同じノード,機密)")
+    ap.add_argument("--only", default="", help="weekly で今回だけ載せる節をこれだけにする(例: 出荷準備度,担当者)")
     args = ap.parse_args(argv)
     try:
         cfg = config.load(args.config)
@@ -55,12 +57,19 @@ def main(argv: list[str] | None = None) -> int:
 
         from .ids import JST
         from .report import Report
-        from .weekly import make_weekly
+        from .weekly import SECTIONS, make_weekly, sections_of
         if not cfg.shared or not cfg.report_dir:
             print("止めました: 個人設定に shared と report を書いてください", file=sys.stderr)
             return 2
+        split = lambda t: [x.strip() for x in t.replace("、", ",").split(",") if x.strip()]
+        hide, only = split(args.hide), split(args.only)
+        unknown = [x for x in hide + only if x not in SECTIONS]
+        if unknown:
+            print(f"止めました: 知らない節 {'、'.join(unknown)}。使える節: {'、'.join(SECTIONS)}", file=sys.stderr)
+            return 2
         r = Report(dry_run=bool(dry))
-        made = make_weekly(cfg.shared, cfg.report_dir, datetime.now(JST).date(), r, bool(dry), force=True)
+        made = make_weekly(cfg.shared, cfg.report_dir, datetime.now(JST).date(), r, bool(dry), force=True,
+                           sections=sections_of(cfg.shared, hide, only))
         print(f"週報を作りました: {len(made)} 件({cfg.report_dir})")
         return 0
     while True:

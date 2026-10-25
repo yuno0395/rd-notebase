@@ -7,3 +7,13 @@ keep_in_vault:
   video: [mp4, webm, mov]
   video_max_mb: 20
 report_runner: yu            # 管理者向け週報を作る1台
+report_sections:             # 週報に載せる節。false で外す。見込みはいつも載せる
+  出荷準備度: true
+  候補の数: true
+  マイルストーン: true
+  目的に沿わない: true
+  反論のついた仮説: true
+  同じノード: 自動           # ほかのプロジェクトがあるときだけ載せる
+  行き詰まり: true
+  担当者: true
+  機密: true

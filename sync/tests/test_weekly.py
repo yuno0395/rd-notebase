@@ -125,3 +125,26 @@ def test_only_runner_on_monday(shared, tmp_path):
     assert not out.exists()
     maybe_weekly("Yu", shared, out, monday, Report(), False)
     assert (out / PJ / "2026-W44.html").exists()
+
+
+def test_sections_can_be_chosen(shared, tmp_path):
+    out = tmp_path / "報告"
+    # 同じノードは「自動」: ほかに進めているプロジェクトがなければ載せない
+    p = next((shared / "別PJ").glob("0RC001001_*.md"))
+    p.write_text(p.read_text(encoding="utf-8").replace("members: [Yu]", "members: [Yu]\nstatus: 完了"), encoding="utf-8")
+    # チーム設定で機密を外す
+    (shared / "_仕組み").mkdir(parents=True, exist_ok=True)
+    (shared / "_仕組み/同期設定.yaml").write_text("report_runner: yu\nreport_sections:\n  機密: false\n", encoding="utf-8")
+    make_weekly(shared, out, date(2026, 10, 26), Report())
+    html = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
+    assert "他のプロジェクトと同じノード" not in html
+    assert "機密の事実への参照" not in html
+    assert "出荷準備度(目的ごと)" in html and "見込み" in html
+
+
+def test_sections_only_and_hide(shared):
+    from notesync.weekly import sections_of
+    s = sections_of(shared, hide=["担当者"])
+    assert s["担当者"] is False and s["同じノード"] == "自動"
+    s = sections_of(shared, only=["出荷準備度"])
+    assert [k for k, v in s.items() if v] == ["出荷準備度"]
