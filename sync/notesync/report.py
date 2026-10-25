@@ -22,6 +22,7 @@ class Report:
         self.warnings: list[str] = []
         self.records: list[str] = []
         self.skipped = ""  # 別の PC が同期していて見送ったとき、その PC の名前
+        self.stopped = ""  # vault が見つからず止めたときの理由(F-50)
 
     def todo(self, text: str, checked: bool = False) -> None:
         if text not in self.todos:

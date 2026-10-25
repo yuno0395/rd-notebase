@@ -16,6 +16,7 @@ from .recover import report_pending
 from .assign import Vault, assign_ids, collect_used, fix_links, name_index, report_same_names
 from . import ids
 from .config import Config
+from .relocate import follow
 from .lock import Busy, Lock
 from .report import Report
 from .safety import Backup
@@ -39,6 +40,32 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
     """1回分の同期。同じ個人 vault を別の PC が同期している間は見送る(複数の PC で使う)。"""
     dry = cfg.dry_run if dry_run is None else dry_run
     now = time.time() if now is None else now
+    # F-50: vault の名前や場所が変わっていたら、新しい場所を見つけて設定を直す
+    moved, move_warnings = follow(cfg, dry=dry)
+    moved, move_warnings = cfg.moved + moved, cfg.move_warnings + move_warnings
+    cfg.moved, cfg.move_warnings = [], []
+    if not cfg.personal.exists():
+        # 古い名前のフォルダを作り直さない(作ると、そこへ共有のノートが配られてしまう)
+        report = Report(dry_run=dry)
+        report.stopped = (f"個人 vault が見つかりません: {cfg.personal}。名前を変えたなら、設定ファイル "
+                          f"{cfg.config_path or ''} の personal を新しい場所に直してください")
+        for w in move_warnings:
+            report.warn(w)
+        return report
+    missing = [p for p in cfg.secret if not p.exists()]
+    if missing:
+        # 機密の言葉が混ざっていないかを確かめられないので、共有へは送らない
+        report = Report(dry_run=dry)
+        report.stopped = (f"機密フォルダが見つかりません: {'、'.join(str(p) for p in missing)}。機密の言葉の確かめが"
+                          f"できないので、同期を止めました。名前を変えたなら設定ファイル {cfg.config_path or ''} の"
+                          " secret を直し、権限が外れたなら管理者に聞いてください")
+        report.warn(report.stopped)
+        for w in move_warnings:
+            report.warn(w)
+        for r in moved:
+            report.record(r)
+        report.write(cfg.personal)
+        return report
     lock = Lock(cfg.lock_path)
     try:
         lock.acquire()
@@ -47,18 +74,20 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
         report.skipped = b.pc
         return report
     try:
-        return _run(cfg, dry, now)
+        report = _run(cfg, dry, now, moved, move_warnings)
+        return report
     finally:
         lock.release()
 
 
-def _run(cfg: Config, dry: bool, now: float) -> Report:
+def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warnings: list[str] = ()) -> Report:
     report = Report(dry_run=dry)
+    for r in moved:
+        report.record(r)
+    for w in move_warnings:
+        report.warn(w)
     backup = Backup(cfg.backup_dir)
     vaults = vaults_of(cfg)
-    for p in cfg.secret:
-        if not p.exists():
-            report.warn(f"機密フォルダが見つかりません: {p}(権限か設定を確かめてください)")
 
     # F-28: 作ったばかりでテンプレートのままのノートには触らない(取り消しを邪魔しないため)
     try:

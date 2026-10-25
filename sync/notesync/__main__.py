@@ -80,7 +80,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     while True:
         report = run_once(cfg, dry_run=dry)
-        if report.skipped:
+        if report.stopped:
+            print(f"止めました: {report.stopped}", file=sys.stderr)
+            if args.command == "once":
+                return 2
+        elif report.skipped:
             print(f"見送りました: {report.skipped} の PC が同じ個人 vault を同期しています")
         else:
             print(f"同期しました: 記録 {len(report.records)} 件、対応が必要 {len(report.todos)} 件、警告 {len(report.warnings)} 件")
