@@ -6,7 +6,7 @@
 //   - 何も選ばずに使う: カーソルのある行の文を名前にする(行頭の - や - [ ]、末尾の 📅 などは残す)。
 // 同じ種類・同じ名前(か別名)のノートがあれば、作らずにそれにつなぐ。
 // 質問はしない。作ったノートは開かない。parent には今のノートが入る。ただし、
-//   - 仮説: 今のノートから parent をたどった先の目的。
+//   - 仮説: 今のノートが仮説なら今のノート(下の仮説になる。仮説の木)。それ以外は parent をたどった先の目的。
 //   - イシュー: 今のノートから parent をたどった先の価値の仮説(目的は越えない)。今のノートが
 //     タスク・設計記録・実験・試作記録なら、previous に今のノート、generation に元のイシュー＋1 を入れる。
 //     今のノートがノードなら、friend に今のノートを入れる。仮説が見つからなければ parent は空けて知らせる。
@@ -180,9 +180,13 @@ function initialValues(app, kind, note) {
   const project = asList(fm.project);
   const out = {};
   if (kind === "仮説") {
-    // 仮説の parent は目的。今のノートからたどって見つからなければ空けておく
-    const purpose = findPurpose(app, note);
-    if (purpose) out.parent = flow([linkOf(purpose)]);
+    // 仮説の parent は目的か上の仮説(仮説の木)。仮説で作ったら、その下の仮説にする。
+    // それ以外は今のノートからたどった目的。見つからなければ空けておく
+    if (typeOf(app, note) === "仮説") out.parent = flow([here]);
+    else {
+      const purpose = findPurpose(app, note);
+      if (purpose) out.parent = flow([linkOf(purpose)]);
+    }
   } else if (kind === "イシュー") {
     // イシューの parent は価値の仮説。対策から生まれたものは previous と generation でたどれるようにする
     const here_type = typeOf(app, note);
@@ -348,11 +352,43 @@ async function make_note(tp, kind) {
     file = await createNote(tp, kind, name, note);
     if (!file) return;
     const noParent =
-      (kind === "仮説" && !findPurpose(app, note) && "目的") ||
+      (kind === "仮説" && typeOf(app, note) !== "仮説" && !findPurpose(app, note) && "目的") ||
       (kind === "イシュー" && !findNearest(app, note, "仮説", ["目的"]).length && "価値の仮説");
     new Notice(`${kind}「${name}」を作りました` + (noParent ? `。${noParent}が見つからなかったので、parent に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
   }
   placeLink(app, ed, note, file, linkOf(file, name), from, to, orig);
 }
 
+// K-Plex の中心のノートから作る(仕様書「全体像の把握(K-Plex)」)。本文には触らない。
+// QuickAdd の「K-Plex の中心から作る」が、Templater の tp の代わりに同じ形のものを渡して呼ぶ。
+async function fromNote(tp, kind, note, rawName) {
+  const app = tp.app;
+  const { Notice } = tp.obsidian;
+  if (!KINDS[kind]) throw new Error(`知らない種類です: ${kind}`);
+  const name = String(rawName || "").trim();
+  if (!name) return null;
+  if (BAD_CHARS.test(name)) {
+    new Notice("ファイル名に使えない文字(/ : * ? \" < > | # ^ [ ] や改行)が入っています");
+    return null;
+  }
+  if (name.length > MAX_NAME) {
+    new Notice(`名前が長すぎます(${MAX_NAME} 文字まで)`);
+    return null;
+  }
+  const same = findSame(app, KINDS[kind].type, name);
+  if (same.length) {
+    new Notice(`同じ名前の${kind}がもうあります。つなぐときは本文で [[ ]] にしてください`, 6000);
+    return null;
+  }
+  const file = await createNote(tp, kind, name, note);
+  if (!file) return null;
+  const noParent =
+    (kind === "仮説" && typeOf(app, note) !== "仮説" && !findPurpose(app, note) && "目的") ||
+    (kind === "イシュー" && !findNearest(app, note, "仮説", ["目的"]).length && "価値の仮説");
+  new Notice(`${kind}「${name}」を「${nameOf(note)}」から作りました` + (noParent ? `。${noParent}が見つからなかったので、parent に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
+  return file;
+}
+
+make_note.fromNote = fromNote;
+make_note.typeOf = typeOf;
 module.exports = make_note;

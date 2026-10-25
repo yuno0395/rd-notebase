@@ -69,5 +69,14 @@
       "key": "G"
     }
   ],
-  "graph:open": []
+  "graph:open": [],
+  "quickadd:choice:dee6ab7d-6a6e-5dc3-8f4b-6698ebf395fb": [
+    {
+      "modifiers": [
+        "Mod",
+        "Shift"
+      ],
+      "key": "N"
+    }
+  ]
 }

@@ -34,6 +34,12 @@ def shared(tmp_path):
     note(s, f"{PJ}/01_目的", "0RA003001", "3割減なら採用される",
          'type: 仮説\nstatus: 検証中\nparent: ["[[0RA002001_部品コスト3割減]]"]\n')
     note(s, f"{PJ}/01_目的", "0RA004001", "外れた話", 'type: 仮説\nstatus: 外れた\nparent: ["[[0RA002001_部品コスト3割減]]"]\n')
+    # 仮説の木: 外れた仮説の下の仮説につながる仕事も「外れた」。反論のついた仮説は週報に出す
+    note(s, f"{PJ}/01_目的", "0RA007001", "下の仮説", 'type: 仮説\nstatus: 検証中\nparent: ["[[0RA004001_外れた話]]"]\n')
+    note(s, f"{PJ}/01_目的", "0RA008001", "金型で3割減る",
+         'type: 仮説\nstatus: 検証中\nparent: ["[[0RA003001_3割減なら採用される]]"]\nchallenger: ["[[0RA005001_肉厚]]"]\n')
+    note(s, f"{PJ}/03_イシュー", "0RB005001", "下の仮説の仕事",
+         'author: Yu\ntype: イシュー\nstatus: 未対応\nimpact: 中\nproject: [樹脂カバー]\nparent: ["[[0RA007001_下の仮説]]"]\n')
     note(s, "共通/02_ノード", "0RA005001", "肉厚", "type: ノード\nvalue_kind: 独立\n")
     note(s, "共通/02_ノード", "0RA006001", "ヒケ量", "type: ノード\nvalue_kind: 組み立て\n")
     note(s, f"{PJ}/03_イシュー", "0RB001001", "ヒケ",
@@ -84,6 +90,8 @@ def test_weekly_report(shared, tmp_path):
     assert "| DR1 | 2026-11-07 | 2026-11-21 | +14 日 |" in md
     assert "| イシュー | 迷子 | Yu | 仮説につながっていない |" in md
     assert "外れた仮説につながっている(外れた話)" in md
+    assert "| イシュー | 下の仮説の仕事 | Yu | 外れた仮説につながっている(外れた話) |" in md
+    assert "| 金型で3割減る | 肉厚 | 0 |" in md
     assert "| ヒケ | 別PJ | 別のヒケ | ヒケ量 |" in md
     assert "DR(2026-10-01)のあと対策 2 件完了、resolution は 未把握 のまま" in md
     assert "原因が組み立て値のまま(ヒケ量)" in md

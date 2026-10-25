@@ -385,6 +385,26 @@
       ],
       "collapsed": false,
       "placeholder": "種類を選ぶ"
+    },
+    {
+      "id": "a253e01a-64e4-5024-aa31-579d7a469762",
+      "name": "K-Plex の中心から作る",
+      "type": "Macro",
+      "command": true,
+      "runOnStartup": false,
+      "macro": {
+        "id": "b94bee57-4e5c-571f-9f44-eaca2f1c628a",
+        "name": "K-Plex の中心から作る",
+        "commands": [
+          {
+            "name": "K-Plexの中心から作る",
+            "type": "UserScript",
+            "id": "76768f8c-ff09-5c20-87ae-ae3a95655bd3",
+            "path": "_仕組み/templates/_quickadd/K-Plexの中心から作る.js",
+            "settings": {}
+          }
+        ]
+      }
     }
   ],
   "inputPrompt": "single-line",

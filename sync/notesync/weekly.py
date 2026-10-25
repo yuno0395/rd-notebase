@@ -174,8 +174,39 @@ class Builder:
             hyps = self.reach(d, "仮説")
             if not hyps:
                 rows.append([d.type, d.name, owner(d), "仮説につながっていない"])
-            elif all(status(h) == "外れた" for h in hyps):
-                rows.append([d.type, d.name, owner(d), f"外れた仮説につながっている({hyps[0].name})"])
+                continue
+            # 仮説は木になる(仮説の parent に仮説)。どの道でも、上のどこかに外れた仮説があれば外れたとみなす
+            gone = [self.gone_hypothesis(h) for h in hyps]
+            if all(gone):
+                rows.append([d.type, d.name, owner(d), f"外れた仮説につながっている({gone[0].name})"])
+        return rows
+
+    def gone_hypothesis(self, h: Doc, seen: set[str] | None = None) -> Doc | None:
+        """h から parent をたどった仮説(h を含む)のうち、外れたもの。目的より上へはたどらない。"""
+        seen = seen if seen is not None else set()
+        if h.id in seen or h.type != "仮説":
+            return None
+        seen.add(h.id)
+        if status(h) == "外れた":
+            return h
+        for p in self.parents(h):
+            g = self.gone_hypothesis(p, seen)
+            if g:
+                return g
+        return None
+
+    def challenged(self, docs: list[Doc]) -> list[list[str]]:
+        """反論(challenger)がついたまま検証中の仮説。下につながる仮説・イシューの数も出す。"""
+        rows = []
+        for h in docs:
+            if h.type != "仮説" or status(h) != "検証中":
+                continue
+            refs = [self.index.resolve(t) for t in targets(h.fm.get("challenger"))]
+            names = [r.name for r in refs if r] or [plain(x) for x in as_list(h.fm.get("challenger"))]
+            if not names:
+                continue
+            below = sum(1 for d in docs if d.type in ("仮説", "イシュー") and any(p.id == h.id for p in self.parents(d)))
+            rows.append([h.name, "、".join(names), str(below)])
         return rows
 
     def same_nodes(self, pj: str, docs: list[Doc]) -> list[list[str]]:
@@ -303,6 +334,8 @@ class Builder:
         r.table("マイルストーン", ["名前", "計画日", "見込み日", "ずれ"], self.milestones(proj))
         L += ["## 目的に沿っていない仕事", ""]
         r.table("目的に沿わない", ["種類", "名前", "担当", "理由"], self.off_purpose(docs))
+        L += ["## 反論のついた仮説(検証中のまま)", ""]
+        r.table("反論のついた仮説", ["仮説", "反論", "すぐ下の仮説・イシュー"], self.challenged(docs))
         L += ["## 他のプロジェクトと同じノードを使うもの", ""]
         r.table("同じノード", ["このプロジェクト", "相手のプロジェクト", "相手", "同じノード"], self.same_nodes(pj, docs))
         L += ["## 行き詰まりの候補", ""]
