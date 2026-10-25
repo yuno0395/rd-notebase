@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 from . import config
+from .report import REPORT_NAME
 from .run import run_once
 
 
@@ -87,7 +88,9 @@ def main(argv: list[str] | None = None) -> int:
         elif report.skipped:
             print(f"見送りました: {report.skipped} の PC が同じ個人 vault を同期しています")
         else:
-            print(f"同期しました: 記録 {len(report.records)} 件、対応が必要 {len(report.todos)} 件、警告 {len(report.warnings)} 件")
+            head = "試し運転しました(何も変えていません)" if report.dry_run else "同期しました"
+            print(f"{head}: 記録 {len(report.records)} 件、対応が必要 {len(report.todos)} 件、警告 {len(report.warnings)} 件。"
+                  f"{cfg.personal / REPORT_NAME} を見てください")
         if args.command == "once":
             return 0
         # 3分待つ合間に「今すぐ共有へ」の合図を見る(F-48)
