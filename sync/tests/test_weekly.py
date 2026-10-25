@@ -115,17 +115,34 @@ def test_weekly_report(shared, tmp_path):
     assert row('3割減なら採用される', '2→1') in (out / PJ / "2026-W45.html").read_text(encoding="utf-8")
 
 
-def test_only_runner_on_monday(shared, tmp_path):
+def test_anyone_on_monday(shared, tmp_path):
+    """誰の PC でも月曜に作る(report_runner は読まない)。同じ週の分は作り直さない。"""
     out = tmp_path / "報告"
     from datetime import datetime
     from notesync.ids import JST
     monday = datetime(2026, 10, 26, 8, tzinfo=JST).timestamp()
-    maybe_weekly("佐藤", shared, out, monday, Report(), False)
+    maybe_weekly(shared, out, monday - 86400, Report(), False)  # 日曜
     assert not out.exists()
-    maybe_weekly("Yu", shared, out, monday - 86400, Report(), False)  # 日曜
-    assert not out.exists()
-    maybe_weekly("Yu", shared, out, monday, Report(), False)
-    assert (out / PJ / "2026-W44.html").exists()
+    maybe_weekly(shared, out, monday, Report(), False)
+    page = out / PJ / "2026-W44.html"
+    assert page.exists()
+    assert not (out / "週報を作っています.lock").exists()
+    page.write_text("手で直した", encoding="utf-8")
+    maybe_weekly(shared, out, monday + 3600, Report(), False)
+    assert page.read_text(encoding="utf-8") == "手で直した"
+
+
+def test_weekly_waits_for_other_pc(shared, tmp_path):
+    import json
+    from datetime import datetime
+    from notesync.ids import JST
+    out = tmp_path / "報告"
+    monday = datetime(2026, 10, 26, 8, tzinfo=JST).timestamp()
+    write(out / "週報を作っています.lock", json.dumps({"pc": "SATO-PC", "time": monday - 60}))
+    r = Report()
+    maybe_weekly(shared, out, monday, r, False)
+    assert not (out / PJ).exists()
+    assert any("SATO-PC" in x for x in r.records)
 
 
 def test_sections_can_be_chosen(shared, tmp_path):

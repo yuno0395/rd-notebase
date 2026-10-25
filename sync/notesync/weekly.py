@@ -3,7 +3,8 @@
 共有 vault のノートの属性と、ノート履歴(history.py)から、プロジェクトごとに作る。
 置き場所は個人設定の report(例: Box\\開発ノート_報告)の `<プロジェクト名>/<年-週>.html`。
 Markdown と Excel に分けず、ブラウザで開く HTML 1つにする(Yu 2026-10-25)。
-週報を作るのはチーム設定の report_runner の1台だけ。毎週月曜の最初の同期で作る。
+週報は、報告フォルダ(個人設定の report)を書いた PC なら誰のものでも作る。毎週月曜の最初の同期で作り、
+今週の分がもうあれば作らない。2台が同時に作らないよう、作る間は報告フォルダに札を置く。
 
 機密フォルダの中身は読まない。secret_refs の件数だけを出す。
 """
@@ -426,8 +427,7 @@ def team_settings(shared: Path) -> dict:
         return {}
 
 
-def runner_of(shared: Path) -> str:
-    return str(team_settings(shared).get("report_runner") or "").strip()
+WEEKLY_LOCK = "週報を作っています.lock"
 
 
 def sections_of(shared: Path, hide: list[str] | None = None, only: list[str] | None = None) -> dict:
@@ -476,15 +476,19 @@ def make_weekly(shared: Path, out_dir: Path, today: date, report: Report, dry_ru
     return made
 
 
-def maybe_weekly(member: str, shared: Path | None, out_dir: Path | None, now: float, report: Report,
+def maybe_weekly(shared: Path | None, out_dir: Path | None, now: float, report: Report,
                  dry_run: bool) -> None:
-    """月曜の同期で、report_runner の PC だけが作る(F-29)。"""
+    """月曜の同期で作る。誰の PC でもよい(Yu 2026-10-25)。チーム設定の report_runner はもう読まない。"""
     if not shared or not out_dir:
         return
     today = datetime.fromtimestamp(now, tz=ids.JST).date()
-    if today.weekday() != 0 or runner_of(shared).lower() != member.lower():
+    if today.weekday() != 0:
         return
+    from .lock import Busy, Lock
     try:
-        make_weekly(shared, out_dir, today, report, dry_run)
+        with Lock(out_dir / WEEKLY_LOCK, now=now):
+            make_weekly(shared, out_dir, today, report, dry_run)
+    except Busy as b:
+        report.record(f"週報は {b.pc} の PC が作っているところなので、任せました")
     except Exception as e:  # おまけが壊れても、核の同期は続ける
         report.warn(f"週報を作るところで止まりました({type(e).__name__}: {e})。同期はそのまま行いました")

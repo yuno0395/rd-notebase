@@ -315,3 +315,20 @@ def test_other_keeps_both_and_stops_asking(box):
     run_once(box["yu"])
     r = report(box["yu"])
     assert "別もの:" not in r and "同じもの:" not in r and "同じ名前:" not in r
+
+
+def test_skips_while_other_pc_syncs(box):
+    """同じ個人 vault を別の PC が同期している間は、その回を見送る(複数の PC で使う)。"""
+    import json
+    import time as _t
+    lock = box["yu"].lock_path
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text(json.dumps({"pc": "WORK-PC", "time": _t.time()}), encoding="utf-8")
+    before = files(box["root"])
+    r = run_once(box["yu"])
+    assert r.skipped == "WORK-PC"
+    assert files(box["root"]) == before
+    lock.unlink()
+    run_once(box["yu"])
+    assert not lock.exists()
+    assert (box["shared"] / "共通/02_ノード/0RB001001_水.md").exists()

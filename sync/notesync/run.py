@@ -7,7 +7,7 @@ import time
 from .attachfix import fix_attachments
 from .fresh import fresh_ids
 from .autofill import run_autofill
-from .boxcopies import report_box_copies
+from .boxcopies import report_box_copies, tidy_layout_copies
 from .heavy import keep_rules, move_heavy
 from .history import record_history
 from .weekly import maybe_weekly
@@ -16,6 +16,7 @@ from .recover import report_pending
 from .assign import Vault, assign_ids, collect_used, fix_links, name_index, report_same_names
 from . import ids
 from .config import Config
+from .lock import Busy, Lock
 from .report import Report
 from .safety import Backup
 from .share import Context, run_share
@@ -35,8 +36,23 @@ def vaults_of(cfg: Config) -> list[Vault]:
 
 
 def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None) -> Report:
+    """1回分の同期。同じ個人 vault を別の PC が同期している間は見送る(複数の PC で使う)。"""
     dry = cfg.dry_run if dry_run is None else dry_run
     now = time.time() if now is None else now
+    lock = Lock(cfg.lock_path)
+    try:
+        lock.acquire()
+    except Busy as b:
+        report = Report(dry_run=dry)
+        report.skipped = b.pc
+        return report
+    try:
+        return _run(cfg, dry, now)
+    finally:
+        lock.release()
+
+
+def _run(cfg: Config, dry: bool, now: float) -> Report:
     report = Report(dry_run=dry)
     backup = Backup(cfg.backup_dir)
     vaults = vaults_of(cfg)
@@ -82,13 +98,14 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
     # 重い添付を 開発データ/ へ移し、リンクを書き換える(F-17〜20)。個人 vault だけ
     move_heavy(cfg.personal, cfg.shared, cfg.shared_data, cfg.member, report, backup, dry, now, cfg.idle_seconds)
     report_box_copies([(v.label, v.root) for v in vaults], report)  # F-16
+    tidy_layout_copies(cfg.personal, report, backup, dry)  # 2台で使うとできる画面配置の複製
 
     # おまけの自動入力(F-26・F-27・F-31)。集める前に書いて、同じ同期で共有に届ける
     run_autofill(cfg.personal, cfg.shared, report, backup, dry, now, cfg.idle_seconds, fresh)
 
     # 集約と再配布(F-05〜11、F-14、F-15)
     if cfg.shared and cfg.shared.exists():
-        state = State(cfg.state_path)
+        state = State(cfg.state_path, cfg.old_state_path)
         if state.broken:
             report.warn("前回同期の記録が壊れていたので、見比べて作り直しました(F-34)")
         ctx = Context(member=cfg.member, personal=cfg.personal, shared=cfg.shared,
@@ -97,7 +114,7 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
                       data_root=cfg.shared_data, keep=keep_rules(cfg.shared), fresh=fresh)
         run_share(ctx)
         record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now)  # F-31・F-32
-        maybe_weekly(cfg.member, cfg.shared, cfg.report_dir, now, report, dry)  # F-29
+        maybe_weekly(cfg.shared, cfg.report_dir, now, report, dry)  # F-29(誰の PC でも作る)
         report_pending(cfg.shared, cfg.shared_data, report)  # F-35
         if not dry:
             state.save()

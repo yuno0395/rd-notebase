@@ -1,6 +1,7 @@
 """前回同期したときの内容(F-14)。
 
-%APPDATA%\\知見同期\\state_<名前>.json に置く。消えても、個人 vault と共有 vault を
+個人 vault の _仕組み/記録/同期の記録.json に置く(どの PC からも同じ記録を使うため。
+v0.45 までの %APPDATA%\\知見同期\\state_<名前>.json は、新しい方がまだなければ読む)。消えても、個人 vault と共有 vault を
 見比べて作り直せる(F-34): 中身が同じなら同期済み、違えば競合として扱い、上書きしない。
 """
 
@@ -21,13 +22,14 @@ def digest_text(text: str) -> str:
 
 
 class State:
-    def __init__(self, path: Path | None):
+    def __init__(self, path: Path | None, old: Path | None = None):
         self.path = path
         self.items: dict[str, dict] = {}
         self.broken = False
-        if path and path.exists():
+        src = path if path and path.exists() else old if old and old.exists() else None
+        if src:
             try:
-                data = json.loads(path.read_text(encoding="utf-8"))
+                data = json.loads(src.read_text(encoding="utf-8"))
                 self.items = dict(data.get("items") or {})
             except (OSError, ValueError, AttributeError):
                 self.broken = True  # 作り直す(F-34)

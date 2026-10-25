@@ -18,6 +18,9 @@ from . import ids
 MEMBER_CSV = Path("_仕組み/tools") / "同期プログラム" / "メンバー.csv"
 MY_SETTINGS = Path("_仕組み") / "個人設定.md"   # 名前と6桁の番号(Yu 2026-10-25)
 MY_YAML = Path("_仕組み/記録") / "私.yaml"       # v0.38 までの形。個人設定.md がなければ読む
+# 前回同期の記録(F-14)と同期中の札。個人 vault に置き、どの PC からも同じものを使う(複数の PC で使う)
+STATE_FILE = Path("_仕組み/記録") / "同期の記録.json"
+LOCK_FILE = Path("_仕組み/記録") / "同期中.lock"
 
 
 class ConfigError(Exception):
@@ -35,12 +38,23 @@ class Config:
     dry_run: bool = False
     idle_seconds: int = 10
     backup_dir: Path | None = None
-    state_dir: Path | None = None  # 前回同期の記録(F-14)の置き場所
+    state_dir: Path | None = None  # 前回同期の記録(F-14)の置き場所。省略時は個人 vault の中
+    old_state_dir: Path | None = None  # v0.45 までの置き場所(%APPDATA%\知見同期)。新しい方がなければ読む
     code: str = ""
 
     @property
-    def state_path(self) -> Path | None:
-        return self.state_dir / f"state_{self.member}.json" if self.state_dir else None
+    def state_path(self) -> Path:
+        if self.state_dir:
+            return self.state_dir / f"state_{self.member}.json"
+        return self.personal / STATE_FILE
+
+    @property
+    def old_state_path(self) -> Path | None:
+        return self.old_state_dir / f"state_{self.member}.json" if self.old_state_dir else None
+
+    @property
+    def lock_path(self) -> Path:
+        return self.personal / LOCK_FILE
 
 
 def default_config_path() -> Path:
@@ -66,7 +80,8 @@ def load(path: Path) -> Config:
         dry_run=bool(data.get("dry_run", False)),
         idle_seconds=int(data.get("idle_seconds", 10)),
         backup_dir=Path(data["backup_dir"]) if data.get("backup_dir") else path.parent / "backup",
-        state_dir=Path(data["state_dir"]) if data.get("state_dir") else path.parent,
+        state_dir=Path(data["state_dir"]) if data.get("state_dir") else None,
+        old_state_dir=path.parent,
     )
     cfg.code = member_code(cfg)
     return cfg

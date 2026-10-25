@@ -66,3 +66,15 @@ def test_error_is_reported(tmp_path, cfg):
     run_now(cfg, take_signals(sig, cfg.personal), boom)
     res = json.loads((sig / "1.done.json").read_text(encoding="utf-8"))
     assert not res["ok"] and "こわれた" in res["message"]
+
+
+def test_other_pc_syncing_is_reported(tmp_path, cfg):
+    """同じ個人 vault を別の PC が同期している間は、送れなかったと返す(F-49)。"""
+    lock = cfg.lock_path
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text(json.dumps({"pc": "WORK-PC", "time": time.time()}), encoding="utf-8")
+    sig = tmp_path / "今すぐ"
+    put(sig, "1", cfg.personal)
+    run_now(cfg, take_signals(sig, cfg.personal), run_once)
+    res = json.loads((sig / "1.done.json").read_text(encoding="utf-8"))
+    assert not res["ok"] and "WORK-PC" in res["message"]

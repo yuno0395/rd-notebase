@@ -76,17 +76,33 @@ def url_prefix(data_root: Path) -> str:
     return file_url(data_root).rstrip("/") + "/"
 
 
+USERS_URL = re.compile(r"^file:///([A-Za-z]):/Users/[^/]+/", re.I)
+
+
+def prefix_pattern(data_root: Path) -> re.Pattern:
+    """自分の開発データの `file:///` の頭。`C:/Users/<名前>/...` なら <名前> は誰でもよいとする。
+
+    1人が2台の PC を使い、Windows のユーザー名が PC ごとに違うと、Box Drive の場所
+    (C:/Users/<名前>/Box)も違う。どちらの PC で書かれたリンクも同じ開発データとして読むため。"""
+    pre = url_prefix(data_root)
+    m = USERS_URL.match(pre)
+    if not m:
+        return re.compile(re.escape(pre), re.I)
+    return re.compile(rf"file:///{m.group(1)}:/Users/[^/]+/" + re.escape(pre[m.end():]), re.I)
+
+
 def to_shared(text: str, data_root: Path | None) -> str:
-    """個人の `file:///<自分の開発データ>/...` を `開発データ/...` にする。"""
+    """個人の `file:///<開発データ>/...` を `開発データ/...` にする。ほかの PC の場所で書かれたものも。"""
     if not data_root:
         return text
-    pre = url_prefix(data_root)
+    pat = prefix_pattern(data_root)
 
     def repl(m: re.Match) -> str:
         dest = m.group(2)
         inner = dest[1:-1] if dest.startswith("<") else dest
-        if inner.startswith(pre):
-            rest = unquote(inner[len(pre):])
+        hit = pat.match(inner)
+        if hit:
+            rest = unquote(inner[hit.end():])
             new = DATA_PREFIX + rest
             new = f"<{new}>" if " " in new else new
             return m.group(0).replace(f"]({dest})", f"]({new})")

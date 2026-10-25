@@ -78,6 +78,12 @@ def run_now(cfg: Config, results: list[Path], run_once) -> None:
         for r in results:
             write_result(r, False, f"同期で止まりました({type(e).__name__}: {e})")
         return
+    if getattr(report, "skipped", ""):  # 同じ個人 vault を別の PC が同期している(F-49)
+        msg = f"{report.skipped} の PC が同期しているところなので、送れませんでした。少し待ってからもう一度押してください"
+        for r in results:
+            write_result(r, False, msg, report)
+        print(f"今すぐ共有へ: {msg}")
+        return
     if report.dry_run:
         msg = "試し運転なので共有へは送っていません。同期レポートを見てください"
     elif report.todos or report.warnings:
