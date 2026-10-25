@@ -72,11 +72,20 @@ def write_result(path: Path, ok: bool, message: str, report=None) -> None:
 
 def run_now(cfg: Config, results: list[Path], run_once) -> None:
     """押した=書き終わった合図なので、保存して間もないノートも待たずに送る。"""
+    now_cfg = replace(cfg, idle_seconds=0)
     try:
-        report = run_once(replace(cfg, idle_seconds=0))
+        report = run_once(now_cfg)
     except Exception as e:  # 止まっても watch は続ける
         for r in results:
             write_result(r, False, f"同期で止まりました({type(e).__name__}: {e})")
+        return
+    finally:
+        # vault の場所を直したら(F-50)、watch の設定にも移す
+        cfg.personal, cfg.shared, cfg.secret = now_cfg.personal, now_cfg.shared, now_cfg.secret
+    if getattr(report, "stopped", ""):
+        for r in results:
+            write_result(r, False, report.stopped, report)
+        print(f"今すぐ共有へ: {report.stopped}")
         return
     if getattr(report, "skipped", ""):  # 同じ個人 vault を別の PC が同期している(F-49)
         msg = f"{report.skipped} の PC が同期しているところなので、送れませんでした。少し待ってからもう一度押してください"

@@ -41,6 +41,9 @@ class Config:
     state_dir: Path | None = None  # 前回同期の記録(F-14)の置き場所。省略時は個人 vault の中
     old_state_dir: Path | None = None  # v0.45 までの置き場所(%APPDATA%\知見同期)。新しい方がなければ読む
     code: str = ""
+    config_path: Path | None = None  # 読んだ config.yaml。vault の場所が変わったときに書き直す(F-50)
+    moved: list[str] = field(default_factory=list)       # load のときに直した場所(次の同期レポートに書く)
+    move_warnings: list[str] = field(default_factory=list)
 
     @property
     def state_path(self) -> Path:
@@ -82,7 +85,11 @@ def load(path: Path) -> Config:
         backup_dir=Path(data["backup_dir"]) if data.get("backup_dir") else path.parent / "backup",
         state_dir=Path(data["state_dir"]) if data.get("state_dir") else None,
         old_state_dir=path.parent,
+        config_path=path,
     )
+    # F-50: vault の名前や場所が変わっていたら、新しい場所を見つけて設定を直す(人の記号を読む前に)
+    from .relocate import follow
+    cfg.moved, cfg.move_warnings = follow(cfg, dry=cfg.dry_run)
     cfg.code = member_code(cfg)
     return cfg
 
