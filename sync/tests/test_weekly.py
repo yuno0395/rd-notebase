@@ -3,11 +3,15 @@
 from datetime import date
 from pathlib import Path
 
-import openpyxl
 import pytest
 
 from notesync.report import Report
 from notesync.weekly import make_weekly, maybe_weekly
+from notesync.weekly_html import row_html
+
+
+def row(*cells):
+    return row_html(list(cells))
 
 PJ = "樹脂カバー"
 
@@ -82,31 +86,32 @@ def test_weekly_report(shared, tmp_path):
     out = tmp_path / "報告"
     r = Report()
     made = make_weekly(shared, out, date(2026, 10, 26), r)
-    assert [p.name for p in made] == ["2026-W44.md", "2026-W44.md"]
-    md = (out / PJ / "2026-W44.md").read_text(encoding="utf-8")
-    assert "- 見込み: **△**" in md and "金型の納期が2週遅れ" in md and "試作費の追加" in md
+    assert [p.name for p in made] == ["2026-W44.html", "2026-W44.html"]
+    md = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
+    assert '<div class="big warn">△</div>' in md and "金型の納期が2週遅れ" in md and "試作費の追加" in md
     assert "見込み未更新" in md                                   # 最後の更新から21日
-    assert "| 部品コスト3割減 | 50%(1/2) | 1 | 0 | 1 | 0 |" in md
-    assert "| DR1 | 2026-11-07 | 2026-11-21 | +14 日 |" in md
-    assert "| イシュー | 迷子 | Yu | 仮説につながっていない |" in md
+    assert row('部品コスト3割減', '50%(1/2)', '1', '0', '1', '0') in md
+    assert row('DR1', '2026-11-07', '2026-11-21', '+14 日') in md
+    assert row('イシュー', '迷子', 'Yu', '仮説につながっていない') in md
     assert "外れた仮説につながっている(外れた話)" in md
-    assert "| イシュー | 下の仮説の仕事 | Yu | 外れた仮説につながっている(外れた話) |" in md
-    assert "| 金型で3割減る | 肉厚 | 0 |" in md
-    assert "| ヒケ | 別PJ | 別のヒケ | ヒケ量 |" in md
+    assert row('イシュー', '下の仮説の仕事', 'Yu', '外れた仮説につながっている(外れた話)') in md
+    assert row('金型で3割減る', '肉厚', '0') in md
+    assert row('ヒケ', '別PJ', '別のヒケ', 'ヒケ量') in md
     assert "DR(2026-10-01)のあと対策 2 件完了、resolution は 未把握 のまま" in md
     assert "原因が組み立て値のまま(ヒケ量)" in md
-    assert "| 対策2 | Yu | 期限を 2 回延ばした |" in md
-    assert "| Yu | 1 | 0 | 1 | 1 | 0 |" in md and "| 佐藤 | 0 | 1 | 0 | 0 | 1 |" in md
-    assert "| ヒケ | 2 |" in md                                     # センサー案 3 つのうち不採用でない 2 つ
-    wb = openpyxl.load_workbook(out / PJ / "2026-W44.xlsx")
-    assert "担当者" in wb.sheetnames and wb["見込み"]["B2"].value == "△"
+    assert row('対策2', 'Yu', '期限を 2 回延ばした') in md
+    assert row('Yu', '1', '0', '1', '1', '0') in md and row('佐藤', '0', '1', '0', '0', '1') in md
+    assert row('ヒケ', '2') in md                                     # センサー案 3 つのうち不採用でない 2 つ
+    assert not list(out.rglob("*.md")) and not list(out.rglob("*.xlsx"))   # HTML 1つだけ
+    index = (out / "週報の一覧.html").read_text(encoding="utf-8")
+    assert f'href="{PJ}/2026-W44.html"' in index
     # 2回目は作らない。次の週は推移が伸びる
     assert make_weekly(shared, out, date(2026, 10, 27), Report()) == []
     (shared / f"{PJ}/設計記録/0RB402001_センサー案2.md").write_text(
         (shared / f"{PJ}/設計記録/0RB402001_センサー案2.md").read_text(encoding="utf-8").replace("候補", "不採用"),
         encoding="utf-8")
     make_weekly(shared, out, date(2026, 11, 2), Report())
-    assert "| ヒケ | 2→1 |" in (out / PJ / "2026-W45.md").read_text(encoding="utf-8")
+    assert row('ヒケ', '2→1') in (out / PJ / "2026-W45.html").read_text(encoding="utf-8")
 
 
 def test_only_runner_on_monday(shared, tmp_path):
@@ -119,4 +124,4 @@ def test_only_runner_on_monday(shared, tmp_path):
     maybe_weekly("Yu", shared, out, monday - 86400, Report(), False)  # 日曜
     assert not out.exists()
     maybe_weekly("Yu", shared, out, monday, Report(), False)
-    assert (out / PJ / "2026-W44.md").exists()
+    assert (out / PJ / "2026-W44.html").exists()

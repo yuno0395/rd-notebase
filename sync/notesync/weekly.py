@@ -1,7 +1,8 @@
 """F-29・F-30: 管理者向けの週報(仕様書「管理者向けの週報」)。
 
 共有 vault のノートの属性と、ノート履歴(history.py)から、プロジェクトごとに作る。
-置き場所は個人設定の report(例: Box\\開発ノート_報告)の `<プロジェクト名>/<年-週>.md`。
+置き場所は個人設定の report(例: Box\\開発ノート_報告)の `<プロジェクト名>/<年-週>.html`。
+Markdown と Excel に分けず、ブラウザで開く HTML 1つにする(Yu 2026-10-25)。
 週報を作るのはチーム設定の report_runner の1台だけ。毎週月曜の最初の同期で作る。
 
 機密フォルダの中身は読まない。secret_refs の件数だけを出す。
@@ -70,20 +71,26 @@ class Week:
 
 @dataclass
 class ProjectReport:
+    """1つのプロジェクトの週報。節(見出し・項目・表)を順にためて、HTML に書き出す(weekly_html.py)。"""
     name: str
-    lines: list[str] = field(default_factory=list)
-    rows: dict[str, list[list[str]]] = field(default_factory=dict)  # Excel の表(シート名 → 行)
+    title: str = ""
+    blocks: list[tuple] = field(default_factory=list)
 
-    def table(self, sheet: str, header: list[str], body: list[list[str]], empty: str = "なし") -> None:
-        self.rows[sheet] = [header] + body
-        if not body:
-            self.lines += [empty, ""]
-            return
-        self.lines.append("| " + " | ".join(header) + " |")
-        self.lines.append("| " + " | ".join("---" for _ in header) + " |")
-        for r in body:
-            self.lines.append("| " + " | ".join(str(c).replace("|", "/") for c in r) + " |")
-        self.lines.append("")
+    def section(self, heading: str, lead: str = "") -> None:
+        self.blocks.append(("h2", heading, lead))
+
+    def items(self, pairs: list[tuple[str, str, bool]]) -> None:
+        """(名前, 値, 目立たせるか) の並び。"""
+        self.blocks.append(("items", pairs))
+
+    def note(self, text: str, warn: bool = False) -> None:
+        self.blocks.append(("note", text, warn))
+
+    def table(self, name: str, header: list[str], body: list[list[str]], empty: str = "なし") -> None:
+        self.blocks.append(("table", name, header, [[str(c) for c in r] for r in body], empty))
+
+    def tables(self) -> dict[str, list[list[str]]]:
+        return {b[1]: [b[2]] + b[3] for b in self.blocks if b[0] == "table"}
 
 
 class Builder:
@@ -313,37 +320,36 @@ class Builder:
     def build(self, proj: Doc, trend: dict[str, list[int]]) -> ProjectReport:
         pj = proj.name
         docs = self.in_project(pj)
-        r = ProjectReport(pj)
-        L = r.lines
-        L += [f"# 週報 {pj}({Week.of(self.today).label}、{self.today.isoformat()} 作成)", ""]
+        r = ProjectReport(pj, f"週報 {pj}({Week.of(self.today).label}、{self.today.isoformat()} 作成)")
         outlook = str(proj.fm.get("outlook") or "").strip() or "(未記入)"
-        L += ["## 見込み", "", f"- 見込み: **{outlook}**",
-              f"- 理由: {str(proj.fm.get('outlook_reason') or '').strip() or '(未記入)'}",
-              f"- 管理者に判断してほしいこと: {str(proj.fm.get('request_to_manager') or '').strip() or 'なし'}"]
+        r.section("見込み")
+        r.items([("見込み", outlook, True),
+                 ("理由", str(proj.fm.get("outlook_reason") or "").strip() or "(未記入)", False),
+                 ("管理者に判断してほしいこと", str(proj.fm.get("request_to_manager") or "").strip() or "なし", False)])
         age = self.outlook_age(proj)
         if age is None or age > STALE_DAYS:
-            L.append("- **見込み未更新**(2週間以上更新されていません)")
-        L.append("")
-        L += ["## 出荷準備度(目的ごと)", ""]
+            r.note("見込み未更新(2週間以上更新されていません)", warn=True)
+        r.section("出荷準備度(目的ごと)", "impact 大のイシューのうち、DR で段階2(設計空間)以上と決まったものの割合")
         r.table("出荷準備度", ["目的", "出荷準備度", "段階0 未把握", "段階1 現象", "段階2 設計空間", "段階3 原理"],
                 self.readiness([d for d in docs if d.type == "イシュー"]))
-        L += ["## 残っている候補の数", ""]
+        r.section("残っている候補の数", "開発の前半は、出荷準備度より候補が絞れていく様子で進み具合を見る")
         r.table("候補の数", ["候補の組", "推移"],
                 [[k, "→".join(str(x) for x in v)] for k, v in sorted(trend.items())])
-        L += ["## マイルストーン", ""]
+        r.section("マイルストーン")
         r.table("マイルストーン", ["名前", "計画日", "見込み日", "ずれ"], self.milestones(proj))
-        L += ["## 目的に沿っていない仕事", ""]
+        r.section("目的に沿っていない仕事", "価値の仮説につながっていないもの、外れた仮説につながったまま動いているもの")
         r.table("目的に沿わない", ["種類", "名前", "担当", "理由"], self.off_purpose(docs))
-        L += ["## 反論のついた仮説(検証中のまま)", ""]
+        r.section("反論のついた仮説(検証中のまま)", "前提を覆す事実がついたのに、まだ検証中の仮説")
         r.table("反論のついた仮説", ["仮説", "反論", "すぐ下の仮説・イシュー"], self.challenged(docs))
-        L += ["## 他のプロジェクトと同じノードを使うもの", ""]
+        r.section("他のプロジェクトと同じノードを使うもの", "同じことを別々に試していないか")
         r.table("同じノード", ["このプロジェクト", "相手のプロジェクト", "相手", "同じノード"], self.same_nodes(pj, docs))
-        L += ["## 行き詰まりの候補", ""]
+        r.section("行き詰まりの候補", "動いているのに前に進んでいないもの")
         r.table("行き詰まり", ["名前", "担当", "様子"], self.stuck(pj, docs))
-        L += ["## 担当者ごとのタスク", ""]
+        r.section("担当者ごとのタスク")
         r.table("担当者", ["担当", "進行中", "待ち", "期限切れ", "確認待ち", "確認を頼まれた"], self.people(docs))
         refs = sum(len(as_list(d.fm.get("secret_refs"))) for d in docs)
-        L += ["## 機密", "", f"機密の事実への参照: {refs} 件(中身は載せません)", ""]
+        r.section("機密")
+        r.note(f"機密の事実への参照: {refs} 件(中身は載せません)")
         return r
 
 
@@ -395,14 +401,19 @@ def runner_of(shared: Path) -> str:
 
 def make_weekly(shared: Path, out_dir: Path, today: date, report: Report, dry_run: bool = False,
                 force: bool = False) -> list[Path]:
-    """全プロジェクトの週報を作る。今週の分がもうあれば作らない(force なら作り直す)。"""
+    """全プロジェクトの週報を作る。今週の分がもうあれば作らない(force なら作り直す)。
+
+    週報はプロジェクトごとに1つの HTML(ブラウザで開く)。報告フォルダの直下に、全プロジェクトの
+    週報への目次(週報の一覧.html)も書き直す。
+    """
+    from .weekly_html import write_index, write_report
     week = Week.of(today).label
     b = Builder(shared, today, all_history(shared))
     made = []
     for proj in sorted(b.index.projects().values(), key=lambda d: d.name):
         if status(proj) in ("完了", "中断"):
             continue
-        path = out_dir / proj.name / f"{week}.md"
+        path = out_dir / proj.name / f"{week}.html"
         if path.exists() and not force:
             continue
         trend_path = out_dir / proj.name / CANDIDATE_CSV
@@ -411,16 +422,12 @@ def make_weekly(shared: Path, out_dir: Path, today: date, report: Report, dry_ru
                  | {k: [v] for k, v in now.items() if k not in read_trend(trend_path)}) if dry_run \
             else write_trend(trend_path, week, now)
         r = b.build(proj, trend)
-        report.record(f"週報を作った: {proj.name}/{week}.md")
+        report.record(f"週報を作った: {proj.name}/{week}.html")
         if not dry_run:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("\n".join(r.lines), encoding="utf-8")
-            try:
-                from .weekly_xlsx import write_xlsx
-                write_xlsx(path.with_suffix(".xlsx"), r)
-            except ImportError:
-                pass  # Excel の部品(openpyxl)がない PC では Markdown だけ
+            write_report(path, r)
         made.append(path)
+    if made and not dry_run:
+        write_index(out_dir, today)
     return made
 
 

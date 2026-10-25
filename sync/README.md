@@ -41,12 +41,11 @@
 
 ```
 pip install pyyaml
-pip install openpyxl                   # 週報を作る PC(report_runner)だけ。Excel の週報に使う
 copy config.example.yaml %APPDATA%\知見同期\config.yaml   (中身を自分用に直す)
 python -m notesync once --dry-run      # 試し運転。_仕組み/同期レポート.md を見る
 python -m notesync once                # 本番を1回
 python -m notesync watch --interval 3  # 常駐(3分ごと)
-python -m notesync weekly              # 今週の週報を今すぐ作り直す
+python -m notesync weekly              # 今週の週報(ブラウザで開く HTML)を今すぐ作り直す
 ```
 
 重い添付(画像・PDF・20MB 未満の動画以外)は `shared_data` の 開発データ/ へ移し、リンクを書き換えます。
