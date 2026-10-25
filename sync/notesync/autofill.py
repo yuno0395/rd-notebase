@@ -1,7 +1,8 @@
 """おまけの自動入力。壊れても核(id 付け・集約・再配布)は止めない(仕様書「核とおまけ」)。
 
 - F-31: イシューの priority を impact と speed(と lead_weeks)から計算して書く。
-- F-26: 設計記録・タスクの「残ったリスク」にあるイシューの previous が空なら、そのノートを入れる。
+- F-26: タスク・実験・試作記録の「リスクはどう変わったか」(古いノートは「残ったリスク」)にあるイシューの
+  previous が空なら、そのノートを入れる。
 - F-27: イシューの generation を previous をたどって計算し、空なら入れ、食い違えば知らせる。
 
 書き換えるのは自分のノート(個人 vault の 01〜05)だけ。他の人のノートは読むだけにする。
@@ -33,7 +34,7 @@ PRIORITY = {
 }
 IMPACTS = {"方針", "絞込", "出荷", "中", "小", "未判定"}
 SPEEDS = {"すぐ", "時間がかかる"}
-RISK_SECTION = "残ったリスク"
+RISK_SECTIONS = ("リスクはどう変わったか", "残ったリスク", "判定")
 
 
 @dataclass
@@ -48,7 +49,8 @@ class Doc:
 
     @property
     def type(self) -> str:
-        return str(self.fm.get("type") or "").strip()
+        t = str(self.fm.get("type") or "").strip()
+        return "ソリューション" if t == "設計記録" else t  # v0.37 までの設計記録はソリューション(Yu 2026-10-25)
 
     @property
     def stem(self) -> str:
@@ -260,13 +262,14 @@ def fill_priority(docs: list[Doc], index: Index, w: Writer, today: date) -> None
 
 # ---------- F-26: previous ----------
 
-def section_links(text: str, heading: str) -> list[str]:
+def section_links(text: str, heading) -> list[str]:
+    headings = {heading} if isinstance(heading, str) else set(heading)
     _, body = frontmatter.split(text)
     out, inside = [], False
     for line in body.splitlines():
         m = re.match(r"^(#{1,6})\s+(.*?)\s*$", line)
         if m:
-            inside = m.group(2) == heading
+            inside = m.group(2) in headings
             continue
         if inside:
             out += [x.group(1).strip() for x in LINK.finditer(line)]
@@ -275,9 +278,9 @@ def section_links(text: str, heading: str) -> list[str]:
 
 def fill_previous(docs: list[Doc], index: Index, w: Writer) -> None:
     for src in docs:
-        if src.type not in ("設計記録", "タスク"):
+        if src.type not in ("タスク", "実験・試作記録"):
             continue
-        for t in section_links(src.text, RISK_SECTION):
+        for t in section_links(src.text, RISK_SECTIONS):
             issue = index.resolve(t)
             if not issue or issue.type != "イシュー" or not issue.own or issue.id == src.id:
                 continue
@@ -285,14 +288,14 @@ def fill_previous(docs: list[Doc], index: Index, w: Writer) -> None:
                 continue
             if w.set(issue, {"previous": json.dumps([src.link], ensure_ascii=False)},
                      f"previous に {src.name} を入れた"):
-                w.report.todo(f"previous を補った: {issue.link} は {src.link} の「残ったリスク」にあったので、"
+                w.report.todo(f"previous を補った: {issue.link} は {src.link} のリスクの欄にあったので、"
                               "previous に入れました。違っていたら直してください")
 
 
 # ---------- F-27: generation ----------
 
 def origin_issue(doc: Doc, index: Index) -> Doc | None:
-    """previous の先にある元のイシュー。previous がイシューならそれ、対策(タスク・設計記録)なら、その parent のイシュー。"""
+    """previous の先にある元のイシュー。previous がイシューならそれ、対策(タスク)なら、その parent のイシュー。"""
     if doc.type == "イシュー":
         return doc
     seen = set()

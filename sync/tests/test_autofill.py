@@ -98,14 +98,14 @@ def test_previous_and_generation(box):
     issue(yu, "0RB001001", "ヒケ", "impact: 出荷\nspeed: すぐ\n")
     write(yu / "04_タスク/0RB002001_リブを足す.md",
           '---\nid: 0RB002001\nauthor: Yu\ntype: タスク\nparent: ["[[0RB001001_ヒケ|ヒケ]]"]\n---\n'
-          "## 残ったリスク\n- [[0RB003001_そり|そり]] が出るかも\n## 次\n[[0RB004001_無関係]]\n")
+          "## リスクはどう変わったか\n- [[0RB003001_そり|そり]] が出るかも\n## 次\n[[0RB004001_無関係]]\n")
     child = issue(yu, "0RB003001", "そり", "impact: 出荷\nspeed: すぐ\n")
     other = issue(yu, "0RB004001", "無関係", "impact: 出荷\nspeed: すぐ\n")
     run_once(box, now=NOW)
     t = text(child)
     assert 'previous: ["[[0RB002001_リブを足す|リブを足す]]"]' in t
     assert "generation: 2" in t
-    assert "previous" not in text(other)                 # 「残ったリスク」の外のリンクは見ない
+    assert "previous" not in text(other)                 # リスクの欄の外のリンクは見ない
     assert "generation" not in text(yu / "03_イシュー/0RB001001_ヒケ.md")  # 元のイシューには書かない
     assert "previous を補った: [[0RB003001_そり|そり]]" in report(box)
 

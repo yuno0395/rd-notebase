@@ -60,5 +60,31 @@
       "key": "H"
     }
   ],
-  "editor:open-search-replace": []
+  "templater-obsidian:_仕組み/templates/_コマンド/ソリューションにする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "U"
+    }
+  ],
+  "editor:open-search-replace": [],
+  "k-plex:kplex-focus-active-note": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "G"
+    }
+  ],
+  "graph:open": [],
+  "quickadd:choice:dee6ab7d-6a6e-5dc3-8f4b-6698ebf395fb": [
+    {
+      "modifiers": [
+        "Mod",
+        "Shift"
+      ],
+      "key": "N"
+    }
+  ]
 }

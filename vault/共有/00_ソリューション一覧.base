@@ -1,0 +1,34 @@
+filters:
+  and:
+    - '!file.inFolder("_仕組み/templates")'
+    - or:
+        - type == "ソリューション"
+        - type == "設計記録"
+views:
+  - type: table
+    name: 候補の一組(仮説・目的ごと)
+    filters:
+      and:
+        - status != "不採用"
+    groupBy:
+      property: parent
+      direction: ASC
+    order:
+      - file.name
+      - status
+      - drawing_no
+      - author
+    sort:
+      - property: status
+        direction: ASC
+  - type: table
+    name: すべて(不採用も)
+    groupBy:
+      property: parent
+      direction: ASC
+    order:
+      - file.name
+      - status
+      - drawing_no
+      - parent
+      - author

@@ -25,6 +25,12 @@
       "mode": "any"
     },
     {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/ソリューションにする.md",
+      "icon": "puzzle",
+      "name": "ソリューションにする(Ctrl+U)",
+      "mode": "any"
+    },
+    {
       "id": "templater-obsidian:_仕組み/templates/_コマンド/目的にする.md",
       "icon": "target",
       "name": "目的にする",
@@ -37,6 +43,18 @@
       "mode": "any"
     },
     {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/関係としてつなぐ.md",
+      "icon": "arrow-left",
+      "name": "関係としてつなぐ(friend)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/反論としてつなぐ.md",
+      "icon": "swords",
+      "name": "反論としてつなぐ(challenger)",
+      "mode": "any"
+    },
+    {
       "id": "templater-obsidian:_仕組み/templates/_コマンド/図を開く.md",
       "icon": "pencil",
       "name": "図を開く(Ctrl+D)",
@@ -46,6 +64,12 @@
       "id": "editor:toggle-checklist-status",
       "icon": "check-square",
       "name": "チェックボックスにする(Ctrl+L)",
+      "mode": "any"
+    },
+    {
+      "id": "k-plex:kplex-focus-active-note",
+      "icon": "network",
+      "name": "K-Plex で見る(Ctrl+G)",
       "mode": "any"
     }
   ]

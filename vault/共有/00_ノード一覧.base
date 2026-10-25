@@ -1,0 +1,43 @@
+filters:
+  and:
+    - '!file.inFolder("_仕組み/templates")'
+    - type == "ノード"
+formulas:
+  # 書いていなければ仮説(仕様書「属性」)
+  mat: 'if(maturity, maturity, "仮説")'
+properties:
+  formula.mat:
+    displayName: maturity
+views:
+  - type: table
+    name: value_kind 未分類(金曜の定例で分ける)
+    filters:
+      and:
+        - '!value_kind'
+    order:
+      - file.name
+      - aliases
+      - parts
+      - author
+    sort:
+      - property: file.ctime
+        direction: DESC
+  - type: table
+    name: maturity ごと
+    groupBy:
+      property: formula.mat
+      direction: ASC
+    order:
+      - file.name
+      - formula.mat
+      - value_kind
+      - parts
+      - author
+  - type: table
+    name: すべて
+    order:
+      - file.name
+      - aliases
+      - value_kind
+      - formula.mat
+      - parts
