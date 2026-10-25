@@ -60,6 +60,14 @@
       "key": "H"
     }
   ],
+  "templater-obsidian:_仕組み/templates/_コマンド/ソリューションにする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "U"
+    }
+  ],
   "editor:open-search-replace": [],
   "k-plex:kplex-focus-active-note": [
     {

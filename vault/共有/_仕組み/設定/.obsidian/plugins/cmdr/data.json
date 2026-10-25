@@ -25,6 +25,12 @@
       "mode": "any"
     },
     {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/ソリューションにする.md",
+      "icon": "puzzle",
+      "name": "ソリューションにする(Ctrl+U)",
+      "mode": "any"
+    },
+    {
       "id": "templater-obsidian:_仕組み/templates/_コマンド/目的にする.md",
       "icon": "target",
       "name": "目的にする",

@@ -12,17 +12,19 @@ const ID_PREFIX = /^[0-9A-Z]{6}[0-9A-Z]+_/i;
 
 // 中心の種類ごとに、上に出す種類
 const ORDER = {
-  目的: ["仮説", "イシュー", "タスク"],
-  仮説: ["イシュー", "仮説", "タスク"],
-  イシュー: ["タスク", "イシュー", "仮説"],
-  タスク: ["イシュー", "タスク", "仮説"],
-  設計記録: ["イシュー", "タスク", "仮説"],
-  "実験・試作記録": ["イシュー", "タスク", "仮説"],
+  目的: ["ソリューション", "仮説", "イシュー", "タスク"],
+  仮説: ["ソリューション", "仮説", "イシュー", "タスク"],
+  ソリューション: ["イシュー", "ソリューション", "タスク", "仮説"],
+  設計記録: ["イシュー", "ソリューション", "タスク", "仮説"],
+  イシュー: ["タスク", "イシュー", "ソリューション", "仮説"],
+  タスク: ["イシュー", "タスク", "ソリューション", "仮説"],
+  "実験・試作記録": ["イシュー", "タスク", "ソリューション", "仮説"],
 };
 const LABEL = {
   イシュー: "イシュー(心配なこと)",
   タスク: "タスク(リスクを下げる仕事)",
   仮説: "仮説(価値の仮説。仮説の下なら下の仮説)",
+  ソリューション: "ソリューション(仮説を実現する案の候補)",
 };
 
 function kplexCenter(app) {
@@ -59,7 +61,7 @@ module.exports = async function (params) {
   }
   const makeNote = await loadMakeNote(app);
   const shown = center.basename.replace(ID_PREFIX, "");
-  const order = ORDER[makeNote.typeOf(app, center)] || ["イシュー", "タスク", "仮説"];
+  const order = ORDER[makeNote.typeOf(app, center)] || ["イシュー", "タスク", "ソリューション", "仮説"];
   const kind = await quickAddApi.suggester(order.map((k) => `${LABEL[k]} ← ${shown}`), order);
   if (!kind) return;
   const name = await quickAddApi.inputPrompt(`${kind}の名前(「${shown}」から作る)`);

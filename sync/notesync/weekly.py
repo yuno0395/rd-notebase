@@ -159,11 +159,11 @@ class Builder:
         return rows
 
     def candidates(self, docs: list[Doc]) -> dict[str, int]:
-        """一組の候補(同じ parent の設計記録、ノードの parts)のうち、不採用・中止でないものの数。"""
+        """一組の候補(同じ parent のソリューション、ノードの parts)のうち、不採用・中止でないものの数。"""
         out: dict[str, int] = {}
         groups: dict[str, list[Doc]] = {}
         for d in docs:
-            if d.type == "設計記録":
+            if d.type == "ソリューション":
                 for p in self.parents(d):
                     groups.setdefault(p.name, []).append(d)
         for name, items in groups.items():
@@ -172,7 +172,7 @@ class Builder:
         for d in docs:
             if d.type == "ノード" and len(as_list(d.fm.get("parts"))) >= 2 and d.name not in out:
                 parts = [self.index.resolve(t) for t in targets(d.fm.get("parts"))]
-                cands = [p for p in parts if p and p.type == "設計記録"]
+                cands = [p for p in parts if p and p.type == "ソリューション"]
                 if len(cands) >= 2:
                     out[d.name] = sum(1 for p in cands if status(p) not in ("不採用", "中止"))
         return out

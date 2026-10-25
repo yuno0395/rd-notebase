@@ -1,10 +1,12 @@
 filters:
   and:
     - '!file.inFolder("_仕組み/templates")'
-    - type == "設計記録"
+    - or:
+        - type == "ソリューション"
+        - type == "設計記録"
 views:
   - type: table
-    name: 候補の一組(イシューごと)
+    name: 候補の一組(仮説・目的ごと)
     filters:
       and:
         - status != "不採用"
@@ -15,7 +17,6 @@ views:
       - file.name
       - status
       - drawing_no
-      - previous
       - author
     sort:
       - property: status

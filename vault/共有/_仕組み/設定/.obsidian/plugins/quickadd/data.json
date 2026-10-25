@@ -69,6 +69,37 @@
           }
         },
         {
+          "id": "8f073beb-cd77-5d8b-a368-bd8150184ef7",
+          "name": "ソリューション",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/ソリューション.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [],
+            "chooseWhenCreatingNote": true,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
           "id": "6af94f01-510e-5ca2-bca5-15b069f4dcbd",
           "name": "ノード",
           "type": "Template",
@@ -264,37 +295,6 @@
           "type": "Template",
           "command": false,
           "templatePath": "_仕組み/templates/実験・試作記録.md",
-          "fileNameFormat": {
-            "enabled": false,
-            "format": ""
-          },
-          "discoverExistingNotesBeforeCreate": false,
-          "folder": {
-            "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
-            "createInSameFolderAsActiveFile": false,
-            "chooseFromSubfolders": false
-          },
-          "appendLink": false,
-          "copyLinkToClipboard": false,
-          "openFile": true,
-          "fileOpening": {
-            "location": "tab",
-            "direction": "vertical",
-            "mode": "default",
-            "focus": true
-          },
-          "fileExistsBehavior": {
-            "kind": "prompt"
-          }
-        },
-        {
-          "id": "8f073beb-cd77-5d8b-a368-bd8150184ef7",
-          "name": "設計記録",
-          "type": "Template",
-          "command": false,
-          "templatePath": "_仕組み/templates/設計記録.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""

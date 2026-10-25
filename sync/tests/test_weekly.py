@@ -48,7 +48,7 @@ def shared(tmp_path):
     note(s, "共通/02_ノード", "0RA006001", "ヒケ量", "type: ノード\nvalue_kind: 組み立て\n")
     note(s, f"{PJ}/03_イシュー", "0RB001001", "ヒケ",
          'author: Yu\ntype: イシュー\nstatus: 対策中\nimpact: 絞込\nspeed: すぐ\nproject: [樹脂カバー]\n'
-         'parent: ["[[0RA003001_3割減なら採用される]]"]\nfriend: ["[[0RA006001_ヒケ量]]"]\n')
+         'parent: ["[[0RB400001_センサー案0]]"]\nfriend: ["[[0RA006001_ヒケ量]]"]\n')
     note(s, f"{PJ}/03_イシュー", "0RB002001", "寸法",
          'author: 佐藤\ntype: イシュー\nstatus: 低減済み\nimpact: 出荷\nspeed: すぐ\nresolution: 設計空間\n'
          'project: [樹脂カバー]\nparent: ["[[0RA003001_3割減なら採用される]]"]\n')
@@ -65,9 +65,10 @@ def shared(tmp_path):
     # kind: DR なら名前に DR がなくても DR とみなす
     note(s, f"{PJ}/議事録", "0RB301001", "仕様の見直し", "type: 議事録\nkind: DR\ndate: 2026-10-01\n")
     note(s, f"{PJ}/議事録", "0RB302001", "打ち合わせ", "type: 議事録\ndate: 2026-10-05\n")
-    for i, st in enumerate(["候補", "不採用", "候補"]):
-        note(s, f"{PJ}/設計記録", f"0RB40{i}001", f"センサー案{i}",
-             f'type: 設計記録\nstatus: {st}\nparent: ["[[0RB001001_ヒケ]]"]\n')
+    # ソリューション候補は仮説の下に並ぶ(一組の候補)。設計記録は v0.37 までの名前で、ソリューションとして数える
+    for i, (tp, st) in enumerate([("ソリューション", "候補"), ("ソリューション", "不採用"), ("設計記録", "候補")]):
+        note(s, f"{PJ}/01_目的", f"0RB40{i}001", f"センサー案{i}",
+             f'type: {tp}\nstatus: {st}\nparent: ["[[0RA003001_3割減なら採用される]]"]\n')
     # 別のプロジェクトが同じノードを使う
     note(s, "別PJ", "0RC001001", "別PJ", "type: プロジェクト\nmembers: [Yu]\n")
     note(s, "別PJ/03_イシュー", "0RC002001", "別のヒケ",
@@ -101,17 +102,17 @@ def test_weekly_report(shared, tmp_path):
     assert "原因が組み立て値のまま(ヒケ量)" in md
     assert row('対策2', 'Yu', '期限を 2 回延ばした') in md
     assert row('Yu', '1', '0', '1', '1', '0') in md and row('佐藤', '0', '1', '0', '0', '1') in md
-    assert row('ヒケ', '2') in md                                     # センサー案 3 つのうち不採用でない 2 つ
+    assert row('3割減なら採用される', '2') in md                                     # センサー案 3 つのうち不採用でない 2 つ
     assert not list(out.rglob("*.md")) and not list(out.rglob("*.xlsx"))   # HTML 1つだけ
     index = (out / "週報の一覧.html").read_text(encoding="utf-8")
     assert f'href="{PJ}/2026-W44.html"' in index
     # 2回目は作らない。次の週は推移が伸びる
     assert make_weekly(shared, out, date(2026, 10, 27), Report()) == []
-    (shared / f"{PJ}/設計記録/0RB402001_センサー案2.md").write_text(
-        (shared / f"{PJ}/設計記録/0RB402001_センサー案2.md").read_text(encoding="utf-8").replace("候補", "不採用"),
+    (shared / f"{PJ}/01_目的/0RB402001_センサー案2.md").write_text(
+        (shared / f"{PJ}/01_目的/0RB402001_センサー案2.md").read_text(encoding="utf-8").replace("候補", "不採用"),
         encoding="utf-8")
     make_weekly(shared, out, date(2026, 11, 2), Report())
-    assert row('ヒケ', '2→1') in (out / PJ / "2026-W45.html").read_text(encoding="utf-8")
+    assert row('3割減なら採用される', '2→1') in (out / PJ / "2026-W45.html").read_text(encoding="utf-8")
 
 
 def test_only_runner_on_monday(shared, tmp_path):

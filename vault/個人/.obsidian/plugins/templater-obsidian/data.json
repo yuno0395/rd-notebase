@@ -75,6 +75,11 @@
       "create_enabled": false
     },
     {
+      "template": "_仕組み/templates/_コマンド/ソリューションにする.md",
+      "insert_enabled": true,
+      "create_enabled": false
+    },
+    {
       "template": "_仕組み/templates/_コマンド/目的にする.md",
       "insert_enabled": true,
       "create_enabled": false
