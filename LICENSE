@@ -1,0 +1,22 @@
+Copyright (c) 2026 Yu (GitHub: yuno0395). All rights reserved.
+
+このリポジトリにあるすべてのもの(コード、テンプレート、設定、仕様書、図)の著作権は
+上の著作権者にあります。著作権者が書面で許した場合を除き、複製、改変、配布、
+公開、販売、他のサービスや製品への組み込みを禁じます。
+
+GitHub 上で読めることは、使ってよいという許可ではありません。
+使いたい場合は、著作権者に連絡してください。
+
+この仕組みが使う Obsidian のプラグインや Python のライブラリは、このリポジトリには
+含まれていません。それぞれの作者のライセンスに従います。
+
+---
+
+All rights reserved. No part of this repository (code, templates, settings,
+specifications, or figures) may be copied, modified, distributed, published,
+sold, or incorporated into other products or services without prior written
+permission from the copyright holder. Being able to view this repository on
+GitHub does not grant any license to use it.
+
+Third-party Obsidian plugins and Python libraries used with this system are
+not included in this repository and remain under their own licenses.
