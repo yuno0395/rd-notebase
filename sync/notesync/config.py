@@ -39,7 +39,7 @@ class Config:
     idle_seconds: int = 10
     backup_dir: Path | None = None
     state_dir: Path | None = None  # 前回同期の記録(F-14)の置き場所。省略時は個人 vault の中
-    old_state_dir: Path | None = None  # v0.43 までの置き場所(%APPDATA%\知見同期)。新しい方がなければ読む
+    old_state_dir: Path | None = None  # v0.45 までの置き場所(%APPDATA%\知見同期)。新しい方がなければ読む
     code: str = ""
 
     @property
