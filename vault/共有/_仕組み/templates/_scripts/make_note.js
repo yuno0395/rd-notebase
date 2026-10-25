@@ -264,7 +264,8 @@ function initialValues(app, kind, note) {
 
 async function placeFor(app, kind, note) {
   const folder = KINDS[kind].folder;
-  if (await app.vault.adapter.exists("_仕組み/記録/私.yaml")) return folder; // 個人 vault
+  const fs = app.vault.adapter;
+  if ((await fs.exists("_仕組み/個人設定.md")) || (await fs.exists("_仕組み/記録/私.yaml"))) return folder; // 個人 vault
   // 共有 vault で仮運用しているとき: 今のノートのプロジェクト、なければ 共通
   const project = (kind === "イシュー" ? projectFor(app, note) : asList(app.metadataCache.getFileCache(note)?.frontmatter?.project))[0];
   const top = note.path.split("/")[0];

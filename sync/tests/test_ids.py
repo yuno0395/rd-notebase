@@ -1,3 +1,5 @@
+import pytest
+
 from datetime import datetime
 
 from notesync import ids
@@ -27,3 +29,17 @@ def test_sort_order_is_creation_order():
     a = ids.make_id(datetime(2026, 3, 1, tzinfo=ids.JST), "002", set())
     b = ids.make_id(datetime(2026, 3, 1, 0, 0, 1, tzinfo=ids.JST), "001", set())
     assert sorted([b, a]) == [a, b]
+
+
+def test_code_from_six_digit_number():
+    # 人の記号は6桁の番号を36進数にした4文字(Yu 2026-10-25)
+    assert ids.code_from_number("229999") == "4XGV"
+    assert ids.code_from_number("000001") == "0001"
+    assert ids.code_from_number("999999") == "LFLR"
+    for bad in ("12345", "1234567", "12a456", ""):
+        with pytest.raises(ValueError):
+            ids.code_from_number(bad)
+    assert ids.code_of("001") == "001"          # 古い3文字の記号はそのまま
+    # 36進数の記号(I・L・O・U を含む)の id も読める
+    assert ids.split_filename("0RDGPGLFLR_水") == ("0RDGPGLFLR", "水")
+    assert ids.make_id(ids.EPOCH, "4XGV", set()) == "0000004XGV"
