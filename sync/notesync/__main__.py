@@ -67,13 +67,26 @@ def main(argv: list[str] | None = None) -> int:
         if unknown:
             print(f"止めました: 知らない節 {'、'.join(unknown)}。使える節: {'、'.join(SECTIONS)}", file=sys.stderr)
             return 2
+        from .lock import Busy, Lock
+        from .weekly import WEEKLY_LOCK
         r = Report(dry_run=bool(dry))
-        made = make_weekly(cfg.shared, cfg.report_dir, datetime.now(JST).date(), r, bool(dry), force=True,
-                           sections=sections_of(cfg.shared, hide, only))
+        try:
+            with Lock(cfg.report_dir / WEEKLY_LOCK):
+                made = make_weekly(cfg.shared, cfg.report_dir, datetime.now(JST).date(), r, bool(dry), force=True,
+                                   sections=sections_of(cfg.shared, hide, only))
+        except Busy as b:
+            print(f"見送りました: {b.pc} の PC が週報を作っています。少し待ってからもう一度どうぞ")
+            return 0
         print(f"週報を作りました: {len(made)} 件({cfg.report_dir})")
         return 0
     while True:
         report = run_once(cfg, dry_run=dry)
+        if report.skipped:
+            print(f"見送りました: {report.skipped} の PC が同じ個人 vault を同期しています")
+            if args.command == "once":
+                return 0
+            time.sleep(args.interval * 60)
+            continue
         print(f"同期しました: 記録 {len(report.records)} 件、対応が必要 {len(report.todos)} 件、警告 {len(report.warnings)} 件")
         if args.command == "once":
             return 0

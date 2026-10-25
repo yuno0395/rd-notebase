@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .report import Report
+from .safety import Backup
 from .vault import box_copy_of, is_hidden
 
 
@@ -45,3 +46,30 @@ def report_box_copies(vaults: list[tuple[str, Path]], report: Report) -> None:
             else:
                 report.todo(f"Box の競合の複製: {label}/{rel} があります。中身を確かめて、"
                             "必要なら元のノートに書き足してから消してください")
+
+
+LAYOUT_FILES = ("workspace.json", "workspace-mobile.json")
+
+
+def tidy_layout_copies(personal: Path, report: Report, backup: Backup, dry_run: bool) -> None:
+    """1人が2台の PC で同じ個人 vault を開くと、Obsidian の画面配置(.obsidian/workspace.json)の
+    Box の複製ができやすい。中身は画面の並びだけなので、backup に移して片付ける。"""
+    d = personal / ".obsidian"
+    if not d.is_dir():
+        return
+    for p in sorted(d.iterdir()):
+        if not p.is_file():
+            continue
+        is_copy, orig = box_copy_of(p)
+        if not is_copy or not orig or orig.name not in LAYOUT_FILES:
+            continue
+        rel = p.relative_to(personal).as_posix()
+        if dry_run:
+            report.record(f"画面配置の複製を片付ける: {rel}")
+            continue
+        backup.save(personal, p)
+        try:
+            p.unlink()
+        except OSError:
+            continue
+        report.record(f"画面配置の複製を片付けた: {rel}(backup に残しました)")
