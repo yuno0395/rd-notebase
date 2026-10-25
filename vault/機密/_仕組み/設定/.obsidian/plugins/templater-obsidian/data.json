@@ -1,0 +1,34 @@
+{
+  "data_version": 2,
+  "templates_folder": "_仕組み/templates",
+  "user_scripts_folder": "_仕組み/templates/_scripts",
+  "trigger_on_file_creation_mode": "regex",
+  "file_templates": [
+    {
+      "regex": "(^|/)06_事実/",
+      "template": "_仕組み/templates/事実.md"
+    }
+  ],
+  "folder_templates": [],
+  "ignore_folders_on_creation": [
+    {
+      "folder": "_仕組み/templates"
+    },
+    {
+      "folder": "_仕組み/attachments"
+    },
+    {
+      "folder": "99_archive"
+    }
+  ],
+  "auto_jump_to_cursor": true,
+  "syntax_highlighting": true,
+  "command_timeout": 5,
+  "enabled_templates_hotkeys": [
+    {
+      "template": "_仕組み/templates/_コマンド/図を開く.md",
+      "insert_enabled": true,
+      "create_enabled": false
+    }
+  ]
+}

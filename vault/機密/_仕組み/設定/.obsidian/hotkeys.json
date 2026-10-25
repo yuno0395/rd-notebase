@@ -1,0 +1,19 @@
+{
+  "quickadd:choice:0def5b2d-f85b-5501-b5b2-04dce540dfce": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "N"
+    }
+  ],
+  "file-explorer:new-file": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/図を開く.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "D"
+    }
+  ]
+}

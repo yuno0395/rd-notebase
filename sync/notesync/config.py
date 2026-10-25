@@ -12,8 +12,8 @@ from pathlib import Path
 
 import yaml
 
-MEMBER_CSV = Path("_tools") / "同期プログラム" / "メンバー.csv"
-MY_YAML = Path("_記録") / "私.yaml"
+MEMBER_CSV = Path("_仕組み/tools") / "同期プログラム" / "メンバー.csv"
+MY_YAML = Path("_仕組み/記録") / "私.yaml"
 
 
 class ConfigError(Exception):
@@ -98,7 +98,7 @@ def member_code(cfg: Config) -> str:
         raise ConfigError(f"私.yaml の name({name})が個人設定の member({cfg.member})と違います")
     code = mine or listed
     if not code:
-        raise ConfigError("人の記号がありません。_記録/私.yaml の code か メンバー.csv に書いてください")
+        raise ConfigError("人の記号がありません。_仕組み/記録/私.yaml の code か メンバー.csv に書いてください")
     dup = [n for n, c in members.items() if c == code and n != cfg.member]
     if dup:
         raise ConfigError(f"人の記号 {code} が {', '.join(dup)} と重なっています")

@@ -23,22 +23,22 @@ def write(path: Path, body: str) -> Path:
 def box(tmp_path):
     root = tmp_path / "Box"
     shared = root / "共有"
-    write(shared / "_tools/同期プログラム/メンバー.csv", "名前,記号,使い始めた日\nYu,001,2026-10-24\n佐藤,002,2026-10-24\n")
+    write(shared / "_仕組み/tools/同期プログラム/メンバー.csv", "名前,記号,使い始めた日\nYu,001,2026-10-24\n佐藤,002,2026-10-24\n")
     write(shared / f"{PJ}/0RA00A001_{PJ}.md", "---\nid: 0RA00A001\ntype: プロジェクト\nmembers: [Yu, 佐藤]\n---\n")
     write(shared / "別PJ/0RA00B001_別PJ.md", "---\nid: 0RA00B001\ntype: プロジェクト\nmembers: [Yu]\n---\n")
     write(shared / "別PJ/03_イシュー/0RA00C001_別の話.md",
           "---\nid: 0RA00C001\nauthor: Yu\ntype: イシュー\nproject: [別PJ]\n---\n")
 
     yu = root / "個人_Yu"
-    write(yu / "_記録/私.yaml", 'name: Yu\ncode: "001"\n')
+    write(yu / "_仕組み/記録/私.yaml", 'name: Yu\ncode: "001"\n')
     write(yu / "02_ノード/0RB001001_水.md", "---\nid: 0RB001001\ntype: ノード\n---\n水の話\n")
     write(yu / "03_イシュー/0RB002001_ヒケ.md",
           f"---\nid: 0RB002001\ntype: イシュー\nimpact: 出荷\nproject: [{PJ}]\n---\n[[0RB001001_水|水]] が原因\n")
     write(yu / "04_タスク/0RB003001_保圧を変える.md",
           '---\nid: 0RB003001\ntype: タスク\nparent: ["[[0RB002001_ヒケ|ヒケ]]"]\n---\n')
-    write(yu / "_attachments/0RB003001/図.excalidraw.md", "図のデータ\n")
+    write(yu / "_仕組み/attachments/0RB003001/図.excalidraw.md", "図のデータ\n")
     write(yu / "02_ノード/0RB004001_秘密のメモ.md", "---\nid: 0RB004001\ntype: ノード\nvisibility: 個人\n---\n")
-    write(yu / "05_結果/0RB005001_保圧のナレッジ.md",
+    write(yu / "05_ナレッジ/0RB005001_保圧のナレッジ.md",
           '---\nid: 0RB005001\ntype: ナレッジ\nparent: ["[[0RB003001_保圧を変える|保圧を変える]]"]\n'
           'risk_reduction:\n  - "[[0RB002001_ヒケ]] 出荷→小"\nusefulness: B\n---\n')
     write(yu / "03_イシュー/0RB006001_迷子.md", "---\nid: 0RB006001\ntype: イシュー\nproject: [無いPJ]\n---\n")
@@ -46,7 +46,7 @@ def box(tmp_path):
           "---\nid: 0RB007001\ntype: ノード\n---\n[[0RC001001_顧客図面]] を見た\n")
 
     sato = root / "個人_佐藤"
-    write(sato / "_記録/私.yaml", 'name: 佐藤\ncode: "002"\n')
+    write(sato / "_仕組み/記録/私.yaml", 'name: 佐藤\ncode: "002"\n')
     write(sato / "02_ノード/0RB101002_鉄.md", "---\nid: 0RB101002\ntype: ノード\n---\n")
 
     secret = root / "機密_顧客A"
@@ -67,7 +67,7 @@ def files(root: Path) -> set[str]:
 
 
 def report(c) -> str:
-    return text(c.personal / "00_同期レポート.md")
+    return text(c.personal / "_仕組み/同期レポート.md")
 
 
 def test_collects_by_type_and_project(box):
@@ -76,7 +76,7 @@ def test_collects_by_type_and_project(box):
     assert "共通/02_ノード/0RB001001_水.md" in s
     assert f"{PJ}/03_イシュー/0RB002001_ヒケ.md" in s
     assert f"{PJ}/04_タスク/0RB003001_保圧を変える.md" in s       # parent のイシューのプロジェクトへ
-    assert "_attachments/0RB003001/図.excalidraw.md" in s           # 添付は同じパスへ(F-07)
+    assert "_仕組み/attachments/0RB003001/図.excalidraw.md" in s           # 添付は同じパスへ(F-07)
     # 共有したノートには author が入っている
     assert "author: Yu" in text(box["shared"] / "共通/02_ノード/0RB001001_水.md")
 
@@ -94,13 +94,13 @@ def test_does_not_collect_when_conditions_fail(box):
 
 
 def test_knowledge_of_big_issue_needs_another_reviewer(box):
-    k = box["yu"].personal / "05_結果/0RB005001_保圧のナレッジ.md"
+    k = box["yu"].personal / "05_ナレッジ/0RB005001_保圧のナレッジ.md"
     write(k, text(k).replace("usefulness: B", "usefulness: B\nreviewed_by: [Yu]"))
     run_once(box["yu"])
     assert "確認待ち" in report(box["yu"])
     write(k, text(k).replace("reviewed_by: [Yu]", "reviewed_by: [Yu, 佐藤]"))
     run_once(box["yu"])
-    assert f"{PJ}/05_結果/0RB005001_保圧のナレッジ.md" in files(box["shared"])
+    assert f"{PJ}/05_ナレッジ/0RB005001_保圧のナレッジ.md" in files(box["shared"])
 
 
 def test_redistributes_to_members_only(box):
@@ -111,7 +111,7 @@ def test_redistributes_to_members_only(box):
     assert f"{PJ}/04_タスク/0RB003001_保圧を変える.md" in got
     assert f"{PJ}/0RA00A001_{PJ}.md" in got
     assert not any(x.startswith("別PJ/") for x in got)            # 佐藤は 別PJ のメンバーでない
-    assert (box["sato"].personal / "_attachments/0RB003001/図.excalidraw.md").exists()
+    assert (box["sato"].personal / "_仕組み/attachments/0RB003001/図.excalidraw.md").exists()
     # 自分が書いたノートは配らない(F-10)
     run_once(box["yu"])
     assert not any("0RB001001" in x for x in files(box["yu"].personal / "90_共有"))
@@ -125,8 +125,8 @@ def test_second_run_changes_nothing(box):
     before = {p: text(box["root"] / p) for p in files(box["root"])}
     run_once(box["yu"])
     run_once(box["sato"])
-    after = {p: text(box["root"] / p) for p in files(box["root"]) if not p.endswith("00_同期レポート.md")}
-    assert after == {p: v for p, v in before.items() if not p.endswith("00_同期レポート.md")}
+    after = {p: text(box["root"] / p) for p in files(box["root"]) if not p.endswith("_仕組み/同期レポート.md")}
+    assert after == {p: v for p, v in before.items() if not p.endswith("_仕組み/同期レポート.md")}
 
 
 def test_update_flows_through(box):
@@ -222,7 +222,7 @@ def test_dry_run_writes_only_report(box):
     before = files(box["root"])
     run_once(box["yu"], dry_run=True)
     after = files(box["root"])
-    assert after - before == {"個人_Yu/00_同期レポート.md"}
+    assert after - before == {"個人_Yu/_仕組み/同期レポート.md"}
     r = report(box["yu"])
     assert "予定: 集約: 02_ノード/0RB001001_水.md → 共有/共通/02_ノード/0RB001001_水.md" in r
     assert not box["yu"].state_path.exists()
@@ -254,13 +254,13 @@ def add_h2o(box):
     write(yu / "02_ノード/0RB008001_H2O.md",
           "---\nid: 0RB008001\ntype: ノード\naliases: [H2O, 純水]\n---\n## これは何か\n"
           "Yuのメモ ![[写真.png]]\n## 何に影響するか\n")
-    write(yu / "_attachments/0RB008001/写真.png", "png")
+    write(yu / "_仕組み/attachments/0RB008001/写真.png", "png")
     write(yu / "03_イシュー/0RB009001_濁り.md",
           f"---\nid: 0RB009001\ntype: イシュー\nproject: [{PJ}]\n---\n[[0RB008001_H2O|H2O]] と [[0RB008001_H2O]]\n")
 
 
 def tick(c, word):
-    p = c.personal / "00_同期レポート.md"
+    p = c.personal / "_仕組み/同期レポート.md"
     lines = [l.replace("- [ ]", "- [x]", 1) if l.startswith(f"- [ ] {word}:") and "0RB008001" in l else l
              for l in text(p).splitlines()]
     write(p, "\n".join(lines) + "\n")
@@ -291,7 +291,7 @@ def test_same_merges_into_shared_node(box):
     assert "## まとめたメモ(H2O、Yu、" in water
     assert "- [ ] Yu: 「H2O」のメモを上の本文に書き直して、この章を消す 📅 " in water
     assert "### これは何か\nYuのメモ" in water and "何に影響するか" not in water
-    assert (shared / "_attachments/0RB102002/写真.png").exists()
+    assert (shared / "_仕組み/attachments/0RB102002/写真.png").exists()
     # 自分のノードは archive へ、リンクは付け替え
     assert not (yu / "02_ノード/0RB008001_H2O.md").exists()
     assert 'merged_into: "[[0RB102002_蒸留水|蒸留水]]"' in text(yu / "99_archive/0RB008001_H2O.md")

@@ -2,7 +2,7 @@
 
 使い方:  python tools/build.py 0.1.0
 できるもの: dist/0.1.0/{共有,個人,機密}/ と dist/0.1.0/manifest.toml
-これを Box の共有 _tools/配布/0.1.0/ に置く。
+これを Box の共有 _仕組み/tools/配布/0.1.0/ に置く。
 
 Python 3.11 以上。標準ライブラリだけを使う。
 """
@@ -50,14 +50,14 @@ def main() -> int:
         copy(ROOT / v["src"], dst)
         for inc in v.get("include", []):
             copy(ROOT / inc["from"], dst / inc["to"])
-        (dst / "_記録").mkdir(parents=True, exist_ok=True)
-        (dst / "_記録" / "版.txt").write_text(version + "\n", encoding="utf-8")
+        (dst / "_仕組み/記録").mkdir(parents=True, exist_ok=True)
+        (dst / "_仕組み/記録" / "版.txt").write_text(version + "\n", encoding="utf-8")
         counts = {"system": 0, "seed": 0}
         for f in sorted(dst.rglob("*")):
             if not f.is_file():
                 continue
             rel = f.relative_to(dst).as_posix()
-            if rel == "_記録/版.txt":
+            if rel == "_仕組み/記録/版.txt":
                 continue
             k = kind(rel, v)
             if k is None:

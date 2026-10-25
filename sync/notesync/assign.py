@@ -56,7 +56,7 @@ def assign_ids(v: Vault, member: str, code: str, used: set[str], report: Report,
             if has_id_without_author(n):
                 fill_author(v, n, member, report, backup, dry_run, now, idle_seconds)
             continue
-        if now - n.path.stat().st_mtime < idle_seconds:
+        if idle_seconds > 0 and now - n.path.stat().st_mtime < idle_seconds:
             report.record(f"{v.label}: {n.rel} は書いている途中なので、次の同期で id をつけます")
             continue
         new_id = n.fm_id if valid_id(n.fm_id) else ids.make_id(created_time(n.path), code, used)
@@ -94,7 +94,7 @@ def fill_author(v: Vault, n: Note, member: str, report: Report, backup: Backup,
     text = read(n.path)
     if "author" in frontmatter.load(text):
         return
-    if now - n.path.stat().st_mtime < idle_seconds:
+    if idle_seconds > 0 and now - n.path.stat().st_mtime < idle_seconds:
         return
     if not dry_run:
         backup.save(v.root, n.path)

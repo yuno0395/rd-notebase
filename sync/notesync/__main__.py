@@ -4,7 +4,7 @@
     python -m notesync watch [--config 個人設定.yaml] [--interval 3]
 
 once は1回だけ同期する。watch は interval 分ごとに繰り返す。
---dry-run は書き込まず、やる予定だけを 00_同期レポート.md に書く(F-23)。
+--dry-run は書き込まず、やる予定だけを _仕組み/同期レポート.md に書く(F-23)。
 """
 
 from __future__ import annotations

@@ -30,7 +30,7 @@ def test_assigns_ids_and_fixes_links(cfg):
     # 属性欄の中の [[水]] も直す
     assert f'parts: ["[[{water.stem}|水]]"]' in text(ice)
 
-    daily = text(cfg.personal / "00_daily" / "2026-10-24.md")
+    daily = text(cfg.personal / "00_日誌/デイリー" / "2026-10-24.md")
     assert f"[[{water.stem}|水]]" in daily
     assert f"[[{ice.stem}|氷の別名]]" in daily      # 別名で引いて、表示はそのまま
     assert "[[2026-10-23]]" in daily                 # 日付のリンクはそのまま
@@ -65,7 +65,7 @@ def test_does_not_touch_shared_copies_and_secret_links(cfg):
 
 def test_report(cfg):
     r = run_once(cfg)
-    rep = text(cfg.personal / "00_同期レポート.md")
+    rep = text(cfg.personal / "_仕組み/同期レポート.md")
     # 共有の「鉄」と名前が重なるので、まとめるかを聞く(F-04 の「同じ名前」の代わり、F-47)
     assert "## 対応が必要" in rep and "同じもの: [[" in rep and "|鉄]] を [[0RAYFN002_鉄|鉄]]" in rep
     assert any("行き先が 2 つ" in t for t in r.todos)
@@ -73,17 +73,17 @@ def test_report(cfg):
     # 2回目は記録が積み重なり、やることがなければ id はつけない
     r2 = run_once(cfg)
     assert not any("id をつけた" in x for x in r2.records)
-    assert text(cfg.personal / "00_同期レポート.md").count("id をつけた 02_ノード/水.md") == 1
+    assert text(cfg.personal / "_仕組み/同期レポート.md").count("id をつけた 02_ノード/水.md") == 1
 
 
 def test_dry_run_writes_only_report(cfg):
     before = {p: text(p) for p in cfg.personal.rglob("*.md")}
     r = run_once(cfg, dry_run=True)
-    after = {p: text(p) for p in cfg.personal.rglob("*.md") if p.name != "00_同期レポート.md"}
+    after = {p: text(p) for p in cfg.personal.rglob("*.md") if p.name != "同期レポート.md"}
     assert after == before
-    rep = text(cfg.personal / "00_同期レポート.md")
+    rep = text(cfg.personal / "_仕組み/同期レポート.md")
     assert "試し運転" in rep and "予定: 個人: id をつけた 02_ノード/水.md" in rep
-    assert any("リンクを id つきに直した 00_daily/2026-10-24.md" in x for x in r.records)
+    assert any("リンクを id つきに直した 00_日誌/デイリー/2026-10-24.md" in x for x in r.records)
 
 
 def test_backup_before_change(cfg):
@@ -104,7 +104,7 @@ def test_skips_note_being_written(cfg):
 
 
 def test_member_code_mismatch_stops(cfg):
-    (cfg.personal / "_記録" / "私.yaml").write_text('name: Yu\ncode: "002"\n', encoding="utf-8")
+    (cfg.personal / "_仕組み/記録" / "私.yaml").write_text('name: Yu\ncode: "002"\n', encoding="utf-8")
     with pytest.raises(config.ConfigError, match="食い違って"):
         config.member_code(cfg)
 

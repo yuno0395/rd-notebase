@@ -1,37 +1,37 @@
 {
   "data_version": 2,
-  "templates_folder": "_templates",
-  "user_scripts_folder": "_templates/_scripts",
+  "templates_folder": "_仕組み/templates",
+  "user_scripts_folder": "_仕組み/templates/_scripts",
   "trigger_on_file_creation_mode": "regex",
   "file_templates": [
     {
       "regex": "(^|/)01_目的/",
-      "template": "_templates/目的.md"
+      "template": "_仕組み/templates/目的.md"
     },
     {
       "regex": "(^|/)02_ノード/",
-      "template": "_templates/ノード.md"
+      "template": "_仕組み/templates/ノード.md"
     },
     {
       "regex": "(^|/)03_イシュー/",
-      "template": "_templates/イシュー.md"
+      "template": "_仕組み/templates/イシュー.md"
     },
     {
       "regex": "(^|/)04_タスク/",
-      "template": "_templates/タスク.md"
+      "template": "_仕組み/templates/タスク.md"
     },
     {
-      "regex": "(^|/)05_結果/",
-      "template": "_templates/ナレッジ.md"
+      "regex": "(^|/)05_ナレッジ/",
+      "template": "_仕組み/templates/ナレッジ.md"
     }
   ],
   "folder_templates": [],
   "ignore_folders_on_creation": [
     {
-      "folder": "_templates"
+      "folder": "_仕組み/templates"
     },
     {
-      "folder": "_attachments"
+      "folder": "_仕組み/attachments"
     },
     {
       "folder": "99_archive"
@@ -45,17 +45,17 @@
   "command_timeout": 5,
   "enabled_templates_hotkeys": [
     {
-      "template": "_templates/_コマンド/図を開く.md",
+      "template": "_仕組み/templates/_コマンド/図を開く.md",
       "insert_enabled": true,
       "create_enabled": false
     },
     {
-      "template": "_templates/_コマンド/ノードにする.md",
+      "template": "_仕組み/templates/_コマンド/ノードにする.md",
       "insert_enabled": true,
       "create_enabled": false
     },
     {
-      "template": "_templates/_コマンド/保存.md",
+      "template": "_仕組み/templates/_コマンド/保存.md",
       "insert_enabled": true,
       "create_enabled": false
     }
