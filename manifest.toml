@@ -44,6 +44,10 @@ system = [
   "00_README.md",
   "00_*.base",
   "_仕組み/templates/*",
+  # 配る設定(キーと、配ったプラグインの設定)は版ごとに上書きする。
+  # community-plugins.json と app.json は各自のものとして最初だけ置く(要件書 F-46)
+  ".obsidian/hotkeys.json",
+  ".obsidian/plugins/*",
 ]
 seed = [
   "_仕組み/同期レポート.md",
