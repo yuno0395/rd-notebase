@@ -1,6 +1,5 @@
 # チーム設定(全員が同じものを使う。要件書「設定ファイル」)
 id_epoch: 2026-01-01T00:00:00+09:00   # id の時刻の起点
-member_code_length: 3        # 足りなくなったら 4(新しい id だけ)
 keep_in_vault:
   images: [png, jpg, jpeg, gif, webp, svg]
   pdf: true
