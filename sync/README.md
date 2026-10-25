@@ -19,6 +19,7 @@
 | 参加プロジェクトと 共通 のノートを `90_共有/` へ配る(自分が書いたものは配らない) | F-10・11 |
 | 前回の内容と見比べ、両方変わっていたら上書きせず競合ファイルを置く | F-14・15 |
 | 前回の記録が消えても、上書きせずに作り直す | F-34 |
+| Obsidian の「今すぐ共有へ」(Ctrl+Shift+S)を受けて、すぐ1回同期する | F-48 |
 
 まだのもの: Box が作る競合の複製(F-16)、重い添付の移動(F-17〜20)、週報の集約、
 共有に直接書かれたノートの拾い直し(F-35)、exe 化。テンプレートの配布(F-13)は
@@ -44,7 +45,7 @@ pip install pyyaml
 copy config.example.yaml %APPDATA%\知見同期\config.yaml   (中身を自分用に直す)
 python -m notesync once --dry-run      # 試し運転。_仕組み/同期レポート.md を見る
 python -m notesync once                # 本番を1回
-python -m notesync watch --interval 3  # 常駐(3分ごと)
+python -m notesync watch --interval 3  # 常駐(3分ごと。Obsidian の Ctrl+Shift+S でその場で1回)
 python -m notesync weekly              # 今週の週報(ブラウザで開く HTML)を今すぐ作り直す
 python -m notesync weekly --hide 同じノード,機密   # 今回だけ節を外す(--only で載せる節だけにもできる)
 ```

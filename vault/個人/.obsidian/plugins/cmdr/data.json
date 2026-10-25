@@ -71,6 +71,20 @@
       "icon": "network",
       "name": "K-Plex で見る(Ctrl+G)",
       "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/今すぐ共有へ.md",
+      "icon": "send",
+      "name": "今すぐ共有へ(Ctrl+Shift+S)",
+      "mode": "desktop"
+    }
+  ],
+  "pageHeader": [
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/今すぐ共有へ.md",
+      "icon": "send",
+      "name": "今すぐ共有へ(Ctrl+Shift+S)",
+      "mode": "desktop"
     }
   ]
 }
