@@ -51,6 +51,16 @@ python -m notesync weekly              # 今週の週報(ブラウザで開く H
 python -m notesync weekly --hide 同じノード,機密   # 今回だけ節を外す(--only で載せる節だけにもできる)
 ```
 
+Windows では、コマンドの代わりに `起動\` の bat をダブルクリックしても動きます(pip install -e は不要。手順はマニュアル 05 の 7・8)。
+
+| bat | 中身 |
+| --- | --- |
+| `0_準備.bat` | pyyaml を入れ、`%APPDATA%\知見同期\config.yaml` がなければひな形を置いてメモ帳で開く |
+| `1_試し運転.bat` | `once --dry-run` |
+| `2_1回同期.bat` | `once`(config.yaml が `dry_run: true` なら試し運転のまま) |
+| `3_同期を続ける.bat` | `watch --interval 3`。画面を閉じると止まり、Ctrl+Shift+S も効かなくなる |
+| `4_週報を作る.bat` | `weekly` |
+
 重い添付(画像・PDF・20MB 未満の動画以外)は `shared_data` の 開発データ/ へ移し、リンクを書き換えます。
 priority・previous・generation を自動で書き、期限や状態の変わった日を共有の `_仕組み/記録/ノート履歴/<名前>.csv` に残します。
 毎週月曜、`report` を書いた PC ならどれでも、最初に同期した1台が週報(ブラウザで開く HTML 1つと 週報の一覧.html)を作ります。今週の分がもうあれば作りません。
