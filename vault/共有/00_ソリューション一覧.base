@@ -1,0 +1,53 @@
+filters:
+  and:
+    - '!file.inFolder("_仕組み/templates")'
+    - or:
+        - type == "ソリューション"
+        - type == "設計記録"
+formulas:
+  # この候補を脅かすイシュー(parent などでこの候補にリンクしているイシュー)のうち、まだ対策が終わっていないもの。
+  # 少ないほど磨けている候補。同期プログラムがなくても数える。
+  open: 'file.backlinks.filter(value.asFile().properties.type == "イシュー" && (value.asFile().properties.status == "未対応" || value.asFile().properties.status == "対策中")).length'
+  # そのうち impact 大(方針・絞込・出荷)
+  open_big: 'file.backlinks.filter(value.asFile().properties.type == "イシュー" && (value.asFile().properties.status == "未対応" || value.asFile().properties.status == "対策中") && (value.asFile().properties.impact == "方針" || value.asFile().properties.impact == "絞込" || value.asFile().properties.impact == "出荷")).length'
+properties:
+  formula.open:
+    displayName: 残りのイシュー
+  formula.open_big:
+    displayName: うち impact 大
+views:
+  - type: table
+    name: 候補の一組(仮説・目的ごと)
+    filters:
+      and:
+        - status != "不採用"
+    groupBy:
+      property: parent
+      direction: ASC
+    order:
+      - file.name
+      - status
+      - formula.open_big
+      - formula.open
+      - drawing_no
+      - author
+    sort:
+      - property: status
+        direction: ASC
+      - property: formula.open_big
+        direction: ASC
+      - property: formula.open
+        direction: ASC
+  - type: table
+    name: すべて(不採用も)
+    groupBy:
+      property: parent
+      direction: ASC
+    order:
+      - file.name
+      - status
+      - formula.open_big
+      - formula.open
+      - drawing_no
+      - parent
+      - author

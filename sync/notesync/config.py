@@ -7,13 +7,17 @@ from __future__ import annotations
 
 import csv
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
+from . import ids
+
 MEMBER_CSV = Path("_仕組み/tools") / "同期プログラム" / "メンバー.csv"
-MY_YAML = Path("_仕組み/記録") / "私.yaml"
+MY_SETTINGS = Path("_仕組み") / "個人設定.md"   # 名前と6桁の番号(Yu 2026-10-25)
+MY_YAML = Path("_仕組み/記録") / "私.yaml"       # v0.38 までの形。個人設定.md がなければ読む
 
 
 class ConfigError(Exception):
@@ -25,6 +29,8 @@ class Config:
     member: str
     personal: Path
     shared: Path | None = None
+    shared_data: Path | None = None  # 開発データ(重い添付の置き場所。F-17〜20)
+    report_dir: Path | None = None   # 開発ノート_報告(管理者向けの週報。F-29)
     secret: list[Path] = field(default_factory=list)
     dry_run: bool = False
     idle_seconds: int = 10
@@ -54,6 +60,8 @@ def load(path: Path) -> Config:
         member=str(data["member"]),
         personal=Path(data["personal"]),
         shared=Path(data["shared"]) if data.get("shared") else None,
+        shared_data=Path(data["shared_data"]) if data.get("shared_data") else None,
+        report_dir=Path(data["report"]) if data.get("report") else None,
         secret=[Path(p) for p in (data.get("secret") or [])],
         dry_run=bool(data.get("dry_run", False)),
         idle_seconds=int(data.get("idle_seconds", 10)),
@@ -65,6 +73,7 @@ def load(path: Path) -> Config:
 
 
 def read_members(shared: Path) -> dict[str, str]:
+    """メンバー.csv の 名前 → 人の記号。2列目が6桁の番号なら36進数の4文字に、古い3文字の記号はそのまま。"""
     path = shared / MEMBER_CSV
     if not path.exists():
         return {}
@@ -73,11 +82,30 @@ def read_members(shared: Path) -> dict[str, str]:
     out = {}
     for row in rows[1:]:
         if len(row) >= 2 and row[0].strip() and row[1].strip():
-            out[row[0].strip()] = row[1].strip().upper()
+            try:
+                out[row[0].strip()] = ids.code_of(row[1])
+            except ValueError as e:
+                raise ConfigError(f"メンバー.csv の {row[0].strip()} の番号: {e}") from e
     return out
 
 
+def _field(text: str, key: str) -> str:
+    """属性欄の1行を文字のまま読む(YAML に読ませると 012345 が数になり先頭の0が消えるため)。"""
+    m = re.search(rf"^{key}:[ \t]*[\"']?([^\"'#\r\n]*?)[\"']?[ \t]*(?:#.*)?$", text, re.M)
+    return m.group(1).strip() if m else ""
+
+
 def read_my_code(personal: Path) -> tuple[str, str]:
+    """個人 vault の自分の名前と人の記号。個人設定.md の number(6桁)を36進数にする。"""
+    path = personal / MY_SETTINGS
+    if path.exists():
+        text = path.read_text(encoding="utf-8")
+        number = _field(text, "number")
+        try:
+            code = ids.code_from_number(number) if number else ""
+        except ValueError as e:
+            raise ConfigError(f"個人設定.md の number は6桁の数字にしてください(今は {number!r})") from e
+        return _field(text, "name"), code
     path = personal / MY_YAML
     if not path.exists():
         return "", ""
@@ -86,19 +114,19 @@ def read_my_code(personal: Path) -> tuple[str, str]:
 
 
 def member_code(cfg: Config) -> str:
-    """人の記号を決める。私.yaml と メンバー.csv が食い違えば止める(F-44)。"""
+    """人の記号を決める。個人設定.md と メンバー.csv が食い違えば止める(F-44)。"""
     name, mine = read_my_code(cfg.personal)
     members = read_members(cfg.shared) if cfg.shared else {}
     listed = members.get(cfg.member, "")
     if mine and listed and mine != listed:
         raise ConfigError(
-            f"人の記号が食い違っています: 私.yaml は {mine}、メンバー.csv の {cfg.member} は {listed}"
+            f"人の記号が食い違っています: 個人設定.md は {mine}、メンバー.csv の {cfg.member} は {listed}"
         )
     if name and name != cfg.member:
-        raise ConfigError(f"私.yaml の name({name})が個人設定の member({cfg.member})と違います")
+        raise ConfigError(f"個人設定.md の name({name})が個人設定の member({cfg.member})と違います")
     code = mine or listed
     if not code:
-        raise ConfigError("人の記号がありません。_仕組み/記録/私.yaml の code か メンバー.csv に書いてください")
+        raise ConfigError("人の記号がありません。個人 vault の _仕組み/個人設定.md に number(6桁の数字)を書いてください")
     dup = [n for n, c in members.items() if c == code and n != cfg.member]
     if dup:
         raise ConfigError(f"人の記号 {code} が {', '.join(dup)} と重なっています")

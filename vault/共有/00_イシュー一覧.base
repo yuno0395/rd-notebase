@@ -2,6 +2,17 @@ filters:
   and:
     - '!file.inFolder("_仕組み/templates")'
     - type == "イシュー"
+formulas:
+  # 仕様書「priority の決め方」の表。同期プログラムがまだ priority を書いていなくても並ぶ。
+  # 同期プログラムが lead_weeks で priority 1 に上げたものは 1 のまま。
+  prio: 'if(priority == 1, 1, if(impact == "方針" || impact == "絞込", if(speed == "時間がかかる", 2, 1), if(impact == "出荷", if(speed == "時間がかかる", 3, 2), if(impact == "中", if(speed == "時間がかかる", 4, 3), if(impact == "小", 4, 2)))))'
+  # 解像度の段階。番号つきで、段階の順に並ぶ。書いていなければ未把握(仕様書「解像度の段階」)
+  res: 'if(resolution == "原理", "3 原理", if(resolution == "設計空間", "2 設計空間", if(resolution == "現象", "1 現象", "0 未把握")))'
+properties:
+  formula.prio:
+    displayName: priority
+  formula.res:
+    displayName: resolution
 views:
   - type: table
     name: priority 順
@@ -11,14 +22,14 @@ views:
         - status != "中止"
     order:
       - file.name
-      - priority
+      - formula.prio
       - impact
       - speed
       - status
-      - resolution
+      - formula.res
       - project
     sort:
-      - property: priority
+      - property: formula.prio
         direction: ASC
   - type: table
     name: impact 未判定(金曜の定例で直す)
@@ -31,10 +42,47 @@ views:
       - status
       - project
   - type: table
+    name: DR 用(impact 大を段階ごとに)
+    filters:
+      and:
+        - impact == "方針" || impact == "絞込" || impact == "出荷"
+        - status != "中止"
+    groupBy:
+      property: formula.res
+      direction: ASC
+    order:
+      - file.name
+      - formula.res
+      - impact
+      - status
+      - friend
+      - project
+    sort:
+      - property: formula.prio
+        direction: ASC
+  - type: table
+    name: 台帳用
+    # プロジェクトの台帳に埋め込んで使う。this は埋め込んだ台帳(ファイル名の id を外した名前で project を絞る)
+    filters:
+      and:
+        - 'list(project).contains(this.file.basename.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, ""))'
+        - status != "解消"
+        - status != "中止"
+    order:
+      - file.name
+      - formula.prio
+      - impact
+      - status
+      - formula.res
+      - parent
+    sort:
+      - property: formula.prio
+        direction: ASC
+  - type: table
     name: すべて
     order:
       - file.name
-      - priority
+      - formula.prio
       - impact
       - status
       - resolution

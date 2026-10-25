@@ -44,8 +44,14 @@ pip install pyyaml
 copy config.example.yaml %APPDATA%\知見同期\config.yaml   (中身を自分用に直す)
 python -m notesync once --dry-run      # 試し運転。_仕組み/同期レポート.md を見る
 python -m notesync once                # 本番を1回
-python -m notesync watch --interval 3  # 常駐(3秒ごと)
+python -m notesync watch --interval 3  # 常駐(3分ごと)
+python -m notesync weekly              # 今週の週報(ブラウザで開く HTML)を今すぐ作り直す
+python -m notesync weekly --hide 同じノード,機密   # 今回だけ節を外す(--only で載せる節だけにもできる)
 ```
+
+重い添付(画像・PDF・20MB 未満の動画以外)は `shared_data` の 開発データ/ へ移し、リンクを書き換えます。
+priority・previous・generation を自動で書き、期限や状態の変わった日を共有の `_仕組み/記録/ノート履歴/<名前>.csv` に残します。
+毎週月曜、チーム設定の `report_runner` の PC が `report` に週報(Markdown と Excel)を作ります。
 
 編集中のノート(最後の保存から `idle_seconds` 秒以内)には触りません。
 `00_日誌/デイリー` などの日付ノート、`_仕組み/templates` などの仕組みのフォルダ、配られた `90_共有` は対象外です。

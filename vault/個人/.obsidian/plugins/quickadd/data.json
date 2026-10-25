@@ -73,11 +73,77 @@
           }
         },
         {
+          "id": "a4dd911f-4000-5815-bbea-f6d6a1d669a0",
+          "name": "ソリューション",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/ソリューション.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [
+              "01_目的"
+            ],
+            "chooseWhenCreatingNote": false,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
           "id": "3bc49e50-fd6c-5a0e-830d-ae2702e4a9a1",
           "name": "ノード",
           "type": "Template",
           "command": false,
           "templatePath": "_仕組み/templates/ノード.md",
+          "fileNameFormat": {
+            "enabled": false,
+            "format": ""
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [
+              "02_ノード"
+            ],
+            "chooseWhenCreatingNote": false,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
+          "id": "53ab7d8e-fe87-5e0a-b52a-4a4a806024cb",
+          "name": "機密の窓口",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/機密の窓口.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -205,11 +271,11 @@
           }
         },
         {
-          "id": "d41bbe39-7ebd-52e7-a455-51ba53a906a0",
-          "name": "実験・試作記録",
+          "id": "b763a643-b424-5198-9a7a-1fa4a393bf70",
+          "name": "DR 議事録",
           "type": "Template",
           "command": false,
-          "templatePath": "_仕組み/templates/実験・試作記録.md",
+          "templatePath": "_仕組み/templates/DR議事録.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -238,11 +304,11 @@
           }
         },
         {
-          "id": "a4dd911f-4000-5815-bbea-f6d6a1d669a0",
-          "name": "設計記録",
+          "id": "d41bbe39-7ebd-52e7-a455-51ba53a906a0",
+          "name": "実験・試作記録",
           "type": "Template",
           "command": false,
-          "templatePath": "_仕組み/templates/設計記録.md",
+          "templatePath": "_仕組み/templates/実験・試作記録.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -306,6 +372,26 @@
       ],
       "collapsed": false,
       "placeholder": "種類を選ぶ"
+    },
+    {
+      "id": "dee6ab7d-6a6e-5dc3-8f4b-6698ebf395fb",
+      "name": "K-Plex の中心から作る",
+      "type": "Macro",
+      "command": true,
+      "runOnStartup": false,
+      "macro": {
+        "id": "75043f4c-af90-5570-877e-e55cb4f97313",
+        "name": "K-Plex の中心から作る",
+        "commands": [
+          {
+            "name": "K-Plexの中心から作る",
+            "type": "UserScript",
+            "id": "fbd3aae5-5c2e-5bfd-b5b7-b8babf022d60",
+            "path": "_仕組み/templates/_quickadd/K-Plexの中心から作る.js",
+            "settings": {}
+          }
+        ]
+      }
     }
   ],
   "inputPrompt": "single-line",

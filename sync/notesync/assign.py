@@ -48,12 +48,14 @@ def valid_id(text: str | None) -> bool:
 
 
 def assign_ids(v: Vault, member: str, code: str, used: set[str], report: Report,
-               backup: Backup, dry_run: bool, now: float, idle_seconds: int) -> dict[str, str]:
-    """id のないノートに id をつける。戻り値は {古いファイル名: 新しいファイル名}。"""
+               backup: Backup, dry_run: bool, now: float, idle_seconds: int,
+               fresh: set[str] = frozenset()) -> dict[str, str]:
+    """id のないノートに id をつける。戻り値は {古いファイル名: 新しいファイル名}。
+    fresh(F-28: 作ったばかりでテンプレートのままのノートの id)には author も書かない。"""
     renamed: dict[str, str] = {}
     for n in notes(v.root):
         if not needs_id(n):
-            if has_id_without_author(n):
+            if has_id_without_author(n) and (n.file_id or "").upper() not in fresh:
                 fill_author(v, n, member, report, backup, dry_run, now, idle_seconds)
             continue
         if idle_seconds > 0 and now - n.path.stat().st_mtime < idle_seconds:

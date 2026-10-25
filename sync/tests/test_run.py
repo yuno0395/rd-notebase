@@ -113,3 +113,16 @@ def test_report_is_not_rewritten_on_second_run(cfg):
     run_once(cfg)
     r2 = run_once(cfg)
     assert not any("00_同期レポート" in t for t in r2.todos + r2.records)
+
+
+def test_member_code_from_personal_settings(cfg):
+    # 個人設定.md の6桁の番号を36進数にする。私.yaml より先に読む。先頭の0も残す
+    (cfg.personal / "_仕組み/個人設定.md").write_text(
+        '---\nname: "Yu"   # 名前\nnumber: "000001"   # 6桁\n---\n# 個人設定\n', encoding="utf-8")
+    members = cfg.shared / config.MEMBER_CSV
+    members.write_text("名前,番号,使い始めた日\nYu,000001,2026-10-25\n佐藤,229999,2026-10-25\n", encoding="utf-8")
+    assert config.member_code(cfg) == "0001"
+    assert config.read_members(cfg.shared)["佐藤"] == "4XGV"
+    (cfg.personal / "_仕組み/個人設定.md").write_text("---\nnumber: 12345\n---\n", encoding="utf-8")
+    with pytest.raises(config.ConfigError, match="6桁"):
+        config.member_code(cfg)
