@@ -4,8 +4,9 @@
 // 人の記号は、各自が決めた6桁の数字を36進数(0〜9・A〜Z)にした4文字(229999 → 4XGV。Yu 2026-10-25)。
 // 次の順に探す。
 //   1. 個人 vault: _仕組み/個人設定.md の number(古い vault は _仕組み/記録/私.yaml の code)
-//   2. 共有・機密 vault: 設定フォルダ名 .obsidian-<番号>(例 .obsidian-229999)の6桁の番号を36進数に
-//      (名前ではなく番号で見分ける。Yu 2026-10-26)
+//   2. 共有・機密 vault: 設定フォルダ名 .obsidian-<番号>_<PCの記号>(例 .obsidian-229999_aa11234567)の
+//      先頭の6桁の番号を36進数に(名前ではなく番号で見分ける。1人が複数の PC を使うので、
+//      PC ごとに設定フォルダを分ける。Yu 2026-10-26)。_<PCの記号> のない .obsidian-229999 も読む
 //   3. v0.49 までの .obsidian-<名前> は、その名前を
 //      _仕組み/tools/同期プログラム/メンバー.csv(機密は _仕組み/tools/メンバー.csv)で引く
 //      (2列目が6桁の数字なら36進数に、古い3文字の記号ならそのまま)
@@ -65,11 +66,12 @@ async function memberCode(app) {
     const m = (await fs.read(OLD_MY_YAML)).match(/^code:\s*["']?([0-9A-Za-z]+)/m);
     if (m) return m[1].toUpperCase();
   }
-  const dir = app.vault.configDir; // 例: .obsidian-229999
+  const dir = app.vault.configDir; // 例: .obsidian-229999_aa11234567
   const name = dir.startsWith(".obsidian-") ? dir.slice(".obsidian-".length) : "";
-  if (/^\d+$/.test(name)) {
-    const code = codeFromNumber(name);
-    if (!code) throw new Error(`設定フォルダ ${dir} の番号は6桁の数字にしてください(例: .obsidian-229999)`);
+  const num = name.match(/^(\d+)(?:_|$)/);
+  if (num) {
+    const code = codeFromNumber(num[1]);
+    if (!code) throw new Error(`設定フォルダ ${dir} の番号は6桁の数字にしてください(例: .obsidian-229999_aa11234567)`);
     return code;
   }
   if (name) {
@@ -85,14 +87,14 @@ async function memberCode(app) {
   if (!name) {
     throw new Error(
       `人の記号が見つかりません。いまの設定フォルダは ${dir} です。` +
-      "共有・機密 vault は、設定 → ファイルとリンク →「設定フォルダを上書き」を .obsidian-<自分の6桁の番号>(例: .obsidian-229999)にして開き直してください。" +
+      "共有・機密 vault は、設定 → ファイルとリンク →「設定フォルダを上書き」を .obsidian-<自分の6桁の番号>_<PCの記号>(例: .obsidian-229999_aa11234567)にして開き直してください。" +
       "個人 vault なら _仕組み/個人設定.md に number(6桁の数字)を書いてください。"
     );
   }
   throw new Error(
     `人の記号が見つかりません。設定フォルダ ${dir} の名前「${name}」が、` +
     "メンバー.csv(_仕組み/tools/同期プログラム/メンバー.csv)にありません。" +
-    "設定フォルダを .obsidian-<自分の6桁の番号>(例: .obsidian-229999)にして開き直してください。"
+    "設定フォルダを .obsidian-<自分の6桁の番号>_<PCの記号>(例: .obsidian-229999_aa11234567)にして開き直してください。"
   );
 }
 
