@@ -33,9 +33,9 @@ def box(tmp_path):
     shared = root / "共有"
     write(shared / "_仕組み/tools/同期プログラム/メンバー.csv", "名前,記号,使い始めた日\nYu,001,2026-10-24\n")
     write(shared / f"{PJ}/0RA00A001_{PJ}.md",
-          "---\nid: 0RA00A001\ntype: プロジェクト\nmembers: [Yu]\nmilestones:\n"
-          "  - {name: DR1, plan: 2026-11-07, forecast: 2026-11-14}\n"
-          "  - {name: 量産開始, plan: 2027-04-01, forecast: 2027-04-01}\n---\n")
+          "---\nid: 0RA00A001\ntype: プロジェクト\nmembers: [Yu]\n---\n"
+          "## 期間・主な節目\n節目ごとに1行\n| 節目 | 計画日 | 見込み日 |\n| --- | --- | --- |\n"
+          "| DR1 | 2026-11-07 | 2026-11-14 |\n| 量産開始 | 2027-04-01 | 2027-04-01 |\n")
     yu = root / "個人_Yu"
     write(yu / "_仕組み/記録/私.yaml", 'name: Yu\ncode: "001"\n')
     c = Config(member="Yu", personal=yu, shared=shared, backup_dir=tmp_path / "backup",
@@ -91,6 +91,16 @@ def test_lead_weeks_uses_named_milestone(box):
     run_once(box, now=NOW)
     assert "priority: 1" in text(p)
     assert "期限から逆算して priority 1 にした" in report(box)
+
+
+def test_lead_weeks_reads_old_milestones_property(box):
+    # v0.48 までの属性 milestones: [{name, plan, forecast}] も読み続ける
+    write(box.shared / f"{PJ}/0RA00A001_{PJ}.md",
+          "---\nid: 0RA00A001\ntype: プロジェクト\nmembers: [Yu]\nmilestones:\n"
+          "  - {name: DR1, plan: 2026-11-07, forecast: 2026-11-14}\n---\n")
+    p = issue(box.personal, "0RB001001", "認証", "impact: 出荷\nspeed: 時間がかかる\nlead_weeks: 4\n")
+    run_once(box, now=NOW)
+    assert "priority: 1" in text(p)
 
 
 def test_previous_and_generation(box):
