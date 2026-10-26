@@ -196,6 +196,42 @@ def to_date(value) -> date | None:
         return None
 
 
+MILESTONE_SECTION = "期間・主な節目"
+
+
+def milestones(proj: Doc) -> list[tuple[str, date | None, date | None]]:
+    """プロジェクトの節目 (名前, 計画日, 見込み日)。
+
+    本文「## 期間・主な節目」の表(| 節目 | 計画日 | 見込み日 |)を読む。
+    v0.48 までの属性 milestones: [{name, plan, forecast}] も読み続ける
+    (Obsidian のプロパティ欄が入れ子を扱えず赤くなるため本文の表に移した。Yu 2026-10-26)。
+    """
+    out: list[tuple[str, date | None, date | None]] = []
+    _, body = frontmatter.split(proj.text)
+    inside = False
+    for line in body.splitlines():
+        m = re.match(r"^(#{1,6})\s+(.*?)\s*$", line)
+        if m:
+            inside = m.group(2) == MILESTONE_SECTION
+            continue
+        if not inside or not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not cells or not cells[0] or set(cells[0]) <= set("-: ") or cells[0] == "節目":
+            continue
+        cells += [""] * 3
+        out.append((plain(cells[0]), to_date(cells[1]), to_date(cells[2])))
+    if out:
+        return out
+    stones = proj.fm.get("milestones") or []
+    if isinstance(stones, list):
+        for s in stones:
+            if isinstance(s, dict):
+                out.append((str(s.get("name") or "").strip(), to_date(s.get("plan")),
+                            to_date(s.get("forecast"))))
+    return out
+
+
 def deadline(issue: Doc, projects: dict[str, Doc], today: date) -> tuple[date, str] | None:
     """lead_weeks の締め切り: イシューの milestone、なければプロジェクトの次のマイルストーンの見込み日。"""
     wanted = plain(str(issue.fm.get("milestone") or "")).strip()
@@ -204,16 +240,10 @@ def deadline(issue: Doc, projects: dict[str, Doc], today: date) -> tuple[date, s
         proj = projects.get(p)
         if not proj:
             continue
-        stones = proj.fm.get("milestones") or []
-        if not isinstance(stones, list):
-            continue
-        for s in stones:
-            if not isinstance(s, dict):
-                continue
-            d = to_date(s.get("forecast") or s.get("plan"))
+        for name, plan, forecast in milestones(proj):
+            d = forecast or plan
             if not d:
                 continue
-            name = str(s.get("name") or "").strip()
             if wanted:
                 if name == wanted:
                     found.append((d, f"{p} の {name}"))

@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 
 from . import ids
-from .autofill import Doc, Index, as_list, load_docs, plain, targets, to_date
+from .autofill import Doc, Index, as_list, load_docs, milestones, plain, targets, to_date
 from .history import HISTORY_DIR, done_date, extensions, read_rows
 from .report import Report
 
@@ -313,12 +313,9 @@ class Builder:
 
     def milestones(self, proj: Doc) -> list[list[str]]:
         rows = []
-        for m in proj.fm.get("milestones") or []:
-            if not isinstance(m, dict):
-                continue
-            plan, fc = to_date(m.get("plan")), to_date(m.get("forecast"))
+        for name, plan, fc in milestones(proj):
             diff = f"{(fc - plan).days:+d} 日" if plan and fc else ""
-            rows.append([str(m.get("name") or ""), plan.isoformat() if plan else "",
+            rows.append([name, plan.isoformat() if plan else "",
                          fc.isoformat() if fc else "", diff])
         return rows
 
