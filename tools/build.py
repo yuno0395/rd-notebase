@@ -1,7 +1,8 @@
 """配布物を組み立てる(仕様書「仕組みの正本と配布」)。
 
 使い方:  python tools/build.py 0.1.0
-できるもの: dist/0.1.0/{共有,個人,機密}/ と dist/0.1.0/manifest.toml
+できるもの: dist/0.1.0/{共有,個人,機密}/ と dist/0.1.0/manifest.toml、plugins.py・プラグインを入れる.bat
+続けて python tools/plugins.py pack 0.1.0 --from <プラグインが入った設定フォルダ> で dist/0.1.0/プラグイン/ をそろえる。
 これを Box の共有 _仕組み/tools/配布/0.1.0/ に置く。
 
 Python 3.11 以上。標準ライブラリだけを使う。
@@ -66,6 +67,9 @@ def main() -> int:
                 counts[k] += 1
         print(f"{v['name']}: 仕組み {counts['system']} / 最初だけ {counts['seed']}")
     shutil.copy2(ROOT / "manifest.toml", out / "manifest.toml")
+    # プラグインを入れる道具(本体は tools/plugins.py pack で dist/<版>/プラグイン/ にそろえる)
+    for f in ("plugins.py", "プラグインを入れる.bat"):
+        shutil.copy2(ROOT / "tools" / f, out / f)
     for e in errors:
         print("エラー:", e)
     return 1 if errors else 0
