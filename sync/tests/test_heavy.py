@@ -168,9 +168,14 @@ def test_recover_shared(box, capsys):
           "---\nid: 0RB009002\nauthor: 佐藤\ntype: イシュー\n---\n![[_仕組み/attachments/0RB009002/測定.csv]]\n")
     write(shared / "_仕組み/attachments/0RB009002/測定.csv", "a,b\n")
     write(shared / "共通/02_ノード/参考メモ.md", "---\ntype: ノード\n---\n")
+    # 配布物のマニュアルは id をつけず、リンクも書き換えない
+    manual = "# 初期設定\n[[02_チームメンバー_普段の仕事]] と [[参考メモ]]\n"
+    write(shared / "00_マニュアル/01_チームメンバー_初期設定.md", manual)
+    write(shared / "00_マニュアル/02_チームメンバー_普段の仕事.md", "# 普段の仕事\n")
     run_once(yu, now=NOW)
     r = report(yu)
     assert "拾い直し: 共有 vault に id のないノートが 2 件あります" in r
+    assert "00_マニュアル" not in r
     assert "拾い直し: 共有 vault の _仕組み/attachments/ に重い添付が 1 件あります" in r
     cfg_path = write(yu.personal.parent / "config.yaml", yaml.safe_dump({
         "member": "Yu", "personal": str(yu.personal), "shared": str(shared), "shared_data": str(data),
@@ -185,5 +190,7 @@ def test_recover_shared(box, capsys):
     assert not (shared / "_仕組み/attachments/0RB009002/測定.csv").exists()
     old = (shared / f"{PJ}/03_イシュー/0RB009002_古い.md").read_text(encoding="utf-8")
     assert f"[測定.csv](開発データ/{PJ}/0RB009002/測定.csv)" in old
+    assert (shared / "00_マニュアル/01_チームメンバー_初期設定.md").read_text(encoding="utf-8") == manual
+    assert (shared / "00_マニュアル/02_チームメンバー_普段の仕事.md").exists()
     run_once(yu, now=NOW + 60)
     assert "拾い直し" not in report(yu)
