@@ -72,3 +72,30 @@ def test_short_link_to_own_folder_becomes_full_path(tmp_path):
     body = (v / f"03_イシュー/{nid}_ヒケ.md").read_text(encoding="utf-8")
     assert f"[図面](_仕組み/attachments/{nid}/図面.pdf)" in body
     assert f"![[_仕組み/attachments/{nid}/図面.pdf]]" in body
+
+
+def test_diary_attachment_moves_to_date_folder(tmp_path):
+    """日誌には id がないので、ファイル名(日付)のフォルダ 日誌/<日付>/ へ移す。"""
+    c, v = setup(tmp_path)
+    write(v / "_仕組み/attachments/成形品.jpg", b"jpg")
+    write(v / "_仕組み/attachments/まとめ.pdf", b"pdf")
+    write(v / "00_日誌/デイリー/2026-10-24.md", "# 2026-10-24\n![[成形品.jpg]]\n")
+    write(v / "00_日誌/週報/2026-W43.md", "![資料](_仕組み/attachments/まとめ.pdf)\n")
+    run_once(c, dry_run=False, now=NOW)
+    day = v / "_仕組み/attachments/日誌/2026-10-24"
+    assert (day / "成形品.jpg").read_bytes() == b"jpg"
+    assert (v / "_仕組み/attachments/日誌/2026-W43/まとめ.pdf").exists()
+    assert not (v / "_仕組み/attachments/成形品.jpg").exists()
+    # 日誌のファイル名は変えない(id をつけない)
+    daily = v / "00_日誌/デイリー/2026-10-24.md"
+    assert "![[_仕組み/attachments/日誌/2026-10-24/成形品.jpg]]" in daily.read_text(encoding="utf-8")
+    weekly = v / "00_日誌/週報/2026-W43.md"
+    assert "![資料](_仕組み/attachments/日誌/2026-W43/まとめ.pdf)" in weekly.read_text(encoding="utf-8")
+
+
+def test_inbox_attachment_stays(tmp_path):
+    c, v = setup(tmp_path)
+    write(v / "_仕組み/attachments/成形品.jpg", b"jpg")
+    write(v / "00_inbox/メモ.md", "![[成形品.jpg]]\n")
+    run_once(c, dry_run=False, now=NOW)
+    assert (v / "_仕組み/attachments/成形品.jpg").exists()
