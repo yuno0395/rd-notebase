@@ -13,7 +13,8 @@ from . import frontmatter, ids
 SYSTEM_DIR = "_仕組み"
 SKIP_DIRS = {SYSTEM_DIR, ".trash"}
 # id をつけないフォルダ(デイリー・週報・inbox。仕様書「id をつけないもの」)
-NO_ID_DIRS = {"00_日誌", "00_inbox", "00_週報", "90_共有", "99_archive"}
+GUIDE_DIRS = {"00_マニュアル"}  # 配布物の案内(仕組みの正本で上書きされる)。id をつけず、書き換えない
+NO_ID_DIRS = {"00_日誌", "00_inbox", "00_週報", "90_共有", "99_archive"} | GUIDE_DIRS
 
 
 @dataclass

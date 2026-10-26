@@ -12,10 +12,10 @@ from pathlib import Path
 from . import frontmatter, ids
 from .report import Report
 from .safety import Backup
-from .vault import NO_ID_DIRS, Note, is_root_doc, iter_md, needs_id, notes, read, write
+from .vault import GUIDE_DIRS, NO_ID_DIRS, Note, is_root_doc, iter_md, needs_id, notes, read, write
 
 LINK = re.compile(r"\[\[([^\[\]|#^\n]+)(\|[^\[\]\n]*)?\]\]")
-NO_LINK_FIX_DIRS = {"90_共有"}  # 他の人のノートの写しは書き換えない
+NO_LINK_FIX_DIRS = {"90_共有"} | GUIDE_DIRS  # 他の人のノートの写しと、配布物の案内は書き換えない
 
 
 @dataclass
