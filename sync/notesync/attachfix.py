@@ -5,7 +5,9 @@
   `_仕組み/attachments/<id>/` へ移し、リンクを直す。ほかのノートも指していれば動かさず知らせる。
 - `_仕組み/attachments/<id>/` の添付へのリンクが vault の一番上からのパスでなければ
   (`![[成形品.jpg]]` など)、`_仕組み/attachments/<id>/成形品.jpg` の形に直す。
-- 書いている途中のノートは触らない。デイリーノートなど id を持たないノートの添付は動かさない。
+- 日誌(00_日誌/ のデイリー・週報)には id がないので、ファイル名(日付)のフォルダ
+  `_仕組み/attachments/日誌/<ファイル名>/` を使う(例 `日誌/2026-10-26/`、`日誌/2026-W43/`)。
+- 書いている途中のノートは触らない。inbox など、id も日誌のフォルダもないノートの添付は動かさない。
 """
 
 from __future__ import annotations
@@ -23,6 +25,8 @@ from .state import digest
 from .vault import box_copy_of, iter_md, read, write
 
 SKIP_TOPS = {"90_共有"}  # 他の人のノートの写しは書き換えない
+DIARY_TOP = "00_日誌"
+DIARY_DIR = "日誌"  # _仕組み/attachments/日誌/<ファイル名>/
 
 
 def clean(target: str) -> str:
@@ -73,13 +77,17 @@ class Fixer:
         return self.idle_seconds > 0 and self.now - p.stat().st_mtime < self.idle_seconds
 
     def notes(self) -> list[tuple[Path, str, str | None]]:
-        """(パス, 相対パス, id)。試し運転では振るはずの id を使う。"""
+        """(パス, 相対パス, 添付のフォルダ名)。フォルダ名は id、日誌なら 日誌/<ファイル名>、どちらもなければ None。
+        試し運転では振るはずの id を使う。"""
         out = []
         for p, rel in iter_md(self.root):
             if rel.parts[0] in SKIP_TOPS:
                 continue
             stem = self.renamed.get(p.stem, p.stem)
-            out.append((p, rel.as_posix(), ids.split_filename(stem)[0]))
+            folder = ids.split_filename(stem)[0]
+            if not folder and rel.parts[0] == DIARY_TOP:
+                folder = f"{DIARY_DIR}/{p.stem}"
+            out.append((p, rel.as_posix(), folder))
         return out
 
     def links(self, text: str):
@@ -144,7 +152,7 @@ class Fixer:
                                  f"({'、'.join(sorted(rels))})。どのノートのものか決めて移してください")
                 continue
             if not with_id:
-                continue  # デイリーノートなど id のないノートの添付
+                continue  # inbox など、置き場の決まらないノートの添付
             p, note_id = owner[with_id[0]]
             if self.busy(p) or self.busy(f):
                 continue
