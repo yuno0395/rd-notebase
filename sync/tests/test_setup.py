@@ -180,7 +180,7 @@ def test_new_version_and_backups(team, monkeypatch):
     aenv = team["admin_env"]
     personal = box / "個人" / "開発ノート_Yu"
     readme = personal / "00_README.md"
-    readme.write_text("自分で書き換えた README\n", encoding="utf-8")  # 仕組みのファイルは版で上書きされる
+    readme.write_text("自分で書き換えた README\n", encoding="utf-8", newline="\n")  # 仕組みのファイルは版で上書きされる
     note = personal / "02_ノード" / "0RDGPG001_水.md"
     note.write_text("---\nid: 0RDGPG001\n---\n", encoding="utf-8")
     code, s, ui = run("管理者", aenv, ["1", "9.9.21", "", "n"])  # 新しい版(1回目は上書きがなく控えはない)
