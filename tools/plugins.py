@@ -21,6 +21,7 @@ Python 3.11 以上。標準ライブラリだけを使う。
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import shutil
 import sys
@@ -159,6 +160,13 @@ def pack(version: str, installed: Path | None, out: Path, get=fetch, allow_downl
                     continue
             if lic_text is not None:
                 break
+        if lic_text is None:
+            # ファイル名が上の一覧にないとき(COPYING など)は GitHub にライセンスのファイルを聞く
+            try:
+                info = json.loads(get(f"https://api.github.com/repos/{repo}/license"))
+                lic_text = base64.b64decode(info["content"])
+            except Exception:
+                pass
         kind = license_kind(lic_text.decode("utf-8", "replace")) if lic_text is not None else "要確認"
         if lic_text is not None:
             (dst / "LICENSE").write_bytes(lic_text)

@@ -292,3 +292,13 @@ def test_sync_report_tells_new_version(tmp_path):
     r = Report()
     notice_new_version(personal, shared, r)
     assert not r.todos
+
+
+def test_input_ended_stops(monkeypatch):
+    """答えが流れてこない(EOF)ときは、既定値で同じ質問を繰り返さずに止める。"""
+    def eof(_prompt=""):
+        raise EOFError
+    monkeypatch.setattr("builtins.input", eof)
+    ui = st.UI()
+    with pytest.raises(st.Stop):
+        ui.ask("Box Drive のフォルダ", "C:/nowhere")

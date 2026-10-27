@@ -183,7 +183,8 @@ class UI:
         try:
             return input(prompt)
         except EOFError:
-            return ""
+            # 答えが来ない(画面がない・流し込みが尽きた)まま既定値で進むと、同じ質問を繰り返し続けるので止める
+            raise Stop("答えを読めませんでした(入力が終わっています)。bat をダブルクリックして画面で答えてください。")
 
     def ask(self, q: str, default: str = "") -> str:
         hint = f" [{default}]" if default else ""
