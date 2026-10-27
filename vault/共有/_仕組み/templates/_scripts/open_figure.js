@@ -1,8 +1,9 @@
 // Ctrl+D: 開いているノートの図を開く。なければ作る(仕様書「図とパワーポイント」)。
 // 図は _仕組み/attachments/<id>/fig_<ノートのファイル名>.excalidraw.md(タブで何の図か分かるように。Yu 2026-10-27)。
 // 例 0RDGPG4XGV_保圧を変えて試作する.md → fig_0RDGPG4XGV_保圧を変えて試作する.excalidraw.md
-// 前の名前 図.excalidraw.md の図や、ノートの名前を変える前の fig_ の図もそのまま開く(名前は変えない。
-// 同期プログラムは消したファイルを共有から戻すので、ここで名前を変えると古い図が残るため)。
+// 前の名前 図.excalidraw.md の図や、ノートの名前を変える前の fig_ の図は、開くときにいまの名前へ変える
+// (Obsidian の名前の変更なので、ノートの引用も直る。書き出した SVG・PNG も同じ名前にする)。
+// 同期のあとでも、同期プログラムが共有の古い名前の図を消すので二重にならない(要件書 F-51)。
 // ひな形はノートの種類で選ぶ(なければ 図.excalidraw.md の 16:9 の枠1つ)。
 //   ナレッジ       → ナレッジ図.excalidraw.md(1枚目 実施前・やったこと・実施後、2枚目 トレードオフ曲線)
 //   ソリューション → トレードオフ曲線.excalidraw.md
@@ -44,6 +45,8 @@ async function open_figure(tp) {
   const name = `fig_${note.basename}`;
   const path = `${dir}/${name}.excalidraw.md`;
   let fig = findFigure(app, dir, path, id);
+  // 90_共有/ は他の人のノートの写しなので、名前は変えずに開くだけ(書いた人の側で変わって届く)
+  if (fig && fig.path !== path && !note.path.startsWith("90_共有/")) fig = await renameFigure(app, fig, dir, name);
   if (!fig) {
     let tpl = TEMPLATES[fm?.type];
     if (!tpl || !app.vault.getAbstractFileByPath(tpl)) tpl = FIG_TEMPLATE; // 機密 vault などひな形がないとき
@@ -66,6 +69,21 @@ function findFigure(app, dir, path, id) {
     .sort((a, b) => (b.name.startsWith(`fig_${id}`) - a.name.startsWith(`fig_${id}`)) || a.name.localeCompare(b.name));
   if (figs.length) return figs[0];
   return app.vault.getAbstractFileByPath(`${dir}/図.excalidraw.md`);
+}
+
+// 古い名前の図をいまの名前にする。先に SVG・PNG を変える(Excalidraw が名前をそろえる設定でも重ならない)。
+async function renameFigure(app, fig, dir, name) {
+  const oldBase = fig.path.slice(0, -".excalidraw.md".length);
+  try {
+    for (const ext of [".svg", ".png", ".dark.svg", ".light.svg", ".dark.png", ".light.png"]) {
+      const f = app.vault.getAbstractFileByPath(oldBase + ext);
+      if (f && !app.vault.getAbstractFileByPath(`${dir}/${name}${ext}`)) await app.fileManager.renameFile(f, `${dir}/${name}${ext}`);
+    }
+    await app.fileManager.renameFile(fig, `${dir}/${name}.excalidraw.md`);
+    return app.vault.getAbstractFileByPath(`${dir}/${name}.excalidraw.md`) || fig;
+  } catch (e) {
+    return app.vault.getAbstractFileByPath(fig.path) || fig; // 変えられなくても開く
+  }
 }
 
 // ひな形の枠(id と名前)を並び順に返す。読めなければ1枚目だけ。

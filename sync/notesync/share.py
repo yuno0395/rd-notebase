@@ -8,7 +8,10 @@
 | そのまま | 変わった | 個人へコピー(他の人の書き足し) | 90_共有/ へコピー(再配布)     |
 | 変わった | 変わった | 競合ファイルを置いて知らせる  | 共有に合わせる(元は backup へ)  |
 
-ファイルを消すことはしない。99_archive への移動だけを共有へ反映する(F-09)。
+ノートを消すことはしない。99_archive への移動だけを共有へ反映する(F-09)。
+ノートの名前を変えたときは、id で同じノートと分かるので、もう片方のファイルも同じ名前に移す。
+添付(`_仕組み/attachments/<id>/`)は名前が変わると別のファイルに見えるので、前回同期した添付が片方から
+なくなり、もう片方がそのままなら、もう片方も消す(名前を変えた・消した、とみなす。消す前の中身は backup へ)。
 """
 
 from __future__ import annotations
@@ -184,6 +187,12 @@ class Context:
         if self.data_root and path.name.endswith(".md"):
             return digest_text(to_shared(read(path), self.data_root))
         return digest(path)
+
+    def remove(self, path: Path, root: Path) -> None:
+        if self.dry_run:
+            return
+        self.backup.save(root, path)
+        path.unlink()
 
     def move(self, src: Path, dest: Path) -> None:
         if self.dry_run:
@@ -445,6 +454,31 @@ def sync_attachments(ctx: Context, note_id: str, mode: str) -> None:
         if d.exists():
             rels |= {f.relative_to(d).as_posix() for f in d.rglob("*")
                      if f.is_file() and not box_copy_of(f)[0] and not is_heavy(f, ctx.keep)}
+    # 前回同期した添付が片方からなくなった(名前を変えた・消した)。もう片方がそのままなら消して、二重にしない
+    # フォルダごとないとき(Box がまだ落としていない、などもありうる)は消さない
+    prefix = f"att:{note_id}/"
+    recs = ctx.state.starting(prefix) if pdir.is_dir() and sdir.is_dir() else {}
+    for key, rec in sorted(recs.items()):
+        r = key[len(prefix):]
+        p, s = pdir / r, sdir / r
+        if p.exists() == s.exists():
+            continue
+        if mode == "down" and not p.exists():
+            continue  # 配られた添付を個人で消しても、共有からは消さない(次の同期で戻る)
+        gone_label, left, left_root, side = (("個人", s, ctx.shared, "共有") if s.exists()
+                                             else ("共有", p, ctx.personal, "個人"))
+        rel = f"_仕組み/attachments/{note_id}/{r}"
+        if recent(ctx, left) or is_heavy(left, ctx.keep):
+            continue
+        if ctx.digest(left) != rec.get("h"):
+            ctx.report.todo(f"添付: {rel} が{gone_label}でなくなりましたが、{side}のものは変わっているので残しています")
+            continue
+        ctx.remove(left, left_root)
+        ctx.report.record(f"添付の名前の変更か削除を反映: {side}/{rel} を消しました({gone_label}でなくなったため。元は backup に)")
+        ctx.count("削除")
+        rels.discard(r)
+        if not ctx.dry_run:
+            ctx.state.items.pop(key, None)
     if mode == "down":
         rels = {r for r in rels if (sdir / r).exists()}
     for r in sorted(rels):
@@ -550,7 +584,9 @@ def run_share(ctx: Context) -> None:
             current = rec["s"]
         else:
             # F-08: 同じ id で別のノート(作成者か名前が違う)があれば集めない
-            clash = [o for o in in_shared if different(o, item)]
+            # 前に同期した id なら、共有で名前が変わっていても同じノート(id は変えない)。作成者が違うときだけ止める
+            clash = [o for o in in_shared
+                     if (bool(o.author and item.author and o.author != item.author) if rec else different(o, item))]
             if clash:
                 o = clash[0]
                 ctx.report.warn(

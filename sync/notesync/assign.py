@@ -142,7 +142,21 @@ def fix_links(v: Vault, index: dict[str, set[str]], stems: set[str], report: Rep
     """名前だけのリンク [[水]] を、id つきの [[0RAYFN001_水|水]] に直す。
 
     直すのは、そのファイル名のノートがなく、名前か別名で1つのノートに決まるときだけ。
+    名前を変えたあとの古いリンク [[0RAYFN001_お水|お水]] も、id が同じノートが1つなら
+    いまのファイル名に直す(Obsidian の外や別の PC で名前が変わったとき。id は変えない)。
     """
+    # id → いまのファイル名。この vault にあればそれを使い(共有がまだ古い名前でも迷わない)、なければほかの vault から
+    by_id: dict[str, set[str]] = defaultdict(set)
+    for found in index.values():
+        for stem in found:
+            file_id, _ = ids.split_filename(stem)
+            if file_id:
+                by_id[file_id].add(stem)
+    local: dict[str, set[str]] = defaultdict(set)
+    for n in notes(v.root):
+        if n.file_id:
+            local[n.file_id].add(n.stem)
+    by_id.update(local)
     changed_files = 0
     for path, rel in iter_md(v.root):
         if rel.parts[0] in NO_LINK_FIX_DIRS:
@@ -155,15 +169,23 @@ def fix_links(v: Vault, index: dict[str, set[str]], stems: set[str], report: Rep
             target = m.group(1).strip()
             alias = m.group(2)
             key = target.lower()
-            if "/" in target or key in stems:
+            if "/" in target:
                 return m.group(0)
-            found = index.get(key, set())
+            file_id, old_name = ids.split_filename(target)
+            if file_id and file_id in by_id:
+                found = by_id[file_id]
+                if key in {x.lower() for x in found}:
+                    return m.group(0)
+            elif key in stems:
+                return m.group(0)
+            else:
+                found = index.get(key, set())
             if len(found) != 1:
-                if len(found) > 1:
+                if len(found) > 1 and not file_id:
                     report.todo(f"リンク `[[{target}]]`({v.label}: {rel.as_posix()})の行き先が {len(found)} つあり、直していません")
                 return m.group(0)
             stem = next(iter(found))
-            shown = alias[1:] if alias else target
+            shown = alias[1:] if alias else (old_name if file_id else target)
             return f"[[{stem}|{shown}]]"
 
         new = LINK.sub(repl, text)
