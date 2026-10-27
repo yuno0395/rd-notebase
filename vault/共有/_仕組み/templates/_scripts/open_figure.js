@@ -1,5 +1,9 @@
 // Ctrl+D: 開いているノートの図を開く。なければ作る(仕様書「図とパワーポイント」)。
-// 図は _仕組み/attachments/<id>/図.excalidraw.md。ひな形はノートの種類で選ぶ(なければ 図.excalidraw.md の 16:9 の枠1つ)。
+// 図は _仕組み/attachments/<id>/fig_<ノートのファイル名>.excalidraw.md(タブで何の図か分かるように。Yu 2026-10-27)。
+// 例 0RDGPG4XGV_保圧を変えて試作する.md → fig_0RDGPG4XGV_保圧を変えて試作する.excalidraw.md
+// 前の名前 図.excalidraw.md の図や、ノートの名前を変える前の fig_ の図もそのまま開く(名前は変えない。
+// 同期プログラムは消したファイルを共有から戻すので、ここで名前を変えると古い図が残るため)。
+// ひな形はノートの種類で選ぶ(なければ 図.excalidraw.md の 16:9 の枠1つ)。
 //   ナレッジ       → ナレッジ図.excalidraw.md(1枚目 実施前・やったこと・実施後、2枚目 トレードオフ曲線)
 //   ソリューション → トレードオフ曲線.excalidraw.md
 // 初めて作ったとき、ひな形の枠ごとに引用のウィキリンクを入れる。枠の名前と同じ見出し(下の表)があれば
@@ -37,18 +41,31 @@ async function open_figure(tp) {
     return;
   }
   const dir = `_仕組み/attachments/${id}`;
-  const path = `${dir}/図.excalidraw.md`;
-  let fig = app.vault.getAbstractFileByPath(path);
+  const name = `fig_${note.basename}`;
+  const path = `${dir}/${name}.excalidraw.md`;
+  let fig = findFigure(app, dir, path, id);
   if (!fig) {
     let tpl = TEMPLATES[fm?.type];
     if (!tpl || !app.vault.getAbstractFileByPath(tpl)) tpl = FIG_TEMPLATE; // 機密 vault などひな形がないとき
     const src = await app.vault.adapter.read(tpl);
     if (!app.vault.getAbstractFileByPath(dir)) await app.vault.createFolder(dir);
     fig = await app.vault.create(path, src);
-    await addEmbeds(app, note, `${dir}/図.excalidraw`, frames(src));
+    await addEmbeds(app, note, `${dir}/${name}.excalidraw`, frames(src));
   }
   const leaf = app.workspace.getLeaf("split", "vertical");
   await leaf.setViewState({ type: "excalidraw", state: { file: fig.path }, active: true });
+}
+
+// いまの名前 → 同じ id の fig_ の図(ノートの名前を変えた後)→ 前の名前 図.excalidraw.md の順に探す。
+function findFigure(app, dir, path, id) {
+  const exact = app.vault.getAbstractFileByPath(path);
+  if (exact) return exact;
+  const folder = app.vault.getAbstractFileByPath(dir);
+  const figs = (folder?.children || [])
+    .filter((f) => f.name.startsWith("fig_") && f.name.endsWith(".excalidraw.md"))
+    .sort((a, b) => (b.name.startsWith(`fig_${id}`) - a.name.startsWith(`fig_${id}`)) || a.name.localeCompare(b.name));
+  if (figs.length) return figs[0];
+  return app.vault.getAbstractFileByPath(`${dir}/図.excalidraw.md`);
 }
 
 // ひな形の枠(id と名前)を並び順に返す。読めなければ1枚目だけ。
