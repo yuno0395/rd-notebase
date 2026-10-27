@@ -257,7 +257,8 @@ def test_config_line_edits(tmp_path):
     assert st.set_key(p, "report", "C:/r")
     import yaml
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
-    assert data["secret"] == ["C:/s1", "C:/s2"] and data["report"] == "C:/r" and data["dry_run"] is True
+    assert [Path(x) for x in data["secret"]] == [Path("C:/s1"), Path("C:/s2")]
+    assert data["report"] == "C:/r" and data["dry_run"] is True
 
 
 def test_check_new_member():

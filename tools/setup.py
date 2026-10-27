@@ -108,6 +108,8 @@ class Ext:
         self.env = env
 
     def run(self, args: list[str], cwd: Path | None = None, env: dict | None = None) -> tuple[int, str]:
+        # 子の Python の出力を UTF-8 にする(Windows のパイプは cp1252 などになり、日本語で落ちる)
+        env = dict(env if env is not None else os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
         try:
             p = subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
         except OSError as e:
