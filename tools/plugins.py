@@ -1,9 +1,10 @@
 """コミュニティプラグインを配布物に入れる(pack)、vault に入れる(install)。
 
-    python plugins.py pack <版> --from <プラグインが入った設定フォルダ>
+    python plugins.py pack <版> --from <プラグインが入った設定フォルダ> [--download]
         正本(rd-notebase)で版を出すときに使う。dist/<版>/プラグイン/ に、配る vault の
         community-plugins.json にあるプラグインの本体(main.js・manifest.json・styles.css)と LICENSE を、
         AGPL・GPL のものは同じ版のソース zip を、出典一覧 プラグインの出典.md を置く。ネットを使う。
+        --download をつけると、設定フォルダにないもの(--from なしなら全部)を GitHub の最新のリリースから取る。
     python plugins.py install [--vault <vault のフォルダ>] [--config <設定フォルダの名前>] [--source <プラグインのフォルダ>]
         各自の PC で使う(プラグインを入れる.bat から)。配布物のプラグイン本体を、vault の設定フォルダ
         (.obsidian や .obsidian-229999_aa11234567)にコピーして有効にする。
@@ -20,6 +21,7 @@ Python 3.11 以上。標準ライブラリだけを使う。
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import shutil
 import sys
@@ -96,8 +98,23 @@ def fetch(url: str) -> bytes:
         return r.read()
 
 
-def pack(version: str, installed: Path, out: Path, get=fetch) -> list[str]:
+def download(repo: str, dst: Path, get=fetch) -> bool:
+    """GitHub の最新のリリースから本体を取る(入れて試した設定フォルダにないとき)。"""
+    for f in BODY:
+        try:
+            data = get(f"https://github.com/{repo}/releases/latest/download/{f}")
+        except Exception:
+            if f == "styles.css":
+                continue
+            return False
+        dst.mkdir(parents=True, exist_ok=True)
+        (dst / f).write_bytes(data)
+    return True
+
+
+def pack(version: str, installed: Path | None, out: Path, get=fetch, allow_download: bool = False) -> list[str]:
     """installed(プラグインが入った設定フォルダ)から、配る分だけを out/プラグイン/ にそろえる。
+    allow_download なら、installed にないものを GitHub の最新のリリースから取る。
     できなかったことを返す(空ならそろった)。"""
     ids = merge(*(read_list(ROOT / p) for p in DIST_LISTS))
     dst_root = out / PLUGIN_DIR
@@ -110,11 +127,16 @@ def pack(version: str, installed: Path, out: Path, get=fetch) -> list[str]:
     except Exception as e:  # ネットにつながらないなど
         return [f"プラグインの一覧を取れませんでした({e})。ネットにつながる PC でやり直してください"]
     rows = []
+    tmp = out / "_取ってきた本体"
     for pid in ids:
-        src = installed / "plugins" / pid
+        src = installed / "plugins" / pid if installed else tmp / pid
         if not (src / "main.js").is_file() or not (src / "manifest.json").is_file():
-            errors.append(f"{pid}: {src} に本体がありません。Obsidian で入れてからやり直してください")
-            continue
+            repo0 = (registry.get(pid) or {}).get("repo", "")
+            if allow_download and repo0 and download(repo0, tmp / pid, get):
+                src = tmp / pid
+            else:
+                errors.append(f"{pid}: {src} に本体がありません。Obsidian で入れてからやり直してください")
+                continue
         ver = version_of(src)
         manifest = json.loads((src / "manifest.json").read_text(encoding="utf-8"))
         name = manifest.get("name") or pid
@@ -138,6 +160,13 @@ def pack(version: str, installed: Path, out: Path, get=fetch) -> list[str]:
                     continue
             if lic_text is not None:
                 break
+        if lic_text is None:
+            # ファイル名が上の一覧にないとき(COPYING など)は GitHub にライセンスのファイルを聞く
+            try:
+                info = json.loads(get(f"https://api.github.com/repos/{repo}/license"))
+                lic_text = base64.b64decode(info["content"])
+            except Exception:
+                pass
         kind = license_kind(lic_text.decode("utf-8", "replace")) if lic_text is not None else "要確認"
         if lic_text is not None:
             (dst / "LICENSE").write_bytes(lic_text)
@@ -171,6 +200,7 @@ def pack(version: str, installed: Path, out: Path, get=fetch) -> list[str]:
         "| --- | --- | --- | --- | --- |",
     ] + [f"| {n} | {v} | {p} | {u} | {k} |" for n, v, p, u, k in rows]
     (dst_root / CREDITS).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    shutil.rmtree(tmp, ignore_errors=True)
     return errors
 
 
@@ -253,7 +283,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("pack")
     p.add_argument("version")
-    p.add_argument("--from", dest="installed", type=Path, required=True)
+    p.add_argument("--from", dest="installed", type=Path)
+    p.add_argument("--download", action="store_true", help="--from にないものは GitHub の最新のリリースから取る")
     i = sub.add_parser("install")
     i.add_argument("--vault", type=Path)
     i.add_argument("--config")
@@ -261,7 +292,10 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     if a.cmd == "pack":
         out = ROOT / "dist" / a.version
-        errors = pack(a.version, a.installed, out)
+        if not a.installed and not a.download:
+            print("--from <設定フォルダ> か --download をつけてください")
+            return 2
+        errors = pack(a.version, a.installed, out, allow_download=a.download)
         print(f"{out / PLUGIN_DIR} にそろえました")
         for e in errors:
             print("要対応:", e)

@@ -24,6 +24,7 @@ system = [
   "00_*.base",
   "_仕組み/templates/*",
   "_仕組み/設定/*",
+  "_仕組み/tools/準備/*",
 ]
 seed = [
   "_仕組み/同期設定.yaml",
@@ -72,3 +73,13 @@ seed = [
   "00_README.md",
   "_仕組み/tools/メンバー.csv",
 ]
+
+# 版ごとの移し替え(仕様書「書きためたノートを壊さずに仕組みを直す」、要件書 F-46)。
+# 準備の bat は、vault の 版.txt より新しく、当てる版より古いか同じ version のものを、古い順に全部当てる。
+# script は `python <script> <vault> --run --backup <控えのフォルダ>` で動くこと。控えはそのフォルダに作り
+# (Box の中に作らない)、何度走らせても同じ結果になること。いまは当てるものはない。書き方の例:
+#
+# [[migrate]]
+# version = "0.3.0"
+# script = "tools/migrate_v0_3_0.py"
+# vaults = ["個人", "共有"]
