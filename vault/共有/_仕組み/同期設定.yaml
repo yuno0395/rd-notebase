@@ -7,6 +7,7 @@ keep_in_vault:
   video_max_mb: 20
 report_sections:             # 週報に載せる節。false で外す。見込みはいつも載せる
   出荷準備度: true
+  成果物候補: true
   候補の数: true
   マイルストーン: true
   目的に沿わない: true

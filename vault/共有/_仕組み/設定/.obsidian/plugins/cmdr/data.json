@@ -25,9 +25,9 @@
       "mode": "any"
     },
     {
-      "id": "templater-obsidian:_仕組み/templates/_コマンド/ソリューションにする.md",
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/設計案にする.md",
       "icon": "puzzle",
-      "name": "ソリューションにする(Ctrl+U)",
+      "name": "設計案にする(Ctrl+U)",
       "mode": "any"
     },
     {

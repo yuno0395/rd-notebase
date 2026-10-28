@@ -31,14 +31,16 @@ from .heavy import DEFAULT_KEEP, is_heavy, to_personal, to_shared
 from .state import State, digest, digest_text
 from .vault import SKIP_DIRS, box_copy_of, is_hidden, read, write
 
-OWN_DIRS = ("01_目的", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
+OWN_DIRS = ("01_目的", "01_設計案", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
 DIST = "90_共有"
 ARCHIVE = "99_archive"
 COMMON = "共通"
 # 共有 vault の一番上で、プロジェクトのフォルダではないもの
 SHARED_SYSTEM = SKIP_DIRS | {"00_inbox", "00_週報", ARCHIVE}
 BIG_IMPACT = {"方針", "絞込", "出荷", "大"}  # 「大」は v0.22 までの書き方
-TYPE_DIR = {"目的": "01_目的", "仮説": "01_目的", "ソリューション": "01_目的", "ノード": "02_ノード",
+# 設計案は v0.54 から 01_設計案/(古い type のソリューション・設計記録も)
+TYPE_DIR = {"目的": "01_目的", "仮説": "01_目的", "設計案": "01_設計案", "ソリューション": "01_設計案",
+            "設計記録": "01_設計案", "ノード": "02_ノード",
             "イシュー": "03_イシュー", "タスク": "04_タスク"}
 CONFLICT_MARK = "_競合_"
 WINDOW = "窓口"           # 機密の窓口(機密フォルダごとに1つ。見てよい人と社内の当事者だけを書く)

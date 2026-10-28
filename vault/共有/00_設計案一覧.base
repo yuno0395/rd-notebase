@@ -2,8 +2,9 @@ filters:
   and:
     - '!file.inFolder("_仕組み/templates")'
     - or:
-        - type == "ソリューション"
+        - type == "設計案"
         - type == "設計記録"
+        - type == "ソリューション"
 formulas:
   # この候補を脅かすイシュー(parent などでこの候補にリンクしているイシュー)のうち、まだ対策が終わっていないもの。
   # 少ないほど磨けている候補。同期プログラムがなくても数える。
@@ -11,13 +12,15 @@ formulas:
   # そのうち impact 大(方針・絞込・出荷)
   open_big: 'file.backlinks.filter(value.asFile().properties.type == "イシュー" && (value.asFile().properties.status == "未対応" || value.asFile().properties.status == "対策中") && (value.asFile().properties.impact == "方針" || value.asFile().properties.impact == "絞込" || value.asFile().properties.impact == "出荷")).length'
 properties:
+  friend:
+    displayName: 実現する仮説・関係
   formula.open:
     displayName: 残りのイシュー
   formula.open_big:
     displayName: うち impact 大
 views:
   - type: table
-    name: 候補の一組(仮説・目的ごと)
+    name: 候補の一組(目的・上の設計案ごと)
     filters:
       and:
         - status != "不採用"
@@ -29,6 +32,7 @@ views:
       - status
       - formula.open_big
       - formula.open
+      - friend
       - drawing_no
       - author
     sort:
@@ -48,6 +52,7 @@ views:
       - status
       - formula.open_big
       - formula.open
+      - friend
       - drawing_no
       - parent
       - author

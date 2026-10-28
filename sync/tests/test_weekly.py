@@ -65,9 +65,9 @@ def shared(tmp_path):
     # kind: DR なら名前に DR がなくても DR とみなす
     note(s, f"{PJ}/議事録", "0RB301001", "仕様の見直し", "type: 議事録\nkind: DR\ndate: 2026-10-01\n")
     note(s, f"{PJ}/議事録", "0RB302001", "打ち合わせ", "type: 議事録\ndate: 2026-10-05\n")
-    # ソリューション候補は仮説の下に並ぶ(一組の候補)。設計記録は v0.37 までの名前で、ソリューションとして数える
-    for i, (tp, st) in enumerate([("ソリューション", "候補"), ("ソリューション", "不採用"), ("設計記録", "候補")]):
-        note(s, f"{PJ}/01_目的", f"0RB40{i}001", f"センサー案{i}",
+    # 設計案の候補は同じ parent で一組になる。ソリューション(v0.54 まで)・設計記録(v0.37 まで)も設計案として数える
+    for i, (tp, st) in enumerate([("設計案", "候補"), ("ソリューション", "不採用"), ("設計記録", "候補")]):
+        note(s, f"{PJ}/01_設計案", f"0RB40{i}001", f"センサー案{i}",
              f'type: {tp}\nstatus: {st}\nparent: ["[[0RA003001_3割減なら採用される]]"]\n')
     # 別のプロジェクトが同じノードを使う
     note(s, "別PJ", "0RC001001", "別PJ", "type: プロジェクト\nmembers: [Yu]\n")
@@ -108,8 +108,8 @@ def test_weekly_report(shared, tmp_path):
     assert f'href="{PJ}/2026-W44.html"' in index
     # 2回目は作らない。次の週は推移が伸びる
     assert make_weekly(shared, out, date(2026, 10, 27), Report()) == []
-    (shared / f"{PJ}/01_目的/0RB402001_センサー案2.md").write_text(
-        (shared / f"{PJ}/01_目的/0RB402001_センサー案2.md").read_text(encoding="utf-8").replace("候補", "不採用"),
+    (shared / f"{PJ}/01_設計案/0RB402001_センサー案2.md").write_text(
+        (shared / f"{PJ}/01_設計案/0RB402001_センサー案2.md").read_text(encoding="utf-8").replace("候補", "不採用"),
         encoding="utf-8")
     make_weekly(shared, out, date(2026, 11, 2), Report())
     assert row('3割減なら採用される', '2→1') in (out / PJ / "2026-W45.html").read_text(encoding="utf-8")
@@ -166,3 +166,40 @@ def test_sections_only_and_hide(shared):
     assert s["担当者"] is False and s["同じノード"] == "自動"
     s = sections_of(shared, only=["出荷準備度"])
     assert [k for k, v in s.items() if v] == ["出荷準備度"]
+
+
+def test_product_axis(tmp_path):
+    """成果物の軸(Yu 2026-10-28): 設計案の parent は成果物の構成、実現する仮説は friend。
+    成果物候補ごとに、実現していない仮説と残りのイシューを出す。"""
+    s = tmp_path / "共有"
+    write(s / "_仕組み/同期設定.yaml", "")
+    note(s, PJ, "0RA001001", PJ, "type: プロジェクト\nmembers: [Yu]\nstatus: 進行中\n")
+    g = '["[[0RA002001_予兆検知]]"]'
+    note(s, f"{PJ}/01_目的", "0RA002001", "予兆検知", "type: 目的\nproject: [樹脂カバー]\n")
+    note(s, f"{PJ}/01_目的", "0RA003001", "電池3年", f"type: 仮説\nstatus: 検証中\nparent: {g}\n")
+    note(s, f"{PJ}/01_目的", "0RA004001", "後付け10分", f"type: 仮説\nstatus: 検証中\nparent: {g}\n")
+    note(s, f"{PJ}/01_目的", "0RA005001", "外れた案", f"type: 仮説\nstatus: 外れた\nparent: {g}\n")
+    # 上の仮説を friend にすれば、下の仮説も実現とみなす
+    note(s, f"{PJ}/01_目的", "0RA006001", "工具なし", 'type: 仮説\nstatus: 検証中\nparent: ["[[0RA004001_後付け10分]]"]\n')
+    note(s, f"{PJ}/01_設計案", "0RB001001", "A案クランプ式", f"type: 設計案\nstatus: 候補\nparent: {g}\n")
+    note(s, f"{PJ}/01_設計案", "0RB002001", "電池ユニット",
+         'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\nfriend: ["[[0RA003001_電池3年]]"]\n')
+    note(s, f"{PJ}/01_設計案", "0RB003001", "マグネット取付",
+         'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\nfriend: ["[[0RA004001_後付け10分]]"]\n')
+    note(s, f"{PJ}/01_設計案", "0RB004001", "B案ねじ止め式",
+         f'type: 設計案\nstatus: 候補\nparent: {g}\nfriend: ["[[0RA003001_電池3年]]"]\n')
+    note(s, f"{PJ}/01_設計案", "0RB005001", "C案", f"type: 設計案\nstatus: 不採用\nparent: {g}\n")
+    issue = "author: Yu\ntype: イシュー\nproject: [樹脂カバー]\n"
+    note(s, f"{PJ}/03_イシュー", "0RC001001", "電池が冬にもたない",
+         issue + 'status: 対策中\nimpact: 出荷\nparent: ["[[0RB002001_電池ユニット]]"]\n')
+    note(s, f"{PJ}/03_イシュー", "0RC002001", "全体が重い", issue + 'status: 未対応\nimpact: 中\nparent: ["[[0RB001001_A案クランプ式]]"]\n')
+    note(s, f"{PJ}/03_イシュー", "0RC003001", "済んだ", issue + 'status: 解消\nimpact: 中\nparent: ["[[0RB003001_マグネット取付]]"]\n')
+    out = tmp_path / "報告"
+    make_weekly(s, out, date(2026, 10, 26), Report())
+    html = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
+    assert "成果物候補ごとの残り" in html
+    assert row("A案クランプ式", "候補", "2/2", "なし", "2", "1") in html
+    assert row("B案ねじ止め式", "候補", "1/2", "工具なし", "0", "0") in html
+    assert "<td>C案</td>" not in html
+    # 成果物候補(部分案)につく仕事は、その成果物が実現する仮説につながっている
+    assert "<td>仮説につながっていない</td>" not in html

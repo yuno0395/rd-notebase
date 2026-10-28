@@ -70,10 +70,10 @@
         },
         {
           "id": "8f073beb-cd77-5d8b-a368-bd8150184ef7",
-          "name": "ソリューション",
+          "name": "設計案",
           "type": "Template",
           "command": false,
-          "templatePath": "_仕組み/templates/ソリューション.md",
+          "templatePath": "_仕組み/templates/設計案.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""

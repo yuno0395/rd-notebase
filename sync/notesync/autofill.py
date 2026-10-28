@@ -22,7 +22,7 @@ from .report import Report
 from .safety import Backup
 from .vault import SKIP_DIRS, box_copy_of, is_hidden, read, write
 
-OWN_DIRS = ("01_目的", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
+OWN_DIRS = ("01_目的", "01_設計案", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
 DIST = "90_共有"
 
 # 仕様書「priority の決め方」
@@ -50,7 +50,8 @@ class Doc:
     @property
     def type(self) -> str:
         t = str(self.fm.get("type") or "").strip()
-        return "ソリューション" if t == "設計記録" else t  # v0.37 までの設計記録はソリューション(Yu 2026-10-25)
+        # v0.37 までの設計記録と v0.54 までのソリューションは設計案(Yu 2026-10-25、2026-10-28)
+        return "設計案" if t in ("設計記録", "ソリューション") else t
 
     @property
     def stem(self) -> str:

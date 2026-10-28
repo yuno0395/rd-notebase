@@ -1110,7 +1110,7 @@ class Setup:
 
         def go():
             root = self.shared / name
-            for sub in ("01_目的", "03_イシュー", "04_タスク", "05_ナレッジ"):
+            for sub in ("01_目的", "01_設計案", "03_イシュー", "04_タスク", "05_ナレッジ"):
                 (root / sub).mkdir(parents=True, exist_ok=True)
             nid = make_note_id(self.shared, self.number)
             text = render(tmpl.read_text(encoding="utf-8"), nid, name, self.today, {"members": chosen})
