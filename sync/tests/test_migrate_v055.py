@@ -43,3 +43,11 @@ def test_migrate(tmp_path):
     assert e.read_text(encoding="utf-8") == '---\ntype: ソリューション\n価値仮説: ["[[電池3年]]"]\n---\n'
     assert list(tmp_path.glob("移行前の控え_個人_*.zip"))
     assert "することはありません" in run(v, "--run")
+
+
+def test_backup_folder(tmp_path):
+    v = tmp_path / "box" / "個人"
+    write(v / "03_イシュー/0RA001001_ヒケ.md", '---\ntype: イシュー\nparent: ["[[A案]]"]\n---\n')
+    run(v, "--run", "--backup", tmp_path / "控え")             # 準備の bat の呼び方
+    assert list((tmp_path / "控え").glob("移行前の控え_個人_*.zip"))
+    assert not list((tmp_path / "box").glob("*.zip"))          # Box の中には作らない

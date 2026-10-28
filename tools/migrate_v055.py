@@ -1,9 +1,10 @@
 """仕様書 v0.55 の属性名の変更を、今ある vault に当てる(個人・共有のどちらにも使える)。
 
-    python migrate_v055.py <vault> [<vault> ...] [--run]
+    python migrate_v055.py <vault> [<vault> ...] [--run] [--backup <控えのフォルダ>]
 
 --run をつけないと、することを表示するだけで何も変えない。
 --run をつけると、最初に vault ごとの控え(zip)を作ってから、次のことをする。
+控えは vault の隣に作る。--backup を渡すとそのフォルダに作る(準備の bat はこれで Box の外に作る)。
 
 1. type が イシュー のノート: 属性欄の `parent:` を `脅かす:` に名前だけ変える(値はそのまま)。
    脅かす がもうあるノートは変えない。
@@ -117,7 +118,14 @@ def note_types(vault: Path) -> dict[str, str]:
 
 def main(argv: list[str]) -> int:
     run = "--run" in argv
-    vaults = [Path(a) for a in argv if a != "--run"]
+    backup: Path | None = None
+    vaults = []
+    rest = iter(argv)
+    for a in rest:
+        if a == "--backup":
+            backup = Path(next(rest, ""))
+        elif a != "--run":
+            vaults.append(Path(a))
     if not vaults:
         print(__doc__)
         return 2
@@ -144,7 +152,8 @@ def main(argv: list[str]) -> int:
             print("  することはありません")
             continue
         if run:
-            zip_base = v.parent / f"移行前の控え_{v.name}_{stamp}"
+            (backup or v.parent).mkdir(parents=True, exist_ok=True)
+            zip_base = (backup or v.parent) / f"移行前の控え_{v.name}_{stamp}"
             shutil.make_archive(str(zip_base), "zip", root_dir=v)
             print(f"  控え: {zip_base}.zip")
         for p, n in todo:
