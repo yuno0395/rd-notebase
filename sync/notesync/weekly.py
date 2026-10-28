@@ -27,13 +27,15 @@ BIG = {"方針", "絞込", "出荷", "大"}
 STAGES = ["未把握", "現象", "設計空間", "原理"]
 OPEN_TASK = {"未着手", "進行中", "待ち", "確認待ち"}
 DONE = {"完了", "中止"}
+OPEN_ISSUE = {"未対応", "対策中"}
+DROPPED = {"不採用", "中止"}
 WORK_TYPES = {"タスク", "イシュー", "実験・試作記録"}
 STALE_DAYS = 14
 CANDIDATE_CSV = "候補の数.csv"
 
 # 週報に載せる節(チーム設定 report_sections で選ぶ。Yu 2026-10-25)。見込みはいつも載せる。
 # 値: true(載せる)/ false(外す)/ 自動(同じノード: ほかのプロジェクトがあるときだけ)
-SECTIONS = ["出荷準備度", "候補の数", "マイルストーン", "目的に沿わない", "反論のついた仮説",
+SECTIONS = ["出荷準備度", "成果物候補", "候補の数", "マイルストーン", "目的に沿わない", "反論のついた仮説",
             "同じノード", "行き詰まり", "担当者", "機密"]
 DEFAULT_SECTIONS = {k: True for k in SECTIONS} | {"同じノード": "自動"}
 
@@ -108,14 +110,29 @@ class Builder:
         self.docs = [d for d in load_docs(shared, own=False, skip={"00_inbox", "00_週報"})
                      if not d.rel.startswith("99_archive/")]
         self.index = Index(self.docs)
+        # parent の逆向き(子)。成果物候補の下の部分案とイシューを数えるため
+        self.children: dict[str, list[Doc]] = {}
+        for d in self.docs:
+            for p in self.parents(d):
+                self.children.setdefault(p.id, []).append(d)
 
     # ---------- つながり ----------
 
     def parents(self, d: Doc) -> list[Doc]:
         return [p for p in (self.index.resolve(t) for t in targets(d.fm.get("parent"))) if p]
 
+    def friends(self, d: Doc) -> list[Doc]:
+        return [f for f in (self.index.resolve(t) for t in targets(d.fm.get("friend"))) if f]
+
+    def ups(self, d: Doc) -> list[Doc]:
+        """上流。parent と、ソリューションなら friend の価値の仮説(その案が実現する仮説。Yu 2026-10-28)。"""
+        out = self.parents(d)
+        if d.type == "ソリューション":
+            out += [h for h in self.friends(d) if h.type == "仮説"]
+        return out
+
     def reach(self, d: Doc, want: str, seen: set[str] | None = None) -> list[Doc]:
-        """parent をたどって着く、type が want のノート。"""
+        """parent(ソリューションは friend の仮説も)をたどって着く、type が want のノート。"""
         seen = seen if seen is not None else set()
         if d.id in seen:
             return []
@@ -123,9 +140,85 @@ class Builder:
         if d.type == want:
             return [d]
         out = []
-        for p in self.parents(d):
+        for p in self.ups(d):
             out += self.reach(p, want, seen)
         return out
+
+    # ---------- 成果物の軸(Yu 2026-10-28) ----------
+
+    def top_solution(self, s: Doc) -> Doc:
+        """s から parent をたどった、いちばん上のソリューション(成果物候補)。"""
+        seen = {s.id}
+        while True:
+            up = [p for p in self.parents(s) if p.type == "ソリューション" and p.id not in seen]
+            if not up:
+                return s
+            s = up[0]
+            seen.add(s.id)
+
+    def subtree(self, root: Doc) -> list[Doc]:
+        """root とその下のソリューション(部分案)。"""
+        out, stack, seen = [], [root], set()
+        while stack:
+            s = stack.pop()
+            if s.id in seen:
+                continue
+            seen.add(s.id)
+            out.append(s)
+            stack += [c for c in self.children.get(s.id, []) if c.type == "ソリューション" and status(c) not in DROPPED]
+        return out
+
+    def realized(self, root: Doc) -> list[Doc]:
+        """成果物候補とその部分案が friend でつないだ価値の仮説。"""
+        out: dict[str, Doc] = {}
+        for s in self.subtree(root):
+            for h in self.friends(s):
+                if h.type == "仮説":
+                    out.setdefault(h.id, h)
+        # v0.52 までの書き方(ソリューションの parent が仮説)も読む
+        for s in self.subtree(root):
+            for h in self.parents(s):
+                if h.type == "仮説":
+                    out.setdefault(h.id, h)
+        return list(out.values())
+
+    def hypothesis_ancestors(self, h: Doc) -> set[str]:
+        out, stack = set(), [h]
+        while stack:
+            x = stack.pop()
+            if x.id in out or x.type != "仮説":
+                continue
+            out.add(x.id)
+            stack += self.parents(x)
+        return out
+
+    def products(self, docs: list[Doc]) -> list[list[str]]:
+        """成果物候補(parent が目的のソリューション)ごとに、実現していない価値の仮説と残りのイシュー。
+
+        仮説は木の末端(下に生きた仮説がないもの)を数える。上の仮説を friend にすれば、その下もすべて実現とみなす。
+        外れた仮説(上が外れたものも)は数えない。両方 0 なら、その候補で目的を果たせる見込み。"""
+        rows = []
+        for c in sorted(docs, key=lambda d: d.name):
+            if c.type != "ソリューション" or status(c) in DROPPED:
+                continue
+            goals = [p for p in self.parents(c) if p.type == "目的"]
+            if not goals:
+                continue
+            goal_ids = {g.id for g in goals}
+            live = [h for h in self.docs if h.type == "仮説" and not self.gone_hypothesis(h)
+                    and goal_ids & {g.id for g in self.reach(h, "目的")}]
+            live_ids = {h.id for h in live}
+            leaves = [h for h in live
+                      if not any(k.type == "仮説" and k.id in live_ids for k in self.children.get(h.id, []))]
+            done = {h.id for h in self.realized(c)}
+            missing = [h for h in leaves if not (self.hypothesis_ancestors(h) & done)]
+            sols = {s.id for s in self.subtree(c)}
+            issues = [i for i in self.docs if i.type == "イシュー" and status(i) in OPEN_ISSUE
+                      and any(p.id in sols for p in self.parents(i))]
+            rows.append([c.name, status(c) or "候補", f"{len(leaves) - len(missing)}/{len(leaves)}",
+                         "、".join(sorted(h.name for h in missing)) or "なし",
+                         str(len(issues)), str(sum(1 for i in issues if impact(i) in BIG))])
+        return rows
 
     def project_of(self, d: Doc) -> set[str]:
         top = d.rel.split("/")[0]
@@ -186,6 +279,10 @@ class Builder:
             if d.type not in WORK_TYPES or status(d) in DONE | {"解消"}:
                 continue
             hyps = self.reach(d, "仮説")
+            if not hyps:
+                # 成果物候補(とその部分案)につく仕事は、その成果物が実現する仮説につながっているとみなす
+                for s in self.reach(d, "ソリューション"):
+                    hyps += self.realized(self.top_solution(s))
             if not hyps:
                 rows.append([d.type, d.name, owner(d), "仮説につながっていない"])
                 continue
@@ -350,6 +447,11 @@ class Builder:
             r.section("出荷準備度(目的ごと)", "impact 大のイシューのうち、DR で段階2(設計空間)以上と決まったものの割合")
             r.table("出荷準備度", ["目的", "出荷準備度", "段階0 未把握", "段階1 現象", "段階2 設計空間", "段階3 原理"],
                     self.readiness([d for d in docs if d.type == "イシュー"]))
+        if "成果物候補" in show:
+            r.section("成果物候補ごとの残り", "目的を果たす成果物の候補が、すべての価値の仮説を実現し、リスクを残していないか。"
+                      "実現していない仮説と残りのイシューが両方 0 になれば、その候補で目的を果たせる")
+            r.table("成果物候補", ["成果物候補", "status", "実現している仮説", "実現していない仮説", "残りのイシュー", "うち impact 大"],
+                    self.products(docs))
         if "候補の数" in show:
             r.section("残っている候補の数", "開発の前半は、出荷準備度より候補が絞れていく様子で進み具合を見る")
             r.table("候補の数", ["候補の組", "推移"],
