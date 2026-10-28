@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="340" viewBox="0 0 1160 340" font-family="'Yu Gothic UI','Meiryo','Hiragino Sans','Noto Sans JP',sans-serif" role="img" aria-label="開いて中心を移す">
+<title>開いて中心を移す</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f6fde"/></marker></defs>
+<rect x="0.5" y="0.5" width="1159" height="339" rx="14" fill="#ffffff" stroke="#d6dae1"/>
+<circle cx="30" cy="30" r="12" fill="#2f6fde"/>
+<text x="30.0" y="30.5" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">1</text>
+<text x="50.0" y="30.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">ノートを開いて Ctrl+G</text>
+<rect x="24.0" y="54.0" width="270.0" height="250.0" rx="10" fill="#ffffff" stroke="#c3c8d0" stroke-width="1.2"/>
+<text x="40.0" y="80.0" font-size="17" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">A案 クランプ式</text>
+<text x="40.0" y="112.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">## この案の中身</text>
+<text x="40.0" y="138.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">クランプで挟んで固定する</text>
+<text x="40.0" y="164.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">## 価値の仮説を実現できるか</text>
+<text x="40.0" y="190.0" font-size="13" fill="#7a3fbf" text-anchor="start" font-weight="normal" dominant-baseline="middle">[[電池が3年もつ]]</text>
+<rect x="70.0" y="245.0" width="53.0" height="30.0" rx="6" fill="#f4f5f7" stroke="#9aa1ad" stroke-width="1.2"/>
+<rect x="70.0" y="272.0" width="53.0" height="3" rx="1.5" fill="#9aa1ad"/>
+<text x="96.5" y="260.0" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">Ctrl</text>
+<text x="133.0" y="260.0" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">+</text>
+<rect x="145.0" y="245.0" width="28.2" height="30.0" rx="6" fill="#f4f5f7" stroke="#9aa1ad" stroke-width="1.2"/>
+<rect x="145.0" y="272.0" width="28.2" height="3" rx="1.5" fill="#9aa1ad"/>
+<text x="159.1" y="260.0" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">G</text>
+<line x1="300.0" y1="180.0" x2="345.0" y2="180.0" stroke="#2f6fde" stroke-width="2.5" marker-end="url(#arrow)"/>
+<circle cx="380" cy="30" r="12" fill="#2f6fde"/>
+<text x="380.0" y="30.5" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">2</text>
+<text x="400.0" y="30.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">そのノートが真ん中に出る</text>
+<line x1="580.0" y1="156.0" x2="580.0" y2="115.2" stroke="#b8bec8" stroke-width="1.4"/>
+<line x1="580.0" y1="214.0" x2="483.2" y2="256.3" stroke="#b8bec8" stroke-width="1.4"/>
+<line x1="580.0" y1="214.0" x2="676.8" y2="256.3" stroke="#b8bec8" stroke-width="1.4"/>
+<line x1="481.9" y1="185.0" x2="453.9" y2="189.1" stroke="#b8bec8" stroke-width="1.4"/>
+<line x1="678.1" y1="185.0" x2="706.1" y2="189.1" stroke="#b8bec8" stroke-width="1.4"/>
+<rect x="545.0" y="75.2" width="70.0" height="40.0" rx="10" fill="#ffffff" stroke="#8f97a3" stroke-width="1.3"/>
+<text x="580.0" y="96.2" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">目的</text>
+<rect x="448.2" y="256.3" width="70.0" height="40.0" rx="10" fill="#ffffff" stroke="#8f97a3" stroke-width="1.3"/>
+<text x="483.2" y="277.3" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">電池</text>
+<rect x="641.8" y="256.3" width="70.0" height="40.0" rx="10" fill="#ffffff" stroke="#8f97a3" stroke-width="1.3"/>
+<text x="676.8" y="277.3" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">取付</text>
+<rect x="383.9" y="169.1" width="70.0" height="40.0" rx="10" fill="#ffffff" stroke="#8f97a3" stroke-width="1.3"/>
+<text x="418.9" y="190.1" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">仮説</text>
+<rect x="706.1" y="169.1" width="84.0" height="40.0" rx="10" fill="#e5484d" stroke="#e5484d" stroke-width="1.3"/>
+<text x="748.1" y="190.1" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="normal" dominant-baseline="middle">イシュー</text>
+<rect x="481.9" y="156.0" width="196.2" height="58.0" rx="10" fill="#1f3a5f" stroke="#1f3a5f" stroke-width="2"/>
+<text x="580.0" y="186.0" font-size="22" fill="#ffffff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">A案 クランプ式</text>
+<line x1="800.0" y1="180.0" x2="845.0" y2="180.0" stroke="#2f6fde" stroke-width="2.5" marker-end="url(#arrow)"/>
+<circle cx="870" cy="30" r="12" fill="#2f6fde"/>
+<text x="870.0" y="30.5" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">3</text>
+<text x="890.0" y="30.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">赤いカードを1回クリック</text>
+<text x="890.0" y="56.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">→ そのカードが真ん中に移る</text>
+<line x1="990.0" y1="224.0" x2="990.0" y2="259.5" stroke="#b8bec8" stroke-width="1.4"/>
+<line x1="1054.0" y1="195.0" x2="1082.0" y2="198.8" stroke="#b8bec8" stroke-width="1.4"/>
+<rect x="955.0" y="259.5" width="70.0" height="40.0" rx="10" fill="#ffffff" stroke="#8f97a3" stroke-width="1.3"/>
+<text x="990.0" y="280.5" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">タスク</text>
+<rect x="1082.0" y="178.8" width="70.0" height="40.0" rx="10" fill="#ffffff" stroke="#8f97a3" stroke-width="1.3"/>
+<text x="1117.0" y="199.8" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">A案</text>
+<rect x="926.0" y="166.0" width="128.0" height="58.0" rx="10" fill="#1f3a5f" stroke="#1f3a5f" stroke-width="2"/>
+<text x="990.0" y="196.0" font-size="22" fill="#ffffff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">イシュー</text>
+</svg>

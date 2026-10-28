@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="400" viewBox="0 0 1080 400" font-family="'Yu Gothic UI','Meiryo','Hiragino Sans','Noto Sans JP',sans-serif" role="img" aria-label="右クリックでつなぐ">
+<title>右クリックでつなぐ</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f6fde"/></marker></defs>
+<rect x="0.5" y="0.5" width="1079" height="399" rx="14" fill="#ffffff" stroke="#d6dae1"/>
+<circle cx="30" cy="30" r="12" fill="#2f6fde"/>
+<text x="30.0" y="30.5" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">1</text>
+<text x="50.0" y="30.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">本文の [[ ]] の上で右クリック</text>
+<rect x="24.0" y="54.0" width="300.0" height="200.0" rx="10" fill="#ffffff" stroke="#c3c8d0" stroke-width="1.2"/>
+<text x="40.0" y="80.0" font-size="17" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">A案 クランプ式</text>
+<text x="40.0" y="112.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">## 価値の仮説を実現できるか</text>
+<rect x="38.0" y="128.0" width="150.0" height="26.0" rx="4" fill="#efe6fb" stroke="none" stroke-width="1.2"/>
+<text x="46.0" y="141.0" font-size="13" fill="#7a3fbf" text-anchor="start" font-weight="normal" dominant-baseline="middle">[[電池が3年もつ]]</text>
+<rect x="150.0" y="150.0" width="190.0" height="92.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<rect x="156.0" y="158.0" width="178.0" height="26.0" rx="5" fill="#e7efff" stroke="none" stroke-width="1.2"/>
+<text x="166.0" y="171.0" font-size="14" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">関係としてつなぐ</text>
+<text x="166.0" y="199.0" font-size="14" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">反論としてつなぐ</text>
+<text x="166.0" y="225.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">ノードにする …</text>
+<line x1="345.0" y1="170.0" x2="390.0" y2="170.0" stroke="#2f6fde" stroke-width="2.5" marker-end="url(#arrow)"/>
+<circle cx="410" cy="30" r="12" fill="#2f6fde"/>
+<text x="410.0" y="30.5" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">2</text>
+<text x="430.0" y="30.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">属性欄に入る(本文のリンクは残る)</text>
+<rect x="400.0" y="54.0" width="250.0" height="150.0" rx="10" fill="#fbfbfc" stroke="#c3c8d0" stroke-width="1.2"/>
+<text x="416.0" y="84.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">type</text>
+<text x="500.0" y="84.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">設計案</text>
+<text x="416.0" y="120.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">parent</text>
+<text x="500.0" y="120.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">樹脂カバーを量産する</text>
+<rect x="408.0" y="141.0" width="234.0" height="30.0" rx="5" fill="#e7efff" stroke="none" stroke-width="1.2"/>
+<text x="416.0" y="156.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">価値仮説</text>
+<text x="500.0" y="156.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">電池が3年もつ</text>
+<line x1="655.0" y1="130.0" x2="700.0" y2="130.0" stroke="#2f6fde" stroke-width="2.5" marker-end="url(#arrow)"/>
+<circle cx="745" cy="30" r="12" fill="#2f6fde"/>
+<text x="745.0" y="30.5" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">3</text>
+<text x="765.0" y="30.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">K-Plex の左に出る</text>
+<line x1="858.0" y1="135.0" x2="830.0" y2="137.6" stroke="#b8bec8" stroke-width="1.4"/>
+<rect x="707.7" y="117.6" width="122.2" height="40.0" rx="10" fill="#ffffff" stroke="#8f97a3" stroke-width="1.3"/>
+<text x="768.8" y="138.6" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">電池が3年もつ</text>
+<rect x="858.0" y="106.0" width="74.1" height="58.0" rx="10" fill="#1f3a5f" stroke="#1f3a5f" stroke-width="2"/>
+<text x="895.0" y="136.0" font-size="22" fill="#ffffff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">A案</text>
+<rect x="24.0" y="280.0" width="1032.0" height="104.0" rx="10" fill="#f7f8fa" stroke="#e1e4ea" stroke-width="1.2"/>
+<text x="44.0" y="300.0" font-size="14" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">どの欄に入るか(右クリックで自動で決まる)</text>
+<text x="44.0" y="326.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">関係としてつなぐ</text>
+<text x="210.0" y="326.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">設計案 → 価値の仮説</text>
+<text x="470.0" y="326.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">→ 属性 価値仮説</text>
+<text x="680.0" y="326.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">→ K-Plex の左</text>
+<text x="44.0" y="348.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">関係としてつなぐ</text>
+<text x="210.0" y="348.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">それ以外(ノード同士など)</text>
+<text x="470.0" y="348.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">→ 属性 friend</text>
+<text x="680.0" y="348.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">→ K-Plex の左</text>
+<text x="44.0" y="370.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">反論としてつなぐ</text>
+<text x="210.0" y="370.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">覆す事実・反例</text>
+<text x="470.0" y="370.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">→ 属性 challenger</text>
+<text x="680.0" y="370.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">→ K-Plex の右</text>
+</svg>

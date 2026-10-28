@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="250" viewBox="0 0 900 250" font-family="'Yu Gothic UI','Meiryo','Hiragino Sans','Noto Sans JP',sans-serif" role="img" aria-label="カードの色と点線">
+<title>カードの色と点線</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f6fde"/></marker></defs>
+<rect x="0.5" y="0.5" width="899" height="249" rx="14" fill="#ffffff" stroke="#d6dae1"/>
+<text x="30.0" y="30.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">イシューの色 = priority(同期プログラムが書く)</text>
+<rect x="45.5" y="70.0" width="129.0" height="40.0" rx="10" fill="#e5484d" stroke="#e5484d" stroke-width="1.3"/>
+<text x="110.0" y="91.0" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="normal" dominant-baseline="middle">ヒケで外観不良</text>
+<text x="110.0" y="128.0" font-size="13" fill="#5b6472" text-anchor="middle" font-weight="normal" dominant-baseline="middle">1 最優先</text>
+<rect x="215.5" y="70.0" width="129.0" height="40.0" rx="10" fill="#f08c00" stroke="#f08c00" stroke-width="1.3"/>
+<text x="280.0" y="91.0" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="normal" dominant-baseline="middle">ヒケで外観不良</text>
+<text x="280.0" y="128.0" font-size="13" fill="#5b6472" text-anchor="middle" font-weight="normal" dominant-baseline="middle">2 次に</text>
+<rect x="385.5" y="70.0" width="129.0" height="40.0" rx="10" fill="#f8e46e" stroke="#f8e46e" stroke-width="1.3"/>
+<text x="450.0" y="91.0" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">ヒケで外観不良</text>
+<text x="450.0" y="128.0" font-size="13" fill="#5b6472" text-anchor="middle" font-weight="normal" dominant-baseline="middle">3 手が空いたら</text>
+<rect x="555.5" y="70.0" width="129.0" height="40.0" rx="10" fill="#c9cbd3" stroke="#c9cbd3" stroke-width="1.3"/>
+<text x="620.0" y="91.0" font-size="15" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">ヒケで外観不良</text>
+<text x="620.0" y="128.0" font-size="13" fill="#5b6472" text-anchor="middle" font-weight="normal" dominant-baseline="middle">4 保留</text>
+<text x="30.0" y="175.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">終わったもの(解消・中止・不採用・外れた)は灰色の点線</text>
+<rect x="45.5" y="195.0" width="129.0" height="40.0" rx="10" fill="#f3f3f5" stroke="#b0b0b0" stroke-width="1.3" stroke-dasharray="6 4"/>
+<text x="110.0" y="216.0" font-size="15" fill="#9a9a9a" text-anchor="middle" font-weight="normal" dominant-baseline="middle">ヒケで外観不良</text>
+<rect x="214.8" y="195.0" width="130.5" height="40.0" rx="10" fill="#f3f3f5" stroke="#b0b0b0" stroke-width="1.3" stroke-dasharray="6 4"/>
+<text x="280.0" y="216.0" font-size="15" fill="#9a9a9a" text-anchor="middle" font-weight="normal" dominant-baseline="middle">B案 ねじ止め式</text>
+<text x="380.0" y="215.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">← 消えずに薄く残る。経緯をたどれる</text>
+</svg>
