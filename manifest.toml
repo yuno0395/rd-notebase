@@ -37,7 +37,7 @@ include = [
   { from = "vault/共有/_仕組み/templates", to = "_仕組み/templates" },
   { from = "vault/共有/00_イシュー一覧.base", to = "00_イシュー一覧.base" },
   { from = "vault/共有/00_タスク一覧.base", to = "00_タスク一覧.base" },
-  { from = "vault/共有/00_ソリューション一覧.base", to = "00_ソリューション一覧.base" },
+  { from = "vault/共有/00_設計案一覧.base", to = "00_設計案一覧.base" },
   { from = "vault/共有/00_ノード一覧.base", to = "00_ノード一覧.base" },
 ]
 system = [

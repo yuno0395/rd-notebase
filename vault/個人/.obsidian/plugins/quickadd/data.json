@@ -74,10 +74,10 @@
         },
         {
           "id": "a4dd911f-4000-5815-bbea-f6d6a1d669a0",
-          "name": "ソリューション",
+          "name": "設計案",
           "type": "Template",
           "command": false,
-          "templatePath": "_仕組み/templates/ソリューション.md",
+          "templatePath": "_仕組み/templates/設計案.md",
           "fileNameFormat": {
             "enabled": false,
             "format": ""
@@ -86,7 +86,7 @@
           "folder": {
             "enabled": true,
             "folders": [
-              "01_目的"
+              "01_設計案"
             ],
             "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,

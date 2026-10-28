@@ -2,8 +2,9 @@ filters:
   and:
     - '!file.inFolder("_仕組み/templates")'
     - or:
-        - type == "ソリューション"
+        - type == "設計案"
         - type == "設計記録"
+        - type == "ソリューション"
 formulas:
   # この候補を脅かすイシュー(parent などでこの候補にリンクしているイシュー)のうち、まだ対策が終わっていないもの。
   # 少ないほど磨けている候補。同期プログラムがなくても数える。
@@ -19,7 +20,7 @@ properties:
     displayName: うち impact 大
 views:
   - type: table
-    name: 候補の一組(目的・上のソリューションごと)
+    name: 候補の一組(目的・上の設計案ごと)
     filters:
       and:
         - status != "不採用"

@@ -1,7 +1,7 @@
 // Ctrl+D: 開いているノートの図を開く。なければ作る(仕様書「図とパワーポイント」)。
 // 図は _仕組み/attachments/<id>/図.excalidraw.md。ひな形はノートの種類で選ぶ(なければ 図.excalidraw.md の 16:9 の枠1つ)。
 //   ナレッジ       → ナレッジ図.excalidraw.md(1枚目 実施前・やったこと・実施後、2枚目 トレードオフ曲線)
-//   ソリューション → トレードオフ曲線.excalidraw.md
+//   設計案 → トレードオフ曲線.excalidraw.md
 // 初めて作ったとき、ひな形の枠ごとに引用のウィキリンクを入れる。枠の名前と同じ見出し(下の表)があれば
 // その見出しの説明の行の下に入れる。見出しがなければ、1枚目だけカーソルの位置に入れる。2回目からは図を開くだけ。
 // 2枚目を自分で足したときは、Excalidraw でフレームを選び「フレームへのリンクをコピー」で貼る。
@@ -9,8 +9,9 @@
 const FIG_TEMPLATE = "_仕組み/templates/図.excalidraw.md";
 const TEMPLATES = {
   "ナレッジ": "_仕組み/templates/ナレッジ図.excalidraw.md",
-  "ソリューション": "_仕組み/templates/トレードオフ曲線.excalidraw.md",
+  "設計案": "_仕組み/templates/トレードオフ曲線.excalidraw.md",
   "設計記録": "_仕組み/templates/トレードオフ曲線.excalidraw.md",
+  "ソリューション": "_仕組み/templates/トレードオフ曲線.excalidraw.md",
 };
 // 枠の名前 → 引用を入れる見出し(左から探す)
 const HEADINGS = {

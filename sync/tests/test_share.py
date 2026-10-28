@@ -332,3 +332,17 @@ def test_skips_while_other_pc_syncs(box):
     run_once(box["yu"])
     assert not lock.exists()
     assert (box["shared"] / "共通/02_ノード/0RB001001_水.md").exists()
+
+
+def test_design_options_go_to_their_own_folder(box):
+    """設計案は 01_設計案/ へ集める。古い type(ソリューション・設計記録)も同じ(仕様書 v0.54)。"""
+    yu = box["yu"].personal
+    write(yu / "01_目的/0RB201001_予兆検知.md", f"---\nid: 0RB201001\ntype: 目的\nproject: [{PJ}]\n---\n")
+    goal = '["[[0RB201001_予兆検知|予兆検知]]"]'
+    write(yu / "01_設計案/0RB202001_A案.md", f"---\nid: 0RB202001\ntype: 設計案\nparent: {goal}\n---\n")
+    write(yu / "01_目的/0RB203001_B案.md", f"---\nid: 0RB203001\ntype: ソリューション\nparent: {goal}\n---\n")
+    run_once(box["yu"])
+    s = files(box["shared"])
+    assert f"{PJ}/01_目的/0RB201001_予兆検知.md" in s
+    assert f"{PJ}/01_設計案/0RB202001_A案.md" in s
+    assert f"{PJ}/01_設計案/0RB203001_B案.md" in s

@@ -125,14 +125,14 @@ class Builder:
         return [f for f in (self.index.resolve(t) for t in targets(d.fm.get("friend"))) if f]
 
     def ups(self, d: Doc) -> list[Doc]:
-        """上流。parent と、ソリューションなら friend の価値の仮説(その案が実現する仮説。Yu 2026-10-28)。"""
+        """上流。parent と、設計案なら friend の価値の仮説(その案が実現する仮説。Yu 2026-10-28)。"""
         out = self.parents(d)
-        if d.type == "ソリューション":
+        if d.type == "設計案":
             out += [h for h in self.friends(d) if h.type == "仮説"]
         return out
 
     def reach(self, d: Doc, want: str, seen: set[str] | None = None) -> list[Doc]:
-        """parent(ソリューションは friend の仮説も)をたどって着く、type が want のノート。"""
+        """parent(設計案は friend の仮説も)をたどって着く、type が want のノート。"""
         seen = seen if seen is not None else set()
         if d.id in seen:
             return []
@@ -147,17 +147,17 @@ class Builder:
     # ---------- 成果物の軸(Yu 2026-10-28) ----------
 
     def top_solution(self, s: Doc) -> Doc:
-        """s から parent をたどった、いちばん上のソリューション(成果物候補)。"""
+        """s から parent をたどった、いちばん上の設計案(成果物候補)。"""
         seen = {s.id}
         while True:
-            up = [p for p in self.parents(s) if p.type == "ソリューション" and p.id not in seen]
+            up = [p for p in self.parents(s) if p.type == "設計案" and p.id not in seen]
             if not up:
                 return s
             s = up[0]
             seen.add(s.id)
 
     def subtree(self, root: Doc) -> list[Doc]:
-        """root とその下のソリューション(部分案)。"""
+        """root とその下の設計案(部分案)。"""
         out, stack, seen = [], [root], set()
         while stack:
             s = stack.pop()
@@ -165,7 +165,7 @@ class Builder:
                 continue
             seen.add(s.id)
             out.append(s)
-            stack += [c for c in self.children.get(s.id, []) if c.type == "ソリューション" and status(c) not in DROPPED]
+            stack += [c for c in self.children.get(s.id, []) if c.type == "設計案" and status(c) not in DROPPED]
         return out
 
     def realized(self, root: Doc) -> list[Doc]:
@@ -175,7 +175,7 @@ class Builder:
             for h in self.friends(s):
                 if h.type == "仮説":
                     out.setdefault(h.id, h)
-        # v0.52 までの書き方(ソリューションの parent が仮説)も読む
+        # v0.52 までの書き方(設計案の parent が仮説)も読む
         for s in self.subtree(root):
             for h in self.parents(s):
                 if h.type == "仮説":
@@ -193,13 +193,13 @@ class Builder:
         return out
 
     def products(self, docs: list[Doc]) -> list[list[str]]:
-        """成果物候補(parent が目的のソリューション)ごとに、実現していない価値の仮説と残りのイシュー。
+        """成果物候補(parent が目的の設計案)ごとに、実現していない価値の仮説と残りのイシュー。
 
         仮説は木の末端(下に生きた仮説がないもの)を数える。上の仮説を friend にすれば、その下もすべて実現とみなす。
         外れた仮説(上が外れたものも)は数えない。両方 0 なら、その候補で目的を果たせる見込み。"""
         rows = []
         for c in sorted(docs, key=lambda d: d.name):
-            if c.type != "ソリューション" or status(c) in DROPPED:
+            if c.type != "設計案" or status(c) in DROPPED:
                 continue
             goals = [p for p in self.parents(c) if p.type == "目的"]
             if not goals:
@@ -253,11 +253,11 @@ class Builder:
         return rows
 
     def candidates(self, docs: list[Doc]) -> dict[str, int]:
-        """一組の候補(同じ parent のソリューション、ノードの parts)のうち、不採用・中止でないものの数。"""
+        """一組の候補(同じ parent の設計案、ノードの parts)のうち、不採用・中止でないものの数。"""
         out: dict[str, int] = {}
         groups: dict[str, list[Doc]] = {}
         for d in docs:
-            if d.type == "ソリューション":
+            if d.type == "設計案":
                 for p in self.parents(d):
                     groups.setdefault(p.name, []).append(d)
         for name, items in groups.items():
@@ -266,7 +266,7 @@ class Builder:
         for d in docs:
             if d.type == "ノード" and len(as_list(d.fm.get("parts"))) >= 2 and d.name not in out:
                 parts = [self.index.resolve(t) for t in targets(d.fm.get("parts"))]
-                cands = [p for p in parts if p and p.type == "ソリューション"]
+                cands = [p for p in parts if p and p.type == "設計案"]
                 if len(cands) >= 2:
                     out[d.name] = sum(1 for p in cands if status(p) not in ("不採用", "中止"))
         return out
@@ -281,7 +281,7 @@ class Builder:
             hyps = self.reach(d, "仮説")
             if not hyps:
                 # 成果物候補(とその部分案)につく仕事は、その成果物が実現する仮説につながっているとみなす
-                for s in self.reach(d, "ソリューション"):
+                for s in self.reach(d, "設計案"):
                     hyps += self.realized(self.top_solution(s))
             if not hyps:
                 rows.append([d.type, d.name, owner(d), "仮説につながっていない"])

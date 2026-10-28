@@ -65,9 +65,9 @@ def shared(tmp_path):
     # kind: DR なら名前に DR がなくても DR とみなす
     note(s, f"{PJ}/議事録", "0RB301001", "仕様の見直し", "type: 議事録\nkind: DR\ndate: 2026-10-01\n")
     note(s, f"{PJ}/議事録", "0RB302001", "打ち合わせ", "type: 議事録\ndate: 2026-10-05\n")
-    # ソリューション候補は仮説の下に並ぶ(一組の候補)。設計記録は v0.37 までの名前で、ソリューションとして数える
-    for i, (tp, st) in enumerate([("ソリューション", "候補"), ("ソリューション", "不採用"), ("設計記録", "候補")]):
-        note(s, f"{PJ}/01_目的", f"0RB40{i}001", f"センサー案{i}",
+    # 設計案の候補は同じ parent で一組になる。ソリューション(v0.54 まで)・設計記録(v0.37 まで)も設計案として数える
+    for i, (tp, st) in enumerate([("設計案", "候補"), ("ソリューション", "不採用"), ("設計記録", "候補")]):
+        note(s, f"{PJ}/01_設計案", f"0RB40{i}001", f"センサー案{i}",
              f'type: {tp}\nstatus: {st}\nparent: ["[[0RA003001_3割減なら採用される]]"]\n')
     # 別のプロジェクトが同じノードを使う
     note(s, "別PJ", "0RC001001", "別PJ", "type: プロジェクト\nmembers: [Yu]\n")
@@ -108,8 +108,8 @@ def test_weekly_report(shared, tmp_path):
     assert f'href="{PJ}/2026-W44.html"' in index
     # 2回目は作らない。次の週は推移が伸びる
     assert make_weekly(shared, out, date(2026, 10, 27), Report()) == []
-    (shared / f"{PJ}/01_目的/0RB402001_センサー案2.md").write_text(
-        (shared / f"{PJ}/01_目的/0RB402001_センサー案2.md").read_text(encoding="utf-8").replace("候補", "不採用"),
+    (shared / f"{PJ}/01_設計案/0RB402001_センサー案2.md").write_text(
+        (shared / f"{PJ}/01_設計案/0RB402001_センサー案2.md").read_text(encoding="utf-8").replace("候補", "不採用"),
         encoding="utf-8")
     make_weekly(shared, out, date(2026, 11, 2), Report())
     assert row('3割減なら採用される', '2→1') in (out / PJ / "2026-W45.html").read_text(encoding="utf-8")
@@ -169,7 +169,7 @@ def test_sections_only_and_hide(shared):
 
 
 def test_product_axis(tmp_path):
-    """成果物の軸(Yu 2026-10-28): ソリューションの parent は成果物の構成、実現する仮説は friend。
+    """成果物の軸(Yu 2026-10-28): 設計案の parent は成果物の構成、実現する仮説は friend。
     成果物候補ごとに、実現していない仮説と残りのイシューを出す。"""
     s = tmp_path / "共有"
     write(s / "_仕組み/同期設定.yaml", "")
@@ -181,14 +181,14 @@ def test_product_axis(tmp_path):
     note(s, f"{PJ}/01_目的", "0RA005001", "外れた案", f"type: 仮説\nstatus: 外れた\nparent: {g}\n")
     # 上の仮説を friend にすれば、下の仮説も実現とみなす
     note(s, f"{PJ}/01_目的", "0RA006001", "工具なし", 'type: 仮説\nstatus: 検証中\nparent: ["[[0RA004001_後付け10分]]"]\n')
-    note(s, f"{PJ}/01_目的", "0RB001001", "A案クランプ式", f"type: ソリューション\nstatus: 候補\nparent: {g}\n")
-    note(s, f"{PJ}/01_目的", "0RB002001", "電池ユニット",
-         'type: ソリューション\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\nfriend: ["[[0RA003001_電池3年]]"]\n')
-    note(s, f"{PJ}/01_目的", "0RB003001", "マグネット取付",
-         'type: ソリューション\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\nfriend: ["[[0RA004001_後付け10分]]"]\n')
-    note(s, f"{PJ}/01_目的", "0RB004001", "B案ねじ止め式",
-         f'type: ソリューション\nstatus: 候補\nparent: {g}\nfriend: ["[[0RA003001_電池3年]]"]\n')
-    note(s, f"{PJ}/01_目的", "0RB005001", "C案", f"type: ソリューション\nstatus: 不採用\nparent: {g}\n")
+    note(s, f"{PJ}/01_設計案", "0RB001001", "A案クランプ式", f"type: 設計案\nstatus: 候補\nparent: {g}\n")
+    note(s, f"{PJ}/01_設計案", "0RB002001", "電池ユニット",
+         'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\nfriend: ["[[0RA003001_電池3年]]"]\n')
+    note(s, f"{PJ}/01_設計案", "0RB003001", "マグネット取付",
+         'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\nfriend: ["[[0RA004001_後付け10分]]"]\n')
+    note(s, f"{PJ}/01_設計案", "0RB004001", "B案ねじ止め式",
+         f'type: 設計案\nstatus: 候補\nparent: {g}\nfriend: ["[[0RA003001_電池3年]]"]\n')
+    note(s, f"{PJ}/01_設計案", "0RB005001", "C案", f"type: 設計案\nstatus: 不採用\nparent: {g}\n")
     issue = "author: Yu\ntype: イシュー\nproject: [樹脂カバー]\n"
     note(s, f"{PJ}/03_イシュー", "0RC001001", "電池が冬にもたない",
          issue + 'status: 対策中\nimpact: 出荷\nparent: ["[[0RB002001_電池ユニット]]"]\n')

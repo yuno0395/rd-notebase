@@ -1,5 +1,5 @@
-// イシュー・タスク・仮説・ソリューション・目的・ナレッジにする(仕様書「ショートカットキー」)。
-// Ctrl+I(イシュー)・Ctrl+T(タスク)・Ctrl+H(仮説)・Ctrl+U(ソリューション)と、右クリックのメニューから使う。
+// イシュー・タスク・仮説・設計案・目的・ナレッジにする(仕様書「ショートカットキー」)。
+// Ctrl+I(イシュー)・Ctrl+T(タスク)・Ctrl+H(仮説)・Ctrl+U(設計案)と、右クリックのメニューから使う。
 //
 //   - 文字を選んで使う: その文字を名前にする。
 //   - [[ ]] の上で使う: そのリンクの名前で作る(まだファイルがないときだけ)。
@@ -7,11 +7,11 @@
 // 同じ種類・同じ名前(か別名)のノートがあれば、作らずにそれにつなぐ。
 // 質問はしない。作ったノートは開かない。parent には今のノートが入る。ただし、
 //   - 仮説: 今のノートが仮説なら今のノート(下の仮説になる。仮説の木)。それ以外は parent をたどった先の目的。
-//   - ソリューション: parent は成果物の構成(Yu 2026-10-28)。目的で押せば成果物候補、ソリューションで押せば
+//   - 設計案: parent は成果物の構成(Yu 2026-10-28)。目的で押せば成果物候補、設計案で押せば
 //     その部分案。仮説で押したとき(たどった先が仮説のときも)は、parent にその目的、friend にその仮説(この案が
-//     実現する仮説)を入れる。ほかのノートでは parent をたどって最初に着く目的・仮説・ソリューションで同じように決める。
-//   - イシュー: 今のノートから parent をたどって最初に着くソリューション候補(その候補が仮説を実現できるかを
-//     脅かすリスク。Yu 2026-10-25)。ソリューションがなければ価値の仮説(目的は越えない)。今のノートが
+//     実現する仮説)を入れる。ほかのノートでは parent をたどって最初に着く目的・仮説・設計案で同じように決める。
+//   - イシュー: 今のノートから parent をたどって最初に着く設計案候補(その候補が仮説を実現できるかを
+//     脅かすリスク。Yu 2026-10-25)。設計案がなければ価値の仮説(目的は越えない)。今のノートが
 //     タスク・実験・試作記録なら、previous に今のノート、generation に元のイシュー＋1 を入れる。
 //     今のノートがノードなら、friend に今のノートを入れる。どちらも見つからなければ parent は空けて知らせる。
 
@@ -25,14 +25,19 @@ const TASK_MARKS = /\s*(?:📅|⏳|🛫|✅|➕|🔁|⏫|🔼|🔽|❌|🆔|⛔)
 
 // イシューを生む対策(仕様書「対策から新しいイシューが生まれるとき」)
 const COUNTERMEASURES = ["タスク", "実験・試作記録"];
-// ソリューションの上に来るもの
-const SOLUTION_PARENTS = ["目的", "仮説", "ソリューション"];
+// 設計案の上に来るもの
+const SOLUTION_PARENTS = ["目的", "仮説", "設計案"];
+
+// v0.37 までの設計記録と v0.54 までのソリューションは、設計案として扱う(Yu 2026-10-28)
+function normType(t) {
+  return t === "設計記録" || t === "ソリューション" ? "設計案" : t;
+}
 
 const KINDS = {
   イシュー: { type: "イシュー", template: T + "イシュー.md", folder: "03_イシュー" },
   タスク: { type: "タスク", template: T + "タスク.md", folder: "04_タスク" },
   仮説: { type: "仮説", template: T + "価値の仮説.md", folder: "01_目的" },
-  ソリューション: { type: "ソリューション", template: T + "ソリューション.md", folder: "01_目的" },
+  設計案: { type: "設計案", template: T + "設計案.md", folder: "01_設計案" },
   目的: { type: "目的", template: T + "目的.md", folder: "01_目的" },
   ナレッジ: { type: "ナレッジ", template: T + "ナレッジ.md", folder: "05_ナレッジ" },
 };
@@ -57,7 +62,7 @@ function findSame(app, type, name) {
     const fm = app.metadataCache.getFileCache(f)?.frontmatter;
     if (!fm) return false;
     const t = String(fm.type || "").trim();
-    if ((t === "設計記録" ? "ソリューション" : t) !== type) return false;
+    if (normType(t) !== type) return false;
     return nameOf(f).toLowerCase() === key || asList(fm.aliases).some((a) => a.toLowerCase() === key);
   });
 }
@@ -93,7 +98,7 @@ function flow(values) {
 
 function typeOf(app, file) {
   const t = String(app.metadataCache.getFileCache(file)?.frontmatter?.type || "").trim();
-  return t === "設計記録" ? "ソリューション" : t; // v0.37 までの設計記録はソリューションとして扱う
+  return normType(t);
 }
 
 // 今のノートか、その parent をたどった先にある目的(近いものから。5段まで)
@@ -171,7 +176,7 @@ function findNearestOf(app, note, types) {
   return [];
 }
 
-// ソリューションの parent(成果物の構成)と friend(実現する価値の仮説)。Yu 2026-10-28
+// 設計案の parent(成果物の構成)と friend(実現する価値の仮説)。Yu 2026-10-28
 function solutionLinks(app, note) {
   const ups = findNearestOf(app, note, SOLUTION_PARENTS);
   const hyps = ups.filter((f) => typeOf(app, f) === "仮説");
@@ -183,9 +188,9 @@ function solutionLinks(app, note) {
   return { parents, hyps };
 }
 
-// イシューの parent: いちばん近いソリューション候補、なければ価値の仮説
+// イシューの parent: いちばん近い設計案候補、なければ価値の仮説
 function issueParents(app, note) {
-  const sol = findNearest(app, note, "ソリューション", ["目的", "仮説"]);
+  const sol = findNearest(app, note, "設計案", ["目的", "仮説"]);
   return sol.length ? sol : findNearest(app, note, "仮説", ["目的"]);
 }
 
@@ -228,7 +233,7 @@ function initialValues(app, kind, note) {
   const here = linkOf(note);
   const project = asList(fm.project);
   const out = {};
-  if (kind === "ソリューション") {
+  if (kind === "設計案") {
     const { parents, hyps } = solutionLinks(app, note);
     if (parents.length) out.parent = flow(parents.map((f) => linkOf(f)));
     if (hyps.length) out.friend = flow(hyps.map((f) => linkOf(f)));
@@ -241,7 +246,7 @@ function initialValues(app, kind, note) {
       if (purpose) out.parent = flow([linkOf(purpose)]);
     }
   } else if (kind === "イシュー") {
-    // イシューの parent はソリューション候補(なければ価値の仮説)。対策から生まれたものは previous と generation でたどれるようにする
+    // イシューの parent は設計案候補(なければ価値の仮説)。対策から生まれたものは previous と generation でたどれるようにする
     const here_type = typeOf(app, note);
     const ups = issueParents(app, note);
     if (ups.length) out.parent = flow(ups.map((f) => linkOf(f)));
@@ -407,8 +412,8 @@ async function make_note(tp, kind) {
     if (!file) return;
     const noParent =
       (kind === "仮説" && typeOf(app, note) !== "仮説" && !findPurpose(app, note) && "目的") ||
-      (kind === "イシュー" && !issueParents(app, note).length && "ソリューション候補か価値の仮説") ||
-    (kind === "ソリューション" && !solutionLinks(app, note).parents.length && "目的か上のソリューション");
+      (kind === "イシュー" && !issueParents(app, note).length && "設計案候補か価値の仮説") ||
+    (kind === "設計案" && !solutionLinks(app, note).parents.length && "目的か上の設計案");
     new Notice(`${kind}「${name}」を作りました` + (noParent ? `。${noParent}が見つからなかったので、parent に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
   }
   placeLink(app, ed, note, file, linkOf(file, name), from, to, orig);
@@ -439,8 +444,8 @@ async function fromNote(tp, kind, note, rawName) {
   if (!file) return null;
   const noParent =
     (kind === "仮説" && typeOf(app, note) !== "仮説" && !findPurpose(app, note) && "目的") ||
-    (kind === "イシュー" && !issueParents(app, note).length && "ソリューション候補か価値の仮説") ||
-    (kind === "ソリューション" && !solutionLinks(app, note).parents.length && "目的か上のソリューション");
+    (kind === "イシュー" && !issueParents(app, note).length && "設計案候補か価値の仮説") ||
+    (kind === "設計案" && !solutionLinks(app, note).parents.length && "目的か上の設計案");
   new Notice(`${kind}「${name}」を「${nameOf(note)}」から作りました` + (noParent ? `。${noParent}が見つからなかったので、parent に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
   return file;
 }
