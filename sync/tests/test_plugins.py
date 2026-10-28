@@ -131,3 +131,29 @@ def test_pack_without_network(tmp_path, monkeypatch):
 
     errors = plugins.pack("0.2.0", tmp_path, tmp_path / "dist", get=get)
     assert errors and "ネット" in errors[0]
+
+
+def test_pack_license_from_api(tmp_path, monkeypatch):
+    """LICENSE のファイル名が一覧にないときは、GitHub のライセンス API から取る。"""
+    import base64
+    lists = tmp_path / "root"
+    (lists / plugins.DIST_LISTS[0]).parent.mkdir(parents=True, exist_ok=True)
+    (lists / plugins.DIST_LISTS[0]).write_text(json.dumps(["templater-obsidian"]), encoding="utf-8")
+    monkeypatch.setattr(plugins, "ROOT", lists)
+    installed = tmp_path / ".obsidian"
+    put_plugin(installed / "plugins", "templater-obsidian", "2.1.0")
+    pages = {
+        plugins.REGISTRY: json.dumps([{"id": "templater-obsidian", "repo": "b/Templater"}]).encode(),
+        "https://api.github.com/repos/b/Templater/license": json.dumps({"content": base64.b64encode(AGPL).decode()}).encode(),
+        "https://github.com/b/Templater/archive/refs/tags/2.1.0.zip": b"PK zip",
+    }
+
+    def get(url):
+        if url in pages:
+            return pages[url]
+        raise OSError("404")
+
+    errors = plugins.pack("0.2.0", installed, tmp_path / "dist", get=get)
+    p = tmp_path / "dist" / plugins.PLUGIN_DIR
+    assert (p / "templater-obsidian/LICENSE").read_bytes() == AGPL
+    assert errors == []

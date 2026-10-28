@@ -1,7 +1,8 @@
 """配布物を組み立てる(仕様書「仕組みの正本と配布」)。
 
 使い方:  python tools/build.py 0.1.0
-できるもの: dist/0.1.0/{共有,個人,機密}/ と dist/0.1.0/manifest.toml、plugins.py・プラグインを入れる.bat
+できるもの: dist/0.1.0/{共有,個人,機密}/ と dist/0.1.0/manifest.toml、plugins.py・プラグインを入れる.bat、
+          準備/setup.py(準備の bat の中身)、同期プログラム/(notesync と起動用の bat)、移し替え/(manifest の migrate)
 続けて python tools/plugins.py pack 0.1.0 --from <プラグインが入った設定フォルダ> で dist/0.1.0/プラグイン/ をそろえる。
 これを Box の共有 _仕組み/tools/配布/0.1.0/ に置く。
 
@@ -70,6 +71,21 @@ def main() -> int:
     # プラグインを入れる道具(本体は tools/plugins.py pack で dist/<版>/プラグイン/ にそろえる)
     for f in ("plugins.py", "プラグインを入れる.bat"):
         shutil.copy2(ROOT / "tools" / f, out / f)
+    # 準備の bat の中身と、各 PC に入れる同期プログラム(メンバーが GitHub を使わなくてよいように)
+    (out / "準備").mkdir()
+    shutil.copy2(ROOT / "tools" / "setup.py", out / "準備" / "setup.py")
+    skip = shutil.ignore_patterns("__pycache__", "*.pyc")
+    shutil.copytree(ROOT / "sync" / "notesync", out / "同期プログラム" / "notesync", ignore=skip)
+    shutil.copytree(ROOT / "sync" / "起動", out / "同期プログラム" / "起動", ignore=skip)
+    shutil.copy2(ROOT / "sync" / "config.example.yaml", out / "同期プログラム" / "config.example.yaml")
+    # 版ごとの移し替え(要件書 F-46。飛ばした版も古い順に当てる)
+    for m in manifest.get("migrate", []):
+        src = ROOT / m["script"]
+        if not src.is_file():
+            errors.append(f"移し替え {m['script']}(版 {m['version']})がありません")
+            continue
+        (out / "移し替え").mkdir(exist_ok=True)
+        shutil.copy2(src, out / "移し替え" / src.name)
     for e in errors:
         print("エラー:", e)
     return 1 if errors else 0

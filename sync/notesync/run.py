@@ -36,6 +36,30 @@ def vaults_of(cfg: Config) -> list[Vault]:
     return vs
 
 
+def _vkey(v: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(x) for x in v.strip().lstrip("v").split("."))
+    except ValueError:
+        return ()
+
+
+def notice_new_version(personal, shared, report: Report) -> None:
+    """管理者が新しい版を出したら、同期レポートで知らせる(当てるのは各自の準備の bat。仕様書「bat 1つで準備と更新」)。"""
+    if not shared:
+        return
+    try:
+        latest = (shared / "_仕組み/tools/準備/最新の版.txt").read_text(encoding="utf-8").strip()
+    except OSError:
+        return
+    try:
+        mine = (personal / "_仕組み/記録/版.txt").read_text(encoding="utf-8").strip()
+    except OSError:
+        mine = ""
+    if _vkey(latest) and (not _vkey(mine) or _vkey(mine) < _vkey(latest)):
+        report.todo(f"新しい版 {latest} があります(いまは {mine or '版なし'})。共有 vault の _仕組み/tools/準備/ の "
+                    "bat(PL はプロジェクトリーダー.bat、ほかはチームメンバー.bat)を押してください")
+
+
 def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None) -> Report:
     """1回分の同期。同じ個人 vault を別の PC が同期している間は見送る(複数の PC で使う)。"""
     dry = cfg.dry_run if dry_run is None else dry_run
@@ -151,6 +175,7 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
         report.warn(f"共有 vault が見つかりません: {cfg.shared}(Box Drive が止まっていないか確かめてください)")
 
     update_daily(cfg.personal, cfg.shared, cfg.member, report, backup, dry, now, cfg.idle_seconds)  # F-30・F-33
+    notice_new_version(cfg.personal, cfg.shared, report)
     report.write(cfg.personal)
     if not dry:
         backup.prune()
