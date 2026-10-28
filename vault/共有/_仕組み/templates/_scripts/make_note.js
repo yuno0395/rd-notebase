@@ -8,12 +8,13 @@
 // 質問はしない。作ったノートは開かない。parent には今のノートが入る。ただし、
 //   - 仮説: 今のノートが仮説なら今のノート(下の仮説になる。仮説の木)。それ以外は parent をたどった先の目的。
 //   - 設計案: parent は成果物の構成(Yu 2026-10-28)。目的で押せば成果物候補、設計案で押せば
-//     その部分案。仮説で押したとき(たどった先が仮説のときも)は、parent にその目的、friend にその仮説(この案が
+//     その部分案。仮説で押したとき(たどった先が仮説のときも)は、parent にその目的、価値仮説にその仮説(この案が
 //     実現する仮説)を入れる。ほかのノートでは parent をたどって最初に着く目的・仮説・設計案で同じように決める。
-//   - イシュー: 今のノートから parent をたどって最初に着く設計案候補(その候補が仮説を実現できるかを
-//     脅かすリスク。Yu 2026-10-25)。設計案がなければ価値の仮説(目的は越えない)。今のノートが
+//   - イシュー: parent ではなく 脅かす に、今のノートから上流をたどって最初に着く設計案(その案が仮説を
+//     実現できるかを脅かすリスク。Yu 2026-10-25。K-Plex で設計案の右に出す。2026-10-28)。設計案がなければ
+//     価値の仮説(目的は越えない)。今のノートが
 //     タスク・実験・試作記録なら、previous に今のノート、generation に元のイシュー＋1 を入れる。
-//     今のノートがノードなら、friend に今のノートを入れる。どちらも見つからなければ parent は空けて知らせる。
+//     今のノートがノードなら、friend に今のノートを入れる。どちらも見つからなければ 脅かす は空けて知らせる。
 
 const T = "_仕組み/templates/";
 const ID_PREFIX = /^[0-9A-Z]{6}[0-9A-Z]+_/i;
@@ -111,22 +112,17 @@ function findPurpose(app, note) {
       if (seen.has(f.path)) continue;
       seen.add(f.path);
       if (typeOf(app, f) === "目的") return f;
-      const fm = app.metadataCache.getFileCache(f)?.frontmatter || {};
-      for (const p of asList(fm.parent)) {
-        const target = (p.match(/\[\[([^\]]+)\]\]/) || [])[1];
-        const dest = target && resolve(app, target, f.path);
-        if (dest) next.push(dest);
-      }
+      next.push(...parentsOf(app, f));
     }
     level = next;
   }
   return null;
 }
 
-// parent の行き先のノート
+// 上流のノート。parent と、イシューの 脅かす(脅かす設計案か仮説。K-Plex では相手の右に出る。Yu 2026-10-28)
 function parentsOf(app, f) {
   const fm = app.metadataCache.getFileCache(f)?.frontmatter || {};
-  return asList(fm.parent)
+  return [...asList(fm.parent), ...asList(fm["脅かす"])]
     .map((p) => (p.match(/\[\[([^\]]+)\]\]/) || [])[1])
     .filter((t) => t)
     .map((t) => resolve(app, t, f.path))
@@ -176,7 +172,7 @@ function findNearestOf(app, note, types) {
   return [];
 }
 
-// 設計案の parent(成果物の構成)と friend(実現する価値の仮説)。Yu 2026-10-28
+// 設計案の parent(成果物の構成)と 価値仮説(実現する価値の仮説。K-Plex の左に出る)。Yu 2026-10-28
 function solutionLinks(app, note) {
   const ups = findNearestOf(app, note, SOLUTION_PARENTS);
   const hyps = ups.filter((f) => typeOf(app, f) === "仮説");
@@ -236,7 +232,7 @@ function initialValues(app, kind, note) {
   if (kind === "設計案") {
     const { parents, hyps } = solutionLinks(app, note);
     if (parents.length) out.parent = flow(parents.map((f) => linkOf(f)));
-    if (hyps.length) out.friend = flow(hyps.map((f) => linkOf(f)));
+    if (hyps.length) out["価値仮説"] = flow(hyps.map((f) => linkOf(f)));
   } else if (kind === "仮説") {
     // 仮説の parent は目的か上の仮説(仮説の木)。仮説で作ったら、その下の仮説にする。
     // それ以外は今のノートからたどった目的。見つからなければ空けておく
@@ -246,10 +242,10 @@ function initialValues(app, kind, note) {
       if (purpose) out.parent = flow([linkOf(purpose)]);
     }
   } else if (kind === "イシュー") {
-    // イシューの parent は設計案候補(なければ価値の仮説)。対策から生まれたものは previous と generation でたどれるようにする
+    // イシューは 脅かす に脅かす設計案(なければ価値の仮説)。対策から生まれたものは previous と generation でたどれるようにする
     const here_type = typeOf(app, note);
     const ups = issueParents(app, note);
-    if (ups.length) out.parent = flow(ups.map((f) => linkOf(f)));
+    if (ups.length) out["脅かす"] = flow(ups.map((f) => linkOf(f)));
     out.impact = "未判定";
     out.speed = "すぐ";
     const proj = projectFor(app, note);
@@ -412,9 +408,9 @@ async function make_note(tp, kind) {
     if (!file) return;
     const noParent =
       (kind === "仮説" && typeOf(app, note) !== "仮説" && !findPurpose(app, note) && "目的") ||
-      (kind === "イシュー" && !issueParents(app, note).length && "設計案候補か価値の仮説") ||
+      (kind === "イシュー" && !issueParents(app, note).length && "設計案か価値の仮説") ||
     (kind === "設計案" && !solutionLinks(app, note).parents.length && "目的か上の設計案");
-    new Notice(`${kind}「${name}」を作りました` + (noParent ? `。${noParent}が見つからなかったので、parent に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
+    new Notice(`${kind}「${name}」を作りました` + (noParent ? `。${noParent}が見つからなかったので、${kind === "イシュー" ? "脅かす" : "parent"} に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
   }
   placeLink(app, ed, note, file, linkOf(file, name), from, to, orig);
 }
@@ -444,9 +440,9 @@ async function fromNote(tp, kind, note, rawName) {
   if (!file) return null;
   const noParent =
     (kind === "仮説" && typeOf(app, note) !== "仮説" && !findPurpose(app, note) && "目的") ||
-    (kind === "イシュー" && !issueParents(app, note).length && "設計案候補か価値の仮説") ||
+    (kind === "イシュー" && !issueParents(app, note).length && "設計案か価値の仮説") ||
     (kind === "設計案" && !solutionLinks(app, note).parents.length && "目的か上の設計案");
-  new Notice(`${kind}「${name}」を「${nameOf(note)}」から作りました` + (noParent ? `。${noParent}が見つからなかったので、parent に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
+  new Notice(`${kind}「${name}」を「${nameOf(note)}」から作りました` + (noParent ? `。${noParent}が見つからなかったので、${kind === "イシュー" ? "脅かす" : "parent"} に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
   return file;
 }
 

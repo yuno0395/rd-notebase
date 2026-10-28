@@ -12,7 +12,7 @@ formulas:
   # そのうち impact 大(方針・絞込・出荷)
   open_big: 'file.backlinks.filter(value.asFile().properties.type == "イシュー" && (value.asFile().properties.status == "未対応" || value.asFile().properties.status == "対策中") && (value.asFile().properties.impact == "方針" || value.asFile().properties.impact == "絞込" || value.asFile().properties.impact == "出荷")).length'
 properties:
-  friend:
+  価値仮説:
     displayName: 実現する仮説・関係
   formula.open:
     displayName: 残りのイシュー
@@ -32,7 +32,7 @@ views:
       - status
       - formula.open_big
       - formula.open
-      - friend
+      - 価値仮説
       - drawing_no
       - author
     sort:
@@ -52,7 +52,7 @@ views:
       - status
       - formula.open_big
       - formula.open
-      - friend
+      - 価値仮説
       - drawing_no
       - parent
       - author

@@ -119,16 +119,23 @@ class Builder:
     # ---------- つながり ----------
 
     def parents(self, d: Doc) -> list[Doc]:
-        return [p for p in (self.index.resolve(t) for t in targets(d.fm.get("parent"))) if p]
+        """上流。イシューは 脅かす(脅かす設計案か仮説。Yu 2026-10-28)も。v0.54 までの parent も読む。"""
+        ts = targets(d.fm.get("parent")) + targets(d.fm.get("脅かす"))
+        return [p for p in (self.index.resolve(t) for t in ts) if p]
 
     def friends(self, d: Doc) -> list[Doc]:
         return [f for f in (self.index.resolve(t) for t in targets(d.fm.get("friend"))) if f]
 
+    def values(self, d: Doc) -> list[Doc]:
+        """設計案が実現する価値の仮説。属性 価値仮説(Yu 2026-10-28)と、v0.54 までの friend の仮説。"""
+        ts = targets(d.fm.get("価値仮説")) + targets(d.fm.get("friend"))
+        return [h for h in (self.index.resolve(t) for t in ts) if h and h.type == "仮説"]
+
     def ups(self, d: Doc) -> list[Doc]:
-        """上流。parent と、設計案なら friend の価値の仮説(その案が実現する仮説。Yu 2026-10-28)。"""
+        """上流。parent と、設計案なら 価値仮説(古い friend の仮説も。その案が実現する仮説。Yu 2026-10-28)。"""
         out = self.parents(d)
         if d.type == "設計案":
-            out += [h for h in self.friends(d) if h.type == "仮説"]
+            out += self.values(d)
         return out
 
     def reach(self, d: Doc, want: str, seen: set[str] | None = None) -> list[Doc]:
@@ -172,9 +179,8 @@ class Builder:
         """成果物候補とその部分案が friend でつないだ価値の仮説。"""
         out: dict[str, Doc] = {}
         for s in self.subtree(root):
-            for h in self.friends(s):
-                if h.type == "仮説":
-                    out.setdefault(h.id, h)
+            for h in self.values(s):
+                out.setdefault(h.id, h)
         # v0.52 までの書き方(設計案の parent が仮説)も読む
         for s in self.subtree(root):
             for h in self.parents(s):
