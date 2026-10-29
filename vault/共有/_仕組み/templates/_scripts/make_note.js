@@ -10,6 +10,9 @@
 //   - 設計案: parent は成果物の構成(Yu 2026-10-28)。目的で押せば成果物候補、設計案で押せば
 //     その部分案。仮説で押したとき(たどった先が仮説のときも)は、parent にその目的、価値仮説にその仮説(この案が
 //     実現する仮説)を入れる。ほかのノートでは parent をたどって最初に着く目的・仮説・設計案で同じように決める。
+//     イシューで押したとき(イシューの対策で考え方の違う案を出す。Yu 2026-10-29)は、脅かされている設計案と
+//     並ぶ候補にする: parent はその案の parent、価値仮説はその案の値を写し、previous にそのイシューを入れる。
+//     脅かされているのが仮説なら、上と同じく parent に目的、価値仮説にその仮説。どちらも previous はそのイシュー。
 //   - イシュー: parent ではなく 脅かす に、今のノートから上流をたどって最初に着く設計案(その案が仮説を
 //     実現できるかを脅かすリスク。Yu 2026-10-25。K-Plex で設計案の右に出す。2026-10-28)。設計案がなければ
 //     価値の仮説(目的は越えない)。今のノートが
@@ -184,6 +187,34 @@ function solutionLinks(app, note) {
   return { parents, hyps };
 }
 
+// イシューで Ctrl+U: 脅かされている設計案と並ぶ候補(Yu 2026-10-29)。脅かされているのが仮説なら solutionLinks と同じ
+function changeLinks(app, issue) {
+  const parents = [];
+  const hyps = [];
+  const add = (list, f) => { if (f && !list.some((x) => x.path === f.path)) list.push(f); };
+  const targets = (f, key) => asList(app.metadataCache.getFileCache(f)?.frontmatter?.[key])
+    .map((p) => (p.match(/\[\[([^\]]+)\]\]/) || [])[1])
+    .filter((t) => t)
+    .map((t) => resolve(app, t, f.path))
+    .filter((d) => d);
+  for (const t of targets(issue, "脅かす").concat(targets(issue, "parent"))) {
+    const ty = typeOf(app, t);
+    if (ty === "設計案") {
+      targets(t, "parent").forEach((f) => add(parents, f));
+      targets(t, "価値仮説").concat(targets(t, "friend"))
+        .filter((f) => typeOf(app, f) === "仮説").forEach((f) => add(hyps, f));
+    } else if (ty === "仮説") {
+      add(hyps, t);
+      add(parents, findPurpose(app, t));
+    }
+  }
+  return { parents, hyps };
+}
+
+function designParents(app, note) {
+  return (typeOf(app, note) === "イシュー" ? changeLinks(app, note) : solutionLinks(app, note)).parents;
+}
+
 // イシューの parent: いちばん近い設計案候補、なければ価値の仮説
 function issueParents(app, note) {
   const sol = findNearest(app, note, "設計案", ["目的", "仮説"]);
@@ -230,9 +261,11 @@ function initialValues(app, kind, note) {
   const project = asList(fm.project);
   const out = {};
   if (kind === "設計案") {
-    const { parents, hyps } = solutionLinks(app, note);
+    const fromIssue = typeOf(app, note) === "イシュー";
+    const { parents, hyps } = fromIssue ? changeLinks(app, note) : solutionLinks(app, note);
     if (parents.length) out.parent = flow(parents.map((f) => linkOf(f)));
     if (hyps.length) out["価値仮説"] = flow(hyps.map((f) => linkOf(f)));
+    if (fromIssue) out.previous = flow([here]);
   } else if (kind === "仮説") {
     // 仮説の parent は目的か上の仮説(仮説の木)。仮説で作ったら、その下の仮説にする。
     // それ以外は今のノートからたどった目的。見つからなければ空けておく
@@ -412,7 +445,7 @@ async function make_note(tp, kind) {
     const noParent =
       (kind === "仮説" && typeOf(app, note) !== "仮説" && !findPurpose(app, note) && "目的") ||
       (kind === "イシュー" && !issueParents(app, note).length && "設計案か価値の仮説") ||
-    (kind === "設計案" && !solutionLinks(app, note).parents.length && "目的か上の設計案");
+    (kind === "設計案" && !designParents(app, note).length && "目的か上の設計案");
     new Notice(`${kind}「${name}」を作りました` + (noParent ? `。${noParent}が見つからなかったので、${kind === "イシュー" ? "脅かす" : "parent"} に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
   }
   placeLink(app, ed, note, file, linkOf(file, name), from, to, orig);
@@ -444,7 +477,7 @@ async function fromNote(tp, kind, note, rawName) {
   const noParent =
     (kind === "仮説" && typeOf(app, note) !== "仮説" && !findPurpose(app, note) && "目的") ||
     (kind === "イシュー" && !issueParents(app, note).length && "設計案か価値の仮説") ||
-    (kind === "設計案" && !solutionLinks(app, note).parents.length && "目的か上の設計案");
+    (kind === "設計案" && !designParents(app, note).length && "目的か上の設計案");
   new Notice(`${kind}「${name}」を「${nameOf(note)}」から作りました` + (noParent ? `。${noParent}が見つからなかったので、${kind === "イシュー" ? "脅かす" : "parent"} に${noParent}を書いてください` : ""), noParent ? 8000 : undefined);
   return file;
 }
