@@ -192,6 +192,7 @@ def test_prospects(tmp_path):
          'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\n価値仮説: ["[[0RA003001_電池3年]]"]\n')
     note(s, f"{PJ}/01_設計案", "0RB004001", "B案ねじ止め式", f"type: 設計案\nstatus: 候補\nparent: {g}\n")
     note(s, f"{PJ}/01_設計案", "0RB005001", "C案", f"type: 設計案\nstatus: 不採用\nparent: {g}\n")
+    note(s, f"{PJ}/01_設計案", "0RB006001", "D案", f"type: 設計案\nstatus: 変更\nparent: {g}\n")   # 新しい候補に置き換えた
     issue = "author: Yu\ntype: イシュー\nproject: [樹脂カバー]\n"
     note(s, f"{PJ}/03_イシュー", "0RC001001", "無線で電池3年もつか",
          issue + 'status: 対策中\nimpact: 方針\n脅かす: ["[[0RB002001_電池ユニット]]"]\n')
@@ -209,8 +210,8 @@ def test_prospects(tmp_path):
     assert html.count('<svg class="kp"') == 2
     assert "<title>A案クランプ式</title>" in html and "部分の案: 電池ユニット" in html
     assert "クランプが成り立つか(priority -、方針、解決)" in html
-    assert "<td>C案</td>" not in html
-    assert "不可能ではない成果物候補: 2 件(不採用・中止にした候補: 1 件)" in html
+    assert "<td>C案</td>" not in html and "<td>D案</td>" not in html
+    assert "不可能ではない成果物候補: 2 件(不採用・中止・変更にした候補: 2 件)" in html
     assert "どの候補にもつかない方針リスク(仮説を脅かすものなど): 解決 0 件、未解決 1 件" in html
 
 
