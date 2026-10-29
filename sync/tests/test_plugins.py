@@ -80,7 +80,7 @@ def test_install_personal_vault_uses_its_own_list_and_skips_same_version(tmp_pat
     assert (ob / "plugins/quickadd/main.js").read_text(encoding="utf-8") == "// quickadd 1.1.0"  # 版が違えば入れ替える
     assert "手元" in (ob / "plugins/periodic-notes/main.js").read_text(encoding="utf-8")  # 同じ版は触らない
     assert (ob / "plugins/periodic-notes/data.json").read_text(encoding="utf-8") == '{"mine": true}'
-    assert done == ["quickadd を入れた(1.0.0 → 1.1.0)"]
+    assert done[0] == "quickadd を入れた(1.0.0 → 1.1.0)" and "コアプラグイン" in done[1] and len(done) == 2
 
 
 def test_config_dirs(tmp_path):
@@ -157,3 +157,21 @@ def test_pack_license_from_api(tmp_path, monkeypatch):
     p = tmp_path / "dist" / plugins.PLUGIN_DIR
     assert (p / "templater-obsidian/LICENSE").read_bytes() == AGPL
     assert errors == []
+
+
+def test_set_core_plugins(tmp_path):
+    """コアプラグインは決まりのものだけ変え、ほかは各自のまま。古い一覧の形も読む。"""
+    d = tmp_path / ".obsidian"
+    assert plugins.set_core_plugins(d)  # ないときは Obsidian の既定から作る
+    core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+    assert core["daily-notes"] is False and core["templates"] is False and core["canvas"] is False
+    assert core["bases"] is True and core["file-explorer"] is True
+    assert not plugins.set_core_plugins(d)  # 2回目は何も変えない
+    (d / "core-plugins.json").write_text(json.dumps({"daily-notes": True, "word-count": False}), encoding="utf-8")
+    assert plugins.set_core_plugins(d)
+    core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+    assert core["daily-notes"] is False and core["word-count"] is False  # 各自が切ったものは切ったまま
+    (d / "core-plugins.json").write_text(json.dumps(["file-explorer", "templates"]), encoding="utf-8")
+    assert plugins.set_core_plugins(d)
+    core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+    assert core["file-explorer"] is True and core["templates"] is False and core["outline"] is False

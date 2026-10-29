@@ -990,10 +990,10 @@ class Setup:
             if settings.is_dir() and settings.resolve() != d.resolve():
                 rels = [f.relative_to(settings).as_posix() for f in settings.rglob("*") if f.is_file()]
                 self.backups.save(label.replace(" ", "") + "_設定", d, rels)
+            sys.path.insert(0, str(self.dist))
+            import importlib
+            plugins = importlib.import_module("plugins")
             if (source / "プラグインの出典.md").is_file():
-                sys.path.insert(0, str(self.dist))
-                import importlib
-                plugins = importlib.import_module("plugins")
                 for line in plugins.install(vault, config, source):
                     self.log(f"{label}: {line}")
             elif settings.is_dir() and settings.resolve() != d.resolve():
@@ -1003,6 +1003,8 @@ class Setup:
                         shutil.copy2(f, d / f.relative_to(settings))
                 if not (d / "community-plugins.json").is_file() and (settings / "community-plugins.json").is_file():
                     shutil.copy2(settings / "community-plugins.json", d / "community-plugins.json")
+            if plugins.set_core_plugins(d):  # 本体がない版でも、個人 vault でも合わせる
+                self.log(f"{label}: コアプラグインを合わせた")
             (d / SEEN_VERSION).write_text(read_version(self.dist / "共有") + "\n", encoding="utf-8")
         if not self.config_needs_update(vault, config):
             return

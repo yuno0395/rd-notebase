@@ -210,6 +210,46 @@ def config_dirs(vault: Path) -> list[str]:
     return sorted(p.name for p in vault.iterdir() if p.is_dir() and (p.name == ".obsidian" or p.name.startswith(".obsidian-")))
 
 
+# コアプラグイン(仕様書「コアプラグイン」)。ファイルに独自の書式を残すものは切り、一覧と見るだけのものは入れる。
+# ほかのコアプラグインは各自のまま(触らない)
+CORE_OFF = ("daily-notes", "templates", "canvas", "zk-prefixer")
+CORE_ON = ("bases", "global-search", "backlink", "graph")
+# core-plugins.json がまだないとき(Obsidian で一度も開いていない)に使う、Obsidian の既定
+CORE_DEFAULT = {
+    "file-explorer": True, "global-search": True, "switcher": True, "graph": True, "backlink": True,
+    "canvas": True, "outgoing-link": True, "tag-pane": True, "properties": True, "page-preview": True,
+    "daily-notes": True, "templates": True, "note-composer": True, "command-palette": True,
+    "slash-command": False, "editor-status": True, "bookmarks": True, "markdown-importer": False,
+    "zk-prefixer": False, "random-note": False, "outline": True, "word-count": True, "slides": False,
+    "audio-recorder": False, "workspaces": False, "file-recovery": True, "publish": False, "sync": False,
+    "bases": True, "webviewer": False,
+}
+
+
+def set_core_plugins(target: Path) -> bool:
+    """target(設定フォルダ)の core-plugins.json を決まりに合わせる。変えたら True。"""
+    f = target / "core-plugins.json"
+    try:
+        have = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        have = None
+    if isinstance(have, list):  # 古い形(有効なものの名前の一覧)
+        have = {k: (k in have) for k in set(CORE_DEFAULT) | set(have)}
+    if not isinstance(have, dict):
+        have = dict(CORE_DEFAULT)
+        changed = True
+    else:
+        changed = False
+    want = dict(have)
+    want.update({k: False for k in CORE_OFF})
+    want.update({k: True for k in CORE_ON})
+    if want == have and not changed:
+        return False
+    target.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(want, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    return True
+
+
 def install(vault: Path, config: str, source: Path) -> list[str]:
     """source(配布物の プラグイン/)の本体を vault/config にコピーして有効にする。したことを返す。"""
     target = vault / config
@@ -251,6 +291,8 @@ def install(vault: Path, config: str, source: Path) -> list[str]:
     if enabled != have:
         (target / "community-plugins.json").write_text(json.dumps(enabled, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         done.append(f"有効にするプラグインを {len(enabled)} 個にした")
+    if set_core_plugins(target):
+        done.append("コアプラグインを合わせた(デイリーノート・テンプレート・Canvas・固有ノート作成を切り、Bases などを入れた)")
     for pid in missing:
         done.append(f"注意: {pid} は配布物にないので入れていません")
     return done

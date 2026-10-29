@@ -106,6 +106,16 @@ def test_admin_first_time(team):
     personal = team["box"] / "個人" / "開発ノート_Yu"
     assert st.my_settings(personal) == ("Yu", "")   # 3文字の古い記号は個人設定.md に書かない(メンバー.csv で読む)
     assert (shared / ".obsidian-001_adm" / "hotkeys.json").is_file()
+    # 手で入れていた設定も bat で入る(貼ったファイルの置き場所・図・コアプラグイン)
+    for d in (shared / ".obsidian-001_adm", personal / ".obsidian"):
+        cal = json.loads((d / "plugins/obsidian-custom-attachment-location/data.json").read_text(encoding="utf-8"))
+        assert cal["attachmentFolderPath"] == "_仕組み/attachments/{{attachDir}}"
+        assert cal["shouldFollowObsidianAttachmentLocation"] is False and "attachDir" in cal["customTokensStr"]
+        exc = json.loads((d / "plugins/obsidian-excalidraw-plugin/data.json").read_text(encoding="utf-8"))
+        assert exc["compress"] is False and exc["onceOffCompressFlagReset"] is True and exc["autoexportSVG"] is True
+        core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+        assert core["daily-notes"] is False and core["templates"] is False and core["canvas"] is False
+        assert core["bases"] is True
     conf = st.read_config(team["admin_env"].config)
     assert conf["member"] == "Yu" and conf["dry_run"] is True and Path(conf["shared"]) == shared
     assert (team["admin_env"].program / "notesync" / "run.py").is_file()
