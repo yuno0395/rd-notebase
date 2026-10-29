@@ -2,13 +2,19 @@
 // 右クリックのメニューから使う。
 //
 //   - [[ ]] の上で使う: そのリンク先を、今のノートの属性欄の friend / challenger に足す。
+//     設計案で価値の仮説を「関係としてつなぐ」と、friend ではなく 価値仮説 に足す(K-Plex の左。Yu 2026-10-28)。
 //   - 文字を選んで使う: 同じ名前か別名のノートがあれば、そのノートを足す。
 // 本文のリンクはそのまま残す。属性欄の値は "[[id_名前|名前]]" の形で、引用符をつけて並べる。
 // すでに入っているノートは二度足さない。まだファイルのないリンクは足さない(先に Ctrl+K などで作る)。
 
 const T = "_仕組み/templates/";
 const ID_PREFIX = /^[0-9A-Z]{6}[0-9A-Z]+_/i;
-const LABEL = { friend: "関係(friend)", challenger: "反論(challenger)" };
+const LABEL = { friend: "関係(friend)", challenger: "反論(challenger)", 価値仮説: "価値仮説" };
+
+function typeOf(app, file) {
+  const t = String(app.metadataCache.getFileCache(file)?.frontmatter?.type || "").trim();
+  return t === "設計記録" || t === "ソリューション" ? "設計案" : t;
+}
 
 function nameOf(file) {
   return file.basename.replace(ID_PREFIX, "");
@@ -100,6 +106,7 @@ async function link_relation(tp, role) {
     return;
   }
   const fm = app.metadataCache.getFileCache(note)?.frontmatter || {};
+  if (role === "friend" && typeOf(app, note) === "設計案" && typeOf(app, file) === "仮説") role = "価値仮説";
   const values = asList(fm[role]);
   const already = values.some((v) => {
     const t = (v.match(/\[\[([^\]]+)\]\]/) || [])[1];

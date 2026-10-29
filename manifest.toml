@@ -76,10 +76,16 @@ seed = [
 
 # 版ごとの移し替え(仕様書「書きためたノートを壊さずに仕組みを直す」、要件書 F-46)。
 # 準備の bat は、vault の 版.txt より新しく、当てる版より古いか同じ version のものを、古い順に全部当てる。
+# 版.txt のない vault(bat より前に作ったもの)には、当てる版までのものを全部当てる。
 # script は `python <script> <vault> --run --backup <控えのフォルダ>` で動くこと。控えはそのフォルダに作り
-# (Box の中に作らない)、何度走らせても同じ結果になること。いまは当てるものはない。書き方の例:
-#
-# [[migrate]]
-# version = "0.3.0"
-# script = "tools/migrate_v0_3_0.py"
-# vaults = ["個人", "共有"]
+# (Box の中に作らない)、何度走らせても同じ結果になること。version は、その移し替えを初めて配る版。
+
+[[migrate]]
+version = "0.2.0"
+script = "tools/migrate_v054.py"   # 仕様書 v0.54: ソリューション・設計記録 → 設計案(01_設計案/ へ)
+vaults = ["個人", "共有"]
+
+[[migrate]]
+version = "0.2.0"
+script = "tools/migrate_v055.py"   # 仕様書 v0.55: イシューの parent → 脅かす、設計案の friend の仮説 → 価値仮説
+vaults = ["個人", "共有"]

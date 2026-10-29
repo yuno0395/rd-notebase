@@ -74,7 +74,7 @@ views:
       - impact
       - status
       - formula.res
-      - parent
+      - 脅かす
     sort:
       - property: formula.prio
         direction: ASC

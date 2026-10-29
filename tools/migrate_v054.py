@@ -1,9 +1,10 @@
 """仕様書 v0.54 の「設計案」への改名を、今ある vault に当てる(個人・共有のどちらにも使える)。
 
-    python migrate_v054.py <vault> [<vault> ...] [--run]
+    python migrate_v054.py <vault> [<vault> ...] [--run] [--backup <控えのフォルダ>]
 
 --run をつけないと、することを表示するだけで何も変えない。
 --run をつけると、最初に vault ごとの控え(zip)を作ってから、次のことをする。
+控えは vault の隣に作る。--backup を渡すとそのフォルダに作る(準備の bat はこれで Box の外に作る)。
 
 1. どの深さの 01_目的/ にあっても、type が ソリューション か 設計記録 のノートを、
    隣の 01_設計案/ へ移し、type を 設計案 にする。添付(_仕組み/attachments/<id>/)は動かさない。
@@ -79,7 +80,14 @@ def plan(vault: Path) -> tuple[list[tuple[Path, Path]], list[Path]]:
 
 def main(argv: list[str]) -> int:
     run = "--run" in argv
-    vaults = [Path(a) for a in argv if a != "--run"]
+    backup: Path | None = None
+    vaults = []
+    rest = iter(argv)
+    for a in rest:
+        if a == "--backup":
+            backup = Path(next(rest, ""))
+        elif a != "--run":
+            vaults.append(Path(a))
     if not vaults:
         print(__doc__)
         return 2
@@ -104,7 +112,8 @@ def main(argv: list[str]) -> int:
             print("  することはありません")
             continue
         if run:
-            zip_base = v.parent / f"移行前の控え_{v.name}_{stamp}"
+            (backup or v.parent).mkdir(parents=True, exist_ok=True)
+            zip_base = (backup or v.parent) / f"移行前の控え_{v.name}_{stamp}"
             shutil.make_archive(str(zip_base), "zip", root_dir=v)
             print(f"  控え: {zip_base}.zip")
         for src, dst in moves:

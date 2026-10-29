@@ -302,3 +302,20 @@ def test_input_ended_stops(monkeypatch):
     ui = st.UI()
     with pytest.raises(st.Stop):
         ui.ask("Box Drive のフォルダ", "C:/nowhere")
+
+
+def test_migrations_for_old_vaults(tmp_path):
+    """版.txt のない vault(bat より前に作ったもの)にも移し替えを当てる。もう当てた版の vault には当てない。"""
+    dist = tmp_path / "0.2.0"
+    (dist / "個人" / "_仕組み" / "記録").mkdir(parents=True)
+    (dist / "個人" / "_仕組み" / "記録" / "版.txt").write_text("0.2.0\n", encoding="utf-8")
+    shutil.copy2(ROOT / "manifest.toml", dist / "manifest.toml")
+    names = [Path(m["script"]).name for m in st.load_manifest(dist)["migrate"]]
+    assert names == ["migrate_v054.py", "migrate_v055.py"]
+    old = tmp_path / "古い個人"
+    (old / "_仕組み").mkdir(parents=True)
+    assert [p.name for _, p in st.plan_vault(dist, "個人", old).migrations] == names
+    (old / "_仕組み" / "記録").mkdir()
+    (old / "_仕組み" / "記録" / "版.txt").write_text("0.2.0\n", encoding="utf-8")
+    assert st.plan_vault(dist, "個人", old).migrations == []
+    assert st.plan_vault(dist, "個人", tmp_path / "新しい個人").migrations == []   # これから作る vault

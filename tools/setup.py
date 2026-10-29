@@ -440,9 +440,11 @@ def plan_vault(dist: Path, kind: str, target: Path) -> VaultPlan:
             vp.put.append(rel)
         elif k == "system" and not same(f, dst):
             vp.replace.append(rel)
-    if old and vkey(old) < vkey(version):
+    # 版.txt のない vault(bat より前に作ったもの)にも当てる。移し替えは何度走らせても同じ結果になるので害がない
+    if not vp.new and (not old or vkey(old) < vkey(version)):
         for m in manifest.get("migrate", []):
-            if kind in m.get("vaults", [kind]) and vkey(old) < vkey(m["version"]) <= vkey(version):
+            if kind in m.get("vaults", [kind]) and (not old or vkey(old) < vkey(m["version"])) \
+                    and vkey(m["version"]) <= vkey(version):
                 vp.migrations.append((m["version"], dist / "移し替え" / Path(m["script"]).name))
         vp.migrations.sort(key=lambda x: vkey(x[0]))
     return vp

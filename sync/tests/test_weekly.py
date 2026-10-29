@@ -183,7 +183,7 @@ def test_product_axis(tmp_path):
     note(s, f"{PJ}/01_目的", "0RA006001", "工具なし", 'type: 仮説\nstatus: 検証中\nparent: ["[[0RA004001_後付け10分]]"]\n')
     note(s, f"{PJ}/01_設計案", "0RB001001", "A案クランプ式", f"type: 設計案\nstatus: 候補\nparent: {g}\n")
     note(s, f"{PJ}/01_設計案", "0RB002001", "電池ユニット",
-         'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\nfriend: ["[[0RA003001_電池3年]]"]\n')
+         'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\n価値仮説: ["[[0RA003001_電池3年]]"]\n')
     note(s, f"{PJ}/01_設計案", "0RB003001", "マグネット取付",
          'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\nfriend: ["[[0RA004001_後付け10分]]"]\n')
     note(s, f"{PJ}/01_設計案", "0RB004001", "B案ねじ止め式",
@@ -191,7 +191,7 @@ def test_product_axis(tmp_path):
     note(s, f"{PJ}/01_設計案", "0RB005001", "C案", f"type: 設計案\nstatus: 不採用\nparent: {g}\n")
     issue = "author: Yu\ntype: イシュー\nproject: [樹脂カバー]\n"
     note(s, f"{PJ}/03_イシュー", "0RC001001", "電池が冬にもたない",
-         issue + 'status: 対策中\nimpact: 出荷\nparent: ["[[0RB002001_電池ユニット]]"]\n')
+         issue + 'status: 対策中\nimpact: 出荷\n脅かす: ["[[0RB002001_電池ユニット]]"]\n')  # v0.55 の書き方
     note(s, f"{PJ}/03_イシュー", "0RC002001", "全体が重い", issue + 'status: 未対応\nimpact: 中\nparent: ["[[0RB001001_A案クランプ式]]"]\n')
     note(s, f"{PJ}/03_イシュー", "0RC003001", "済んだ", issue + 'status: 解消\nimpact: 中\nparent: ["[[0RB003001_マグネット取付]]"]\n')
     out = tmp_path / "報告"
