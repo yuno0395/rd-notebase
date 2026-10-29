@@ -1,7 +1,7 @@
-"""F-30・F-33: 今日のデイリーノートの先頭に、同期プログラムからの短い知らせを出す。
+"""F-33: 今日のデイリーノートの先頭に、同期プログラムからの短い知らせを出す。
 
-- F-33: 共有されなかったノートと理由(同期レポートの「対応が必要」のうち、集めなかったもの)
-- F-30: 金曜は、今週 outlook を更新していない参加プロジェクトに「見込みを更新してください」
+- 共有されなかったノートと理由(同期レポートの「対応が必要」のうち、集めなかったもの)
+- F-30 の「見込みを更新してください」は、週報から見込みを外したのでやめた(Yu 2026-10-29)
 
 見出しのすぐ下に、次の形の囲みを置き、同期のたびに丸ごと書き換える。知らせがなくなれば消す。
 デイリーノートがまだなければ作らない。書いている途中なら触らない。
@@ -67,30 +67,6 @@ def put_block(text: str, items: list[str]) -> str:
     return "\n".join(lines).replace("\n", nl)
 
 
-def outlook_reminders(member: str, shared: Path | None, today: date) -> list[str]:
-    if not shared or today.weekday() != 4:
-        return []
-    rows = []
-    d = shared / HISTORY_DIR
-    if d.exists():
-        for p in d.glob("*.csv"):
-            rows += read_rows(p)
-    monday = today.toordinal() - today.weekday()
-    out = []
-    docs = load_docs(shared, own=False, skip={"00_inbox", "00_週報", "99_archive"})
-    for proj in Index(docs).projects().values():
-        if str(proj.fm.get("status") or "").strip() in ("完了", "中断"):
-            continue
-        if member not in {plain(m) for m in as_list(proj.fm.get("members"))}:
-            continue
-        updated = [r for r in rows if r.get("id") == proj.id and r.get("項目") == "outlook"
-                   and date.fromisoformat(r["日時"][:10]).toordinal() >= monday]
-        if not updated:
-            out.append(f"見込みを更新してください: [[{proj.stem}|{proj.name}]] の outlook・outlook_reason・"
-                       "request_to_manager(今週まだ更新されていません)")
-    return out
-
-
 def update_daily(personal: Path, shared: Path | None, member: str, report: Report, backup: Backup,
                  dry_run: bool, now: float, idle_seconds: int) -> None:
     try:
@@ -100,10 +76,7 @@ def update_daily(personal: Path, shared: Path | None, member: str, report: Repor
             return
         items = [t for t in report.todos if t.startswith(UNSHARED)]
         items = [t.replace("(共有していません)", "").strip() for t in items]
-        reminders = outlook_reminders(member, shared, today)
-        for r in reminders:
-            report.todo(r)
-        items = reminders + [f"共有されていない: {t}" for t in items]
+        items = [f"共有されていない: {t}" for t in items]
         text = read(path)
         new = put_block(text, items)
         if new == text:

@@ -53,6 +53,15 @@ def shared(tmp_path):
          'author: 佐藤\ntype: イシュー\nstatus: 低減済み\nimpact: 出荷\nspeed: すぐ\nresolution: 設計空間\n'
          'project: [樹脂カバー]\nparent: ["[[0RA003001_3割減なら採用される]]"]\n')
     note(s, f"{PJ}/03_イシュー", "0RB003001", "迷子", "author: Yu\ntype: イシュー\nstatus: 未対応\nimpact: 中\nproject: [樹脂カバー]\n")
+    # 優先順位は低いのに一部だけ進めたもの(中途半端な仕事)と、手をつけていないもの
+    note(s, f"{PJ}/03_イシュー", "0RB006001", "梱包の手間",
+         "author: 佐藤\ntype: イシュー\nstatus: 未対応\nimpact: 小\npriority: 4\nproject: [樹脂カバー]\n")
+    note(s, f"{PJ}/03_イシュー", "0RB007001", "手つかず",
+         "author: 佐藤\ntype: イシュー\nstatus: 未対応\nimpact: 小\npriority: 4\nproject: [樹脂カバー]\n")
+    note(s, f"{PJ}/04_タスク", "0RB202001", "箱を試す",
+         'author: 佐藤\ntype: タスク\nstatus: 完了\nparent: ["[[0RB006001_梱包の手間]]"]\n')
+    note(s, f"{PJ}/04_タスク", "0RB203001", "箱を直す",
+         'author: 佐藤\ntype: タスク\nstatus: 未着手\nparent: ["[[0RB006001_梱包の手間]]"]\n')
     note(s, f"{PJ}/03_イシュー", "0RB004001", "外れ先",
          'author: Yu\ntype: イシュー\nstatus: 未対応\nimpact: 中\nproject: [樹脂カバー]\nparent: ["[[0RA004001_外れた話]]"]\n')
     for i, st in enumerate(["完了", "完了", "進行中"]):
@@ -79,7 +88,8 @@ def shared(tmp_path):
           "2026-10-10 09:00,0RB101001,対策1,タスク,status,進行中,完了\n"
           "2026-10-03 09:00,0RB102001,対策2,タスク,due,2026-10-06,2026-10-13\n"
           "2026-10-10 09:00,0RB102001,対策2,タスク,due,2026-10-13,2026-10-20\n"
-          "2026-10-05 09:00,0RA001001,樹脂カバー,プロジェクト,outlook,,△\n")
+          "2026-10-05 09:00,0RA001001,樹脂カバー,プロジェクト,outlook,,△\n"
+          "2026-10-08 09:00,0RB202001,箱を試す,タスク,status,進行中,完了\n")
     return s
 
 
@@ -89,20 +99,17 @@ def test_weekly_report(shared, tmp_path):
     made = make_weekly(shared, out, date(2026, 10, 26), r)
     assert [p.name for p in made] == ["2026-W44.html", "2026-W44.html"]
     md = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
-    assert '<div class="big warn">△</div>' in md and "金型の納期が2週遅れ" in md and "試作費の追加" in md
-    assert "見込み未更新" in md                                   # 最後の更新から21日
-    assert row('部品コスト3割減', '50%(1/2)', '1', '0', '1', '0') in md
+    assert "試作費の追加" in md                                   # 管理者に判断してほしいことは書いてあれば出す
+    assert "金型の納期が2週遅れ" not in md and "見込み未更新" not in md   # 見込みは載せない(Yu 2026-10-29)
+    assert "開発の目処(成果物候補ごと)" in md
     assert row('DR1', '2026-11-07', '2026-11-21', '+14 日') in md
-    assert row('イシュー', '迷子', 'Yu', '仮説につながっていない') in md
-    assert "外れた仮説につながっている(外れた話)" in md
-    assert row('イシュー', '下の仮説の仕事', 'Yu', '外れた仮説につながっている(外れた話)') in md
-    assert row('金型で3割減る', '肉厚', '0') in md
-    assert row('ヒケ', '別PJ', '別のヒケ', 'ヒケ量') in md
-    assert "DR(2026-10-01)のあと対策 2 件完了、resolution は 未把握 のまま" in md
-    assert "原因が組み立て値のまま(ヒケ量)" in md
-    assert row('対策2', 'Yu', '期限を 2 回延ばした') in md
+    assert row('梱包の手間', '4', '佐藤', '完了 1・進行中 0・未着手 1', '2026-10-08') in md
+    assert "<td>手つかず</td>" not in md
     assert row('Yu', '1', '0', '1', '1', '0') in md and row('佐藤', '0', '1', '0', '0', '1') in md
     assert row('3割減なら採用される', '2') in md                                     # センサー案 3 つのうち不採用でない 2 つ
+    # 載せない節(Yu 2026-10-29)。出荷準備度は開発の後の方で載せる。同じノードは既定で外す
+    for gone in ("出荷準備度", "目的に沿っていない", "反論のついた仮説", "行き詰まり", "機密", "他のプロジェクトと同じノード"):
+        assert gone not in md, gone
     assert not list(out.rglob("*.md")) and not list(out.rglob("*.xlsx"))   # HTML 1つだけ
     index = (out / "週報の一覧.html").read_text(encoding="utf-8")
     assert f'href="{PJ}/2026-W44.html"' in index
@@ -147,59 +154,92 @@ def test_weekly_waits_for_other_pc(shared, tmp_path):
 
 def test_sections_can_be_chosen(shared, tmp_path):
     out = tmp_path / "報告"
-    # 同じノードは「自動」: ほかに進めているプロジェクトがなければ載せない
-    p = next((shared / "別PJ").glob("0RC001001_*.md"))
-    p.write_text(p.read_text(encoding="utf-8").replace("members: [Yu]", "members: [Yu]\nstatus: 完了"), encoding="utf-8")
-    # チーム設定で機密を外す
-    (shared / "_仕組み").mkdir(parents=True, exist_ok=True)
-    (shared / "_仕組み/同期設定.yaml").write_text("report_runner: yu\nreport_sections:\n  機密: false\n", encoding="utf-8")
+    # チーム設定で出荷準備度を載せ、同じノードを「自動」にする
+    (shared / "_仕組み/同期設定.yaml").write_text(
+        "report_sections:\n  出荷準備度: true\n  同じノード: 自動\n  担当者: false\n", encoding="utf-8")
     make_weekly(shared, out, date(2026, 10, 26), Report())
     html = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
-    assert "他のプロジェクトと同じノード" not in html
-    assert "機密の事実への参照" not in html
-    assert "出荷準備度(目的ごと)" in html and "見込み" in html
+    assert row('部品コスト3割減', '50%(1/2)', '1', '0', '1', '0') in html
+    assert row('ヒケ', '別PJ', '別のヒケ', 'ヒケ量') in html
+    assert "担当者ごとのタスク" not in html
+    # 「自動」: ほかに進めているプロジェクトがなければ載せない
+    p = next((shared / "別PJ").glob("0RC001001_*.md"))
+    p.write_text(p.read_text(encoding="utf-8").replace("members: [Yu]", "members: [Yu]\nstatus: 完了"), encoding="utf-8")
+    make_weekly(shared, out, date(2026, 10, 26), Report(), force=True)
+    html = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
+    assert "他のプロジェクトと同じノード" not in html and "出荷準備度(目的ごと)" in html
 
 
 def test_sections_only_and_hide(shared):
     from notesync.weekly import sections_of
     s = sections_of(shared, hide=["担当者"])
-    assert s["担当者"] is False and s["同じノード"] == "自動"
+    assert s["担当者"] is False and s["同じノード"] is False and s["出荷準備度"] is False
     s = sections_of(shared, only=["出荷準備度"])
     assert [k for k, v in s.items() if v] == ["出荷準備度"]
 
 
-def test_product_axis(tmp_path):
-    """成果物の軸(Yu 2026-10-28): 設計案の parent は成果物の構成、実現する仮説は friend。
-    成果物候補ごとに、実現していない仮説と残りのイシューを出す。"""
+def test_prospects(tmp_path):
+    """開発の目処(Yu 2026-10-29): 不可能ではない成果物候補ごとに、方針リスクの解決数と未解決数。
+    候補の下の部分の案につくリスクも数える。"""
     s = tmp_path / "共有"
     write(s / "_仕組み/同期設定.yaml", "")
     note(s, PJ, "0RA001001", PJ, "type: プロジェクト\nmembers: [Yu]\nstatus: 進行中\n")
     g = '["[[0RA002001_予兆検知]]"]'
     note(s, f"{PJ}/01_目的", "0RA002001", "予兆検知", "type: 目的\nproject: [樹脂カバー]\n")
     note(s, f"{PJ}/01_目的", "0RA003001", "電池3年", f"type: 仮説\nstatus: 検証中\nparent: {g}\n")
-    note(s, f"{PJ}/01_目的", "0RA004001", "後付け10分", f"type: 仮説\nstatus: 検証中\nparent: {g}\n")
-    note(s, f"{PJ}/01_目的", "0RA005001", "外れた案", f"type: 仮説\nstatus: 外れた\nparent: {g}\n")
-    # 上の仮説を friend にすれば、下の仮説も実現とみなす
-    note(s, f"{PJ}/01_目的", "0RA006001", "工具なし", 'type: 仮説\nstatus: 検証中\nparent: ["[[0RA004001_後付け10分]]"]\n')
     note(s, f"{PJ}/01_設計案", "0RB001001", "A案クランプ式", f"type: 設計案\nstatus: 候補\nparent: {g}\n")
     note(s, f"{PJ}/01_設計案", "0RB002001", "電池ユニット",
          'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\n価値仮説: ["[[0RA003001_電池3年]]"]\n')
-    note(s, f"{PJ}/01_設計案", "0RB003001", "マグネット取付",
-         'type: 設計案\nstatus: 候補\nparent: ["[[0RB001001_A案クランプ式]]"]\nfriend: ["[[0RA004001_後付け10分]]"]\n')
-    note(s, f"{PJ}/01_設計案", "0RB004001", "B案ねじ止め式",
-         f'type: 設計案\nstatus: 候補\nparent: {g}\nfriend: ["[[0RA003001_電池3年]]"]\n')
+    note(s, f"{PJ}/01_設計案", "0RB004001", "B案ねじ止め式", f"type: 設計案\nstatus: 候補\nparent: {g}\n")
     note(s, f"{PJ}/01_設計案", "0RB005001", "C案", f"type: 設計案\nstatus: 不採用\nparent: {g}\n")
     issue = "author: Yu\ntype: イシュー\nproject: [樹脂カバー]\n"
-    note(s, f"{PJ}/03_イシュー", "0RC001001", "電池が冬にもたない",
-         issue + 'status: 対策中\nimpact: 出荷\n脅かす: ["[[0RB002001_電池ユニット]]"]\n')  # v0.55 の書き方
-    note(s, f"{PJ}/03_イシュー", "0RC002001", "全体が重い", issue + 'status: 未対応\nimpact: 中\nparent: ["[[0RB001001_A案クランプ式]]"]\n')
-    note(s, f"{PJ}/03_イシュー", "0RC003001", "済んだ", issue + 'status: 解消\nimpact: 中\nparent: ["[[0RB003001_マグネット取付]]"]\n')
+    note(s, f"{PJ}/03_イシュー", "0RC001001", "無線で電池3年もつか",
+         issue + 'status: 対策中\nimpact: 方針\n脅かす: ["[[0RB002001_電池ユニット]]"]\n')
+    note(s, f"{PJ}/03_イシュー", "0RC002001", "クランプが成り立つか",
+         issue + 'status: 解消\nimpact: 方針\nparent: ["[[0RB001001_A案クランプ式]]"]\n')   # 古い書き方の parent も読む
+    note(s, f"{PJ}/03_イシュー", "0RC003001", "重い", issue + 'status: 未対応\nimpact: 出荷\n脅かす: ["[[0RB001001_A案クランプ式]]"]\n')
+    note(s, f"{PJ}/03_イシュー", "0RC004001", "やめた", issue + 'status: 中止\nimpact: 方針\n脅かす: ["[[0RB004001_B案ねじ止め式]]"]\n')
+    note(s, f"{PJ}/03_イシュー", "0RC005001", "市場があるか", issue + 'status: 未対応\nimpact: 方針\n脅かす: ["[[0RA003001_電池3年]]"]\n')
     out = tmp_path / "報告"
     make_weekly(s, out, date(2026, 10, 26), Report())
     html = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
-    assert "成果物候補ごとの残り" in html
-    assert row("A案クランプ式", "候補", "2/2", "なし", "2", "1") in html
-    assert row("B案ねじ止め式", "候補", "1/2", "工具なし", "0", "0") in html
+    assert row("予兆検知", "A案クランプ式", "候補", "1", "1") in html
+    assert row("予兆検知", "B案ねじ止め式", "候補", "0", "0") in html
+    # 候補ごとの K-Plex 風の図: 中心に候補、左に仮説、右に脅かすイシュー、下に部分の案
+    assert html.count('<svg class="kp"') == 2
+    assert "<title>A案クランプ式</title>" in html and "部分の案: 電池ユニット" in html
+    assert "クランプが成り立つか(priority -、方針、解決)" in html
     assert "<td>C案</td>" not in html
-    # 成果物候補(部分案)につく仕事は、その成果物が実現する仮説につながっている
-    assert "<td>仮説につながっていない</td>" not in html
+    assert "不可能ではない成果物候補: 2 件(不採用・中止にした候補: 1 件)" in html
+    assert "どの候補にもつかない方針リスク(仮説を脅かすものなど): 解決 0 件、未解決 1 件" in html
+
+
+def test_topics(shared, tmp_path):
+    """今週のトピック(Yu 2026-10-29): 台帳の本文に PL が選んだノートとダイジェストを書き、
+    週報に今週の動き(ノート履歴の7日分と、下のタスクの完了)を添えて載せる。"""
+    p = next((shared / PJ).glob("0RA001001_*.md"))
+    p.write_text(p.read_text(encoding="utf-8").replace(
+        "本文\n",
+        "## 今週のトピック\n説明の行\n- [[0RB001001_ヒケ|ヒケ]]: 保圧を上げたらヒケが半分になった\n"
+        "- [[0RB006001_梱包の手間]]\n- [[  ]]: 今週のダイジェスト\n- 金型メーカーと打ち合わせ\n\n![[00_今週動いたノート.base]]\n## 次の章\n- [[0RB003001_迷子]]: 載らない\n"),
+        encoding="utf-8")
+    with (shared / "_仕組み/記録/ノート履歴/Yu.csv").open("a", encoding="utf-8") as f:
+        f.write("2026-10-22 09:00,0RB001001,ヒケ,イシュー,status,未対応,対策中\n"
+                "2026-10-23 09:00,0RB201001,見てほしい,タスク,status,進行中,完了\n"
+                "2026-10-10 09:00,0RB001001,ヒケ,イシュー,resolution,,現象\n")   # 先週より前は出さない
+    out = tmp_path / "報告"
+    make_weekly(shared, out, date(2026, 10, 26), Report())
+    html = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
+    assert row("ヒケ", "イシュー", "保圧を上げたらヒケが半分になった",
+               "status 未対応→対策中(10-22)、タスク「見てほしい」完了(10-23)") in html
+    assert row("梱包の手間", "イシュー", "(未記入)", "記録された変化なし") in html
+    assert row("", "", "金型メーカーと打ち合わせ", "") in html
+    assert "<td>今週のダイジェスト</td>" not in html                     # テンプレートのままの行は出さない
+    assert "載らない" not in html and "00_今週動いたノート" not in html
+    assert html.index("今週のトピック") < html.index("開発の目処(成果物候補ごと)")
+
+
+def test_topics_empty(shared, tmp_path):
+    out = tmp_path / "報告"
+    make_weekly(shared, out, date(2026, 10, 26), Report())
+    assert "今週は書かれていません" in (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
