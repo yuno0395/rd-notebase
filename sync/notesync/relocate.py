@@ -18,6 +18,8 @@ import time
 import uuid
 from pathlib import Path
 
+from .guard import looks_like_vault
+
 VAULT_ID = Path("_仕組み/記録") / "vault_id.txt"
 SYSTEM_DIR = "_仕組み"
 UP = 3          # 元の場所から上へたどる段数
@@ -135,10 +137,19 @@ def _is_shared_for(d: Path, member: str) -> bool:
         return False
 
 
+COPY_WORDS = ("控え", "バックアップ", "backup", "コピー", "copy", "複製", "移行前")
+
+
+def _looks_like_copy(d: Path, old: Path) -> bool:
+    """控えや写しらしい場所。元の場所の名前にない言葉が入っていれば、本物の引っ越し先としては選ばない(F-55)。"""
+    have = str(old).lower()
+    return any(w in str(d).lower() and w not in have for w in COPY_WORDS)
+
+
 def find_moved(old: Path, vault_id: str, kind: str, member: str, taken: set[str]) -> tuple[list[Path], str]:
     """old にあった vault の新しい場所の候補。近いフォルダから探し、見つかった所で止める。返すのは (候補, 見分け方)。"""
     for root in _search_roots(old):
-        dirs = [d for d in _vault_dirs([root]) if _key(d) not in taken]
+        dirs = [d for d in _vault_dirs([root]) if _key(d) not in taken and not _looks_like_copy(d, old)]
         if vault_id:
             hit = [d for d in dirs if read_id(d) == vault_id]
             if hit:
@@ -210,7 +221,8 @@ def follow(cfg, dry: bool = False) -> tuple[list[str], list[str]]:
 
     for kind, path, idx in slots:
         if path.exists():
-            vid = ensure_id(path)
+            # vault の印のない場所(書き間違い)には vault_id.txt を作らない(F-55。作ると vault に見えてしまう)
+            vid = ensure_id(path) if looks_like_vault(path, kind) else read_id(path)
             if vid:
                 rec[_key(path)] = vid
             continue
