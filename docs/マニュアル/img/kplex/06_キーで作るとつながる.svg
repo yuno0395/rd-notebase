@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="300" viewBox="0 0 960 300" font-family="'Yu Gothic UI','Meiryo','Hiragino Sans','Noto Sans JP',sans-serif" role="img" aria-label="キーで作ったときのつながり">
+<title>キーで作ったときのつながり</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f6fde"/></marker></defs>
+<rect x="0.5" y="0.5" width="959" height="299" rx="14" fill="#ffffff" stroke="#d6dae1"/>
+<text x="30.0" y="30.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">キーで作ると、つながりは自動で入る(右クリック不要)</text>
+<rect x="24.0" y="51.0" width="912.0" height="38.0" rx="6" fill="#f7f8fa" stroke="none" stroke-width="1.2"/>
+<rect x="36.0" y="55.0" width="62.9" height="30.0" rx="6" fill="#f4f5f7" stroke="#9aa1ad" stroke-width="1.2"/>
+<rect x="36.0" y="82.0" width="62.9" height="3" rx="1.5" fill="#9aa1ad"/>
+<text x="67.5" y="70.0" font-size="13" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">Ctrl+I</text>
+<text x="130.0" y="70.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">設計案の中で行をイシューに</text>
+<text x="420.0" y="70.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">イシューの 脅かす = その設計案</text>
+<text x="720.0" y="70.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">設計案の右に出る</text>
+<rect x="24.0" y="97.0" width="912.0" height="38.0" rx="6" fill="#ffffff" stroke="none" stroke-width="1.2"/>
+<rect x="36.0" y="101.0" width="62.9" height="30.0" rx="6" fill="#f4f5f7" stroke="#9aa1ad" stroke-width="1.2"/>
+<rect x="36.0" y="128.0" width="62.9" height="3" rx="1.5" fill="#9aa1ad"/>
+<text x="67.5" y="116.0" font-size="13" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">Ctrl+U</text>
+<text x="130.0" y="116.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">仮説の中で行を設計案に</text>
+<text x="420.0" y="116.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">設計案の 価値仮説 = その仮説</text>
+<text x="720.0" y="116.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">設計案の左に出る</text>
+<rect x="24.0" y="143.0" width="912.0" height="38.0" rx="6" fill="#f7f8fa" stroke="none" stroke-width="1.2"/>
+<rect x="36.0" y="147.0" width="62.9" height="30.0" rx="6" fill="#f4f5f7" stroke="#9aa1ad" stroke-width="1.2"/>
+<rect x="36.0" y="174.0" width="62.9" height="3" rx="1.5" fill="#9aa1ad"/>
+<text x="67.5" y="162.0" font-size="13" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">Ctrl+T</text>
+<text x="130.0" y="162.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">イシューの中で行をタスクに</text>
+<text x="420.0" y="162.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">タスクの parent = そのイシュー</text>
+<text x="720.0" y="162.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">イシューの下に出る</text>
+<rect x="24.0" y="189.0" width="912.0" height="38.0" rx="6" fill="#ffffff" stroke="none" stroke-width="1.2"/>
+<rect x="36.0" y="193.0" width="62.9" height="30.0" rx="6" fill="#f4f5f7" stroke="#9aa1ad" stroke-width="1.2"/>
+<rect x="36.0" y="220.0" width="62.9" height="3" rx="1.5" fill="#9aa1ad"/>
+<text x="67.5" y="208.0" font-size="13" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">Ctrl+I</text>
+<text x="130.0" y="208.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">タスクの「リスクはどう変わったか」で</text>
+<text x="420.0" y="208.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">新イシューの previous = そのタスク</text>
+<text x="720.0" y="208.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">新イシューの左に出る</text>
+<rect x="24.0" y="235.0" width="912.0" height="38.0" rx="6" fill="#f7f8fa" stroke="none" stroke-width="1.2"/>
+<rect x="36.0" y="239.0" width="62.9" height="30.0" rx="6" fill="#f4f5f7" stroke="#9aa1ad" stroke-width="1.2"/>
+<rect x="36.0" y="266.0" width="62.9" height="3" rx="1.5" fill="#9aa1ad"/>
+<text x="67.5" y="254.0" font-size="13" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">Ctrl+H</text>
+<text x="130.0" y="254.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="normal" dominant-baseline="middle">仮説の中で行を仮説に</text>
+<text x="420.0" y="254.0" font-size="13" fill="#5b6472" text-anchor="start" font-weight="normal" dominant-baseline="middle">下の仮説の parent = その仮説</text>
+<text x="720.0" y="254.0" font-size="13" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">仮説の下に出る</text>
+</svg>
