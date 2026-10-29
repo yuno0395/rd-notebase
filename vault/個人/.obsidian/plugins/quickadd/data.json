@@ -7,6 +7,39 @@
       "command": true,
       "choices": [
         {
+          "id": "6b1f2c9e-3d4a-5e7b-8c0d-1a2b3c4d5e6f",
+          "name": "メモ(共有しない)",
+          "type": "Template",
+          "command": false,
+          "templatePath": "_仕組み/templates/メモ.md",
+          "fileNameFormat": {
+            "enabled": true,
+            "format": "{{DATE:YYYY-MM-DD}} {{VALUE}}"
+          },
+          "discoverExistingNotesBeforeCreate": false,
+          "folder": {
+            "enabled": true,
+            "folders": [
+              "00_日誌/メモ"
+            ],
+            "chooseWhenCreatingNote": false,
+            "createInSameFolderAsActiveFile": false,
+            "chooseFromSubfolders": false
+          },
+          "appendLink": false,
+          "copyLinkToClipboard": false,
+          "openFile": true,
+          "fileOpening": {
+            "location": "tab",
+            "direction": "vertical",
+            "mode": "default",
+            "focus": true
+          },
+          "fileExistsBehavior": {
+            "kind": "prompt"
+          }
+        },
+        {
           "id": "be3c42af-aa42-55ec-a47c-27e70520bb37",
           "name": "目的",
           "type": "Template",
