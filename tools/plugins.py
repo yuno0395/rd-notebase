@@ -8,7 +8,8 @@
     python plugins.py install [--vault <vault のフォルダ>] [--config <設定フォルダの名前>] [--source <プラグインのフォルダ>]
         各自の PC で使う(プラグインを入れる.bat から)。配布物のプラグイン本体を、vault の設定フォルダ
         (.obsidian や .obsidian-229999_aa11234567)にコピーして有効にする。
-        共有・機密 vault では、_仕組み/設定/.obsidian/ の配る設定(app.json・hotkeys.json・各プラグインの data.json)も上書きする。
+        共有・機密 vault では、_仕組み/設定/.obsidian/ の配る設定(app.json・各プラグインの data.json)も上書きする。
+        キー・右クリックメニュー(Commander)・QuickAdd は上書きせず、各自で足した分を残して合わせる。
 
 ライセンスの決まり(2026-10-26、スレッド「ライセンスと著作権の問題を確かめる」):
   - 本体は rd-notebase に入れない(dist/ と Box の配布物だけ)。main.js は書き換えない。
@@ -210,6 +211,187 @@ def config_dirs(vault: Path) -> list[str]:
     return sorted(p.name for p in vault.iterdir() if p.is_dir() and (p.name == ".obsidian" or p.name.startswith(".obsidian-")))
 
 
+# コアプラグイン(仕様書「コアプラグイン」)。ファイルに独自の書式を残すものは切り、一覧と見るだけのものは入れる。
+# ほかのコアプラグインは各自のまま(触らない)
+CORE_OFF = ("daily-notes", "templates", "canvas", "zk-prefixer")
+CORE_ON = ("bases", "global-search", "backlink", "graph")
+# core-plugins.json がまだないとき(Obsidian で一度も開いていない)に使う、Obsidian の既定
+CORE_DEFAULT = {
+    "file-explorer": True, "global-search": True, "switcher": True, "graph": True, "backlink": True,
+    "canvas": True, "outgoing-link": True, "tag-pane": True, "properties": True, "page-preview": True,
+    "daily-notes": True, "templates": True, "note-composer": True, "command-palette": True,
+    "slash-command": False, "editor-status": True, "bookmarks": True, "markdown-importer": False,
+    "zk-prefixer": False, "random-note": False, "outline": True, "word-count": True, "slides": False,
+    "audio-recorder": False, "workspaces": False, "file-recovery": True, "publish": False, "sync": False,
+    "bases": True, "webviewer": False,
+}
+
+
+def set_core_plugins(target: Path) -> bool:
+    """target(設定フォルダ)の core-plugins.json を決まりに合わせる。変えたら True。"""
+    f = target / "core-plugins.json"
+    try:
+        have = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        have = None
+    if isinstance(have, list):  # 古い形(有効なものの名前の一覧)
+        have = {k: (k in have) for k in set(CORE_DEFAULT) | set(have)}
+    if not isinstance(have, dict):
+        have = dict(CORE_DEFAULT)
+        changed = True
+    else:
+        changed = False
+    want = dict(have)
+    want.update({k: False for k in CORE_OFF})
+    want.update({k: True for k in CORE_ON})
+    if want == have and not changed:
+        return False
+    target.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(want, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    return True
+
+
+# 配る設定のうち、上書きせず各自の分と合わせるもの(Yu 2026-10-29)。設定フォルダ(.obsidian など)からのパス
+MERGED = ("hotkeys.json", "plugins/cmdr/data.json", "plugins/quickadd/data.json")
+# 前の版で配ったもの(キーのコマンド・メニューの項目・QuickAdd の選択肢)の覚え。
+# 版でなくしたものを「各自で足したもの」と取り違えないため
+SENT = "知見同期_配った設定.json"
+
+
+def read_json(f: Path):
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _combo(k: dict) -> tuple:
+    return (tuple(sorted(k.get("modifiers", []))), str(k.get("key", "")).lower())
+
+
+def key_text(k: dict) -> str:
+    """{"modifiers": ["Mod", "Shift"], "key": "n"} → Ctrl+Shift+N"""
+    names = {"Mod": "Ctrl", "Meta": "Win"}
+    order = ["Ctrl", "Shift", "Alt", "Win"]
+    mods = sorted((names.get(m, m) for m in k.get("modifiers", [])), key=lambda m: order.index(m) if m in order else 9)
+    return "+".join(mods + [str(k.get("key", "")).upper()])
+
+
+def command_text(cmd: str) -> str:
+    """templater-obsidian:_仕組み/templates/_コマンド/ノードにする.md → ノードにする"""
+    tail = cmd.split(":", 1)[-1]
+    return tail.rsplit("/", 1)[-1].removesuffix(".md") or cmd
+
+
+def merge_hotkeys(have: dict, dist: dict, sent: list | None = None) -> tuple[dict, list[str]]:
+    """配るキーを入れ直し、各自で足したキーは残す。同じキーを配る側も使っていたら配る側を優先し、知らせる文を返す。"""
+    sent = set(sent or [])
+    owner = {}
+    for cmd, keys in dist.items():
+        for k in keys:
+            owner.setdefault(_combo(k), cmd)
+    out: dict = {}
+    notes: list[str] = []
+    for cmd, keys in have.items():
+        if not isinstance(keys, list):
+            continue
+        if cmd in dist:
+            if keys != dist[cmd] and keys:  # 配るコマンドのキーを自分で変えていた → 配るキーにそろえる
+                mine = ", ".join(key_text(k) for k in keys if isinstance(k, dict))
+                notes.append(f"キーを配る形に戻しました: 「{command_text(cmd)}」(自分のキー {mine} → "
+                             f"{', '.join(key_text(k) for k in dist[cmd]) or 'キーなし'})")
+            continue
+        if cmd in sent:
+            continue  # 前の版で配って、この版でなくしたもの
+        kept = []
+        for k in keys:
+            if not isinstance(k, dict):
+                continue
+            o = owner.get(_combo(k))
+            if o is None:
+                kept.append(k)
+            else:
+                notes.append(f"キーがぶつかりました: {key_text(k)} は配る「{command_text(o)}」に使うので、"
+                             f"自分で付けた「{command_text(cmd)}」から外しました。別のキーを付けてください")
+        out[cmd] = kept
+    out.update(dist)
+    return out, notes
+
+
+def _merge_by_id(have: list, dist: list, sent: list | None) -> list:
+    """配る項目(id で見分ける)を配る順に入れ、各自で足した項目をあとに残す。"""
+    ids = {x.get("id") for x in dist if isinstance(x, dict)}
+    sent = set(sent or [])
+    mine = [x for x in have if isinstance(x, dict) and x.get("id") not in ids and x.get("id") not in sent]
+    return list(dist) + mine
+
+
+def merge_cmdr(have: dict, dist: dict, sent: dict | None = None) -> dict:
+    """Commander: 右クリックメニューや帯のボタン。配る項目は入れ直し、各自で足した項目は残す。"""
+    sent = sent or {}
+    out = dict(have)
+    for k, v in dist.items():
+        if isinstance(v, list) and isinstance(have.get(k), list):
+            out[k] = _merge_by_id(have[k], v, sent.get(k))
+        else:
+            out[k] = v
+    return out
+
+
+def merge_quickadd(have: dict, dist: dict, sent: list | None = None) -> dict:
+    """QuickAdd: 配る選択肢(Ctrl+N の種類など)は入れ直し、各自で足した選択肢は残す。"""
+    out = dict(have)
+    out.update(dist)
+    out["choices"] = _merge_by_id(have.get("choices", []) if isinstance(have.get("choices"), list) else [],
+                                  dist.get("choices", []), sent)
+    if isinstance(have.get("migrations"), dict) and isinstance(dist.get("migrations"), dict):
+        out["migrations"] = {**dist["migrations"], **have["migrations"]}  # QuickAdd が済ませた移し替えは済んだまま
+    return out
+
+
+def sent_of(name: str, dist) -> object:
+    if name == "hotkeys.json":
+        return sorted(dist)
+    if name == "plugins/cmdr/data.json":
+        return {k: [x.get("id") for x in v if isinstance(x, dict)] for k, v in dist.items() if isinstance(v, list)}
+    return [x.get("id") for x in dist.get("choices", []) if isinstance(x, dict)]
+
+
+def merge_one(name: str, have, dist, sent_all: dict) -> tuple[object, list[str]]:
+    """name(MERGED の1つ)の配る設定 dist を、各自の have に合わせた結果と知らせる文。"""
+    if not isinstance(have, dict):
+        return dist, []
+    sent = sent_all.get(name)
+    if name == "hotkeys.json":
+        return merge_hotkeys(have, dist, sent)
+    if name == "plugins/cmdr/data.json":
+        return merge_cmdr(have, dist, sent), []
+    return merge_quickadd(have, dist, sent), []
+
+
+def merge_settings(src: Path, target: Path) -> tuple[list[str], list[str]]:
+    """src(配る設定フォルダ)の MERGED を target(各自の設定フォルダ)に合わせて書く。(変えたファイル, 知らせる文)。"""
+    sent_all = read_json(target / SENT)
+    sent_all = sent_all if isinstance(sent_all, dict) else {}
+    changed: list[str] = []
+    notes: list[str] = []
+    for name in MERGED:
+        dist = read_json(src / name)
+        if not isinstance(dist, dict):
+            continue
+        have = read_json(target / name)
+        want, n = merge_one(name, have, dist, sent_all)
+        notes += n
+        sent_all[name] = sent_of(name, dist)
+        if want != have:
+            (target / name).parent.mkdir(parents=True, exist_ok=True)
+            (target / name).write_text(json.dumps(want, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+            changed.append(name)
+    target.mkdir(parents=True, exist_ok=True)
+    (target / SENT).write_text(json.dumps(sent_all, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    return changed, notes
+
+
 def install(vault: Path, config: str, source: Path) -> list[str]:
     """source(配布物の プラグイン/)の本体を vault/config にコピーして有効にする。したことを返す。"""
     target = vault / config
@@ -223,9 +405,13 @@ def install(vault: Path, config: str, source: Path) -> list[str]:
             if not f.is_file() or f.name == "community-plugins.json":
                 continue
             rel = f.relative_to(settings)
+            if rel.as_posix() in MERGED:
+                continue  # 下で各自の分と合わせる
             (target / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(f, target / rel)
-        done.append("配る設定(app.json・hotkeys.json・プラグインの設定)を入れた")
+        _, notes = merge_settings(settings, target)
+        done.append("配る設定(app.json・プラグインの設定)を入れ、キー・右クリックメニュー・QuickAdd は自分で足した分を残して合わせた")
+        done += notes
         wanted = read_list(settings / "community-plugins.json")
     else:
         wanted = read_list(target / "community-plugins.json")
@@ -251,6 +437,8 @@ def install(vault: Path, config: str, source: Path) -> list[str]:
     if enabled != have:
         (target / "community-plugins.json").write_text(json.dumps(enabled, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         done.append(f"有効にするプラグインを {len(enabled)} 個にした")
+    if set_core_plugins(target):
+        done.append("コアプラグインを合わせた(デイリーノート・テンプレート・Canvas・固有ノート作成を切り、Bases などを入れた)")
     for pid in missing:
         done.append(f"注意: {pid} は配布物にないので入れていません")
     return done

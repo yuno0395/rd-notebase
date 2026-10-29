@@ -46,6 +46,7 @@ system = [
   "00_*.base",
   "_仕組み/templates/*",
   # 配る設定(キーと、配ったプラグインの設定)は版ごとに上書きする。
+  # ただし hotkeys.json・plugins/cmdr・plugins/quickadd の data.json は準備の bat が合わせる(配る分は入れ直し、各自で足した分は残す)
   # community-plugins.json と app.json は各自のものとして最初だけ置く(要件書 F-46)
   ".obsidian/hotkeys.json",
   ".obsidian/plugins/*",
