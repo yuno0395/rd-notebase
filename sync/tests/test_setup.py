@@ -194,6 +194,7 @@ def test_new_version_and_backups(team, monkeypatch):
     hk = personal / ".obsidian" / "hotkeys.json"
     keys = json.loads(hk.read_text(encoding="utf-8"))
     keys["mine:x"] = [{"modifiers": ["Alt"], "key": "X"}]                     # 自分で足したキー
+    keys["mine:y"] = [{"modifiers": ["Mod"], "key": "N"}]                     # 配る Ctrl+N とぶつかる
     hk.write_text(json.dumps(keys), encoding="utf-8")
     note = personal / "02_ノード" / "0RDGPG001_水.md"
     note.write_text("---\nid: 0RDGPG001\n---\n", encoding="utf-8")
@@ -203,7 +204,9 @@ def test_new_version_and_backups(team, monkeypatch):
     assert st.read_version(shared) == "9.9.21" and st.read_version(personal) == "9.9.21"
     assert readme.read_text(encoding="utf-8") != "自分で書き換えた README\n"
     assert note.read_text(encoding="utf-8") == "---\nid: 0RDGPG001\n---\n"
-    assert json.loads(hk.read_text(encoding="utf-8"))["mine:x"] == [{"modifiers": ["Alt"], "key": "X"}]  # 版を当てても残る   # ノートは触らない
+    keys = json.loads(hk.read_text(encoding="utf-8"))
+    assert keys["mine:x"] == [{"modifiers": ["Alt"], "key": "X"}] and keys["mine:y"] == []  # 版を当てても残る。ぶつかる分は外れる
+    assert "キーがぶつかりました: Ctrl+N" in out                                          # 画面と「手でやること」で知らせる   # ノートは触らない
     backs = s.backups.previous()
     assert len(backs) == 1
     with zipfile.ZipFile(backs[-1] / "個人vault.zip") as z:

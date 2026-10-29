@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import csv
 import fnmatch
+import functools
 import json
 import os
 import re
@@ -377,9 +378,14 @@ def merged(*lists: list[str]) -> list[str]:
 
 
 PLUGIN_LIST = ".obsidian/community-plugins.json"
-HOTKEYS = ".obsidian/hotkeys.json"
+CONFIG = ".obsidian"
 
 
+def merge_names(dist: Path) -> tuple[str, ...]:
+    return getattr(dist_plugins(dist), "MERGED", ())
+
+
+@functools.lru_cache(maxsize=None)
 def dist_plugins(dist: Path):
     """配布物の plugins.py(キーやコアプラグインの合わせ方)を読む。"""
     import importlib.util
@@ -399,7 +405,8 @@ class VaultPlan:
     put: list[str] = field(default_factory=list)       # 新しく置く
     replace: list[str] = field(default_factory=list)   # 上書きする
     plugin_list: list[str] | None = None               # 合わせた community-plugins.json
-    hotkeys: dict | None = None                        # 合わせた hotkeys.json(各自で足したキーを残す)
+    merged: list[str] = field(default_factory=list)    # 各自の分と合わせる設定(キー・右クリックメニュー・QuickAdd)
+    notes: list[str] = field(default_factory=list)     # 合わせるときに知らせること(キーがぶつかった など)
     migrations: list[tuple[str, Path]] = field(default_factory=list)
 
     @property
@@ -416,14 +423,14 @@ class VaultPlan:
             parts.append(f"上書き {len(self.replace)}")
         if self.plugin_list is not None:
             parts.append("プラグインの一覧を合わせる")
-        if self.hotkeys is not None:
-            parts.append("キーを合わせる")
+        if self.merged:
+            parts.append("キーなどを自分の分と合わせる")
         head = "作る" if self.new else (f"{self.old_version or '版なし'} → {self.version}" if self.old_version != self.version else f"{self.version} のまま")
         return f"{head}({'、'.join(parts) or '変わるファイルなし'})"
 
     @property
     def changes(self) -> bool:
-        return bool(self.put or self.replace or self.migrations or self.plugin_list is not None or self.hotkeys is not None
+        return bool(self.put or self.replace or self.migrations or self.plugin_list is not None or bool(self.merged)
                     or self.old_version != self.version)
 
 
@@ -449,11 +456,14 @@ def plan_vault(dist: Path, kind: str, target: Path) -> VaultPlan:
             if want != have:
                 vp.plugin_list = want
             continue
-        if kind == "個人" and rel == HOTKEYS and dst.is_file():
-            have = dist_plugins(dist).read_json(dst)
-            want = dist_plugins(dist).merge_hotkeys(have if isinstance(have, dict) else {}, json.loads(f.read_text(encoding="utf-8")))
+        if kind == "個人" and rel.startswith(CONFIG + "/") and rel[len(CONFIG) + 1:] in merge_names(dist) and dst.is_file():
+            pl = dist_plugins(dist)
+            sent = pl.read_json(target / CONFIG / pl.SENT)
+            have = pl.read_json(dst)
+            want, notes = pl.merge_one(rel[len(CONFIG) + 1:], have, pl.read_json(f), sent if isinstance(sent, dict) else {})
             if want != have:
-                vp.hotkeys = want
+                vp.merged.append(rel)
+                vp.notes += notes
             continue
         if not dst.exists():
             vp.put.append(rel)
@@ -480,8 +490,7 @@ def apply_vault(vp: VaultPlan, backups: Backups, label: str, ext: Ext | None = N
         if code != 0:
             raise Stop(f"版 {ver} の移し替えが失敗しました。版.txt は進めていません:\n{out[-800:]}")
         done.append(f"版 {ver} の移し替えを当てた")
-    backups.save(label, vp.target, vp.replace + ([PLUGIN_LIST] if vp.plugin_list is not None else [])
-                 + ([HOTKEYS] if vp.hotkeys is not None else []))
+    backups.save(label, vp.target, vp.replace + ([PLUGIN_LIST] if vp.plugin_list is not None else []) + vp.merged)
     for rel in vp.put + vp.replace:
         dst = vp.target / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -492,8 +501,10 @@ def apply_vault(vp: VaultPlan, backups: Backups, label: str, ext: Ext | None = N
             (vp.target / d.relative_to(vp.src)).mkdir(parents=True, exist_ok=True)
     if vp.plugin_list is not None:
         (vp.target / PLUGIN_LIST).write_text(json.dumps(vp.plugin_list, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    if vp.hotkeys is not None:
-        (vp.target / HOTKEYS).write_text(json.dumps(vp.hotkeys, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if vp.kind == "個人" and (vp.src / CONFIG).is_dir() and (vp.src.parent / "plugins.py").is_file():
+        # キー・右クリックメニュー・QuickAdd は、各自で足した分を残して合わせる(配ったものの覚えもここで書く)
+        _, notes = dist_plugins(vp.src.parent).merge_settings(vp.src / CONFIG, vp.target / CONFIG)
+        done += notes
     (vp.target / VERSION_FILE).parent.mkdir(parents=True, exist_ok=True)
     (vp.target / VERSION_FILE).write_text(vp.version + "\n", encoding="utf-8")
     if vp.put or vp.replace:
@@ -772,6 +783,13 @@ class Setup:
         self.env.memo.parent.mkdir(parents=True, exist_ok=True)
         self.env.memo.write_text(json.dumps(self.memo, ensure_ascii=False, indent=1), encoding="utf-8")
 
+    def say_note(self, label: str, line: str) -> None:
+        """したことを記録に書く。キーがぶつかったなど本人に知らせることは、画面にも出し、最後の「手でやること」にも入れる。"""
+        self.log(f"{label}: {line}")
+        if line.startswith("キー"):
+            self.ui.say(f"    {line}")
+            self.hand_once("key:" + line, f"{label}: {line}")
+
     def log(self, text: str) -> None:
         if self.dry:
             return
@@ -979,7 +997,7 @@ class Setup:
         if vp.changes:
             def go(vp=vp, label=label):
                 for line in apply_vault(vp, self.backups, label.replace(" ", ""), self.ext):
-                    self.log(f"{label}: {line}")
+                    self.say_note(label, line)
             where = "" if kind == "機密" else f"({target})"
             self.add(f"{label}{where} を作る" if vp.new else f"{label} を今の版に: {vp.summary()}", go)
         return vp
@@ -1017,14 +1035,14 @@ class Setup:
             plugins = importlib.import_module("plugins")
             if (source / "プラグインの出典.md").is_file():
                 for line in plugins.install(vault, config, source):
-                    self.log(f"{label}: {line}")
+                    self.say_note(label, line)
             elif settings.is_dir() and settings.resolve() != d.resolve():
                 for f in settings.rglob("*"):
-                    if f.is_file() and f.relative_to(settings).as_posix() == "hotkeys.json":
-                        plugins.put_hotkeys(f, d / "hotkeys.json")  # 各自で足したキーは残す
-                    elif f.is_file() and f.name != "community-plugins.json":
+                    if f.is_file() and f.name != "community-plugins.json" and f.relative_to(settings).as_posix() not in plugins.MERGED:
                         (d / f.relative_to(settings)).parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(f, d / f.relative_to(settings))
+                for line in plugins.merge_settings(settings, d)[1]:  # キーなどは各自で足した分を残す
+                    self.say_note(label, line)
                 if not (d / "community-plugins.json").is_file() and (settings / "community-plugins.json").is_file():
                     shutil.copy2(settings / "community-plugins.json", d / "community-plugins.json")
             if plugins.set_core_plugins(d):  # 本体がない版でも、個人 vault でも合わせる
