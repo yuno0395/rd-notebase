@@ -4,6 +4,7 @@
 - F-26: タスク・実験・試作記録の「リスクはどう変わったか」(古いノートは「残ったリスク」)にあるイシューの
   previous が空なら、そのノートを入れる。
 - F-27: イシューの generation を previous をたどって計算し、空なら入れ、食い違えば知らせる。
+- F-52: 設計案の「価値の仮説を実現できるか」にある価値の仮説を、属性 価値仮説 に足す。
 
 書き換えるのは自分のノート(個人 vault の 01〜05)だけ。他の人のノートは読むだけにする。
 """
@@ -323,6 +324,33 @@ def fill_previous(docs: list[Doc], index: Index, w: Writer) -> None:
                               "previous に入れました。違っていたら直してください")
 
 
+# ---------- F-52: 価値仮説 ----------
+
+VALUE_SECTION = "価値の仮説を実現できるか"
+
+
+def fill_value_hypotheses(docs: list[Doc], index: Index, w: Writer) -> None:
+    """表(や v0.56 までの文章)の [[仮説]] を、属性 価値仮説 に足す。足すだけで消さない(Yu 2026-10-29)。"""
+    for d in docs:
+        if not d.own or d.type != "設計案":
+            continue
+        have = {t.lower() for t in targets(d.fm.get("価値仮説"))}
+        have_ids = {x.id for x in map(index.resolve, have) if x}
+        add = []
+        for t in section_links(d.text, VALUE_SECTION):
+            h = index.resolve(t.rstrip("\\"))    # 表の中のリンクは [[名前\|表示]] になる
+            if not h or h.type != "仮説" or h.id in have_ids:
+                continue
+            have_ids.add(h.id)
+            add.append(h.link)
+        if not add:
+            continue
+        old = as_list(d.fm.get("価値仮説"))
+        if w.set(d, {"価値仮説": json.dumps(old + add, ensure_ascii=False)},
+                 f"価値仮説 に {len(add)} 件足した"):
+            w.report.todo(f"価値仮説 を補った: {d.link} の「{VALUE_SECTION}」にある {'、'.join(add)} を入れました")
+
+
 # ---------- F-27: generation ----------
 
 def origin_issue(doc: Doc, index: Index) -> Doc | None:
@@ -502,6 +530,7 @@ def run_autofill(personal: Path, shared: Path | None, report: Report, backup: Ba
         fill_generation(docs, index, w)
         fill_priority(docs, index, w, today)
         fill_references(docs, index, w)
+        fill_value_hypotheses(docs, index, w)
     except Exception as e:  # おまけが壊れても、核の同期は続ける
         report.warn(f"priority・previous・generation の自動入力で止まりました({type(e).__name__}: {e})。"
                     "id 付けと共有はそのまま行いました")

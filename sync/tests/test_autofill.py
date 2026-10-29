@@ -237,3 +237,25 @@ def test_similar_references(box):
     assert "前のヒケ" not in text(old)                       # 作ってから日がたったノートには足さない
     run_once(box, now=NOW + 60)
     assert text(p).count("[[0RA200001_") == 1              # 重ねない
+
+
+def test_value_hypotheses_from_table(box):
+    """F-52: 設計案の表の [[仮説]] を 価値仮説 に足す。足すだけで消さない。"""
+    yu = box.personal
+    write(yu / "01_目的/0RC001001_電池で3年動く.md", "---\nid: 0RC001001\nauthor: Yu\ntype: 仮説\n---\n")
+    write(yu / "01_目的/0RC002001_工事なしで付く.md",
+          "---\nid: 0RC002001\nauthor: Yu\ntype: 仮説\naliases: [工事不要]\n---\n")
+    write(yu / "02_ノード/0RC003001_電池.md", "---\nid: 0RC003001\nauthor: Yu\ntype: ノード\n---\n")
+    d = write(yu / "01_設計案/0RC009001_A案.md",
+              '---\nid: 0RC009001\nauthor: Yu\ntype: 設計案\n価値仮説: ["[[0RC002001_工事なしで付く|工事なしで付く]]"]\n---\n'
+              "## 価値の仮説を実現できるか\n| 価値の仮説 | どう実現するか | 前提 |\n| --- | --- | --- |\n"
+              "| [[0RC001001_電池で3年動く\\|電池で3年動く]] | 1日1回だけ起きる | [[0RC003001_電池\\|電池]] が 2000mAh |\n"
+              "| [[工事不要]] | 磁石で付ける | |\n"
+              "## 部分の案\n[[0RC001001_電池で3年動く]]\n")
+    run_once(box, now=NOW)
+    t = text(d)
+    assert ('価値仮説: ["[[0RC002001_工事なしで付く|工事なしで付く]]", '
+            '"[[0RC001001_電池で3年動く|電池で3年動く]]"]') in t   # 表の仮説を足す。ノードと、同じ仮説の別名は足さない
+    assert "価値仮説 を補った" in report(box)
+    run_once(box, now=NOW)
+    assert text(d) == t                                     # 何度走らせても同じ
