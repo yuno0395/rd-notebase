@@ -274,6 +274,9 @@ function initialValues(app, kind, note) {
       out.risk_reduction = items.join("");
     }
   }
+  // 共有しないメモ(type: メモ)から作ったときは、メモへのリンクを入れない。作ったノートは共有されるので、
+  // メモの名前が共有に出ないようにする
+  if (typeOf(app, note) === "メモ") for (const k of ["parent", "previous", "friend"]) delete out[k];
   return out;
 }
 
