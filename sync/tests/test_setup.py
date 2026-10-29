@@ -337,3 +337,18 @@ def test_migrations_for_old_vaults(tmp_path):
     (old / "_仕組み" / "記録" / "版.txt").write_text("0.2.0\n", encoding="utf-8")
     assert st.plan_vault(dist, "個人", old).migrations == []
     assert st.plan_vault(dist, "個人", tmp_path / "新しい個人").migrations == []   # これから作る vault
+
+
+@pytest.mark.parametrize("ahead, pushed", [("0\n", True), ("2\n", False)])
+def test_tag_is_not_pushed_with_unpushed_commits(ahead, pushed):
+    """タグを送ると手元だけのコミットも public の正本へ出るので、あれば送らない。"""
+    s = st.Setup.__new__(st.Setup)
+    s.ui, s.version, s.hand, calls = st.UI(["y"]), "9.9.21", [], []
+
+    def git(*args):
+        calls.append(args)
+        return (0, ahead) if args[0] == "rev-list" else (0, "")
+    s.git = git
+    s.tag()
+    assert (("push", "origin", "v9.9.21") in calls) is pushed
+    assert bool(s.hand) is not pushed

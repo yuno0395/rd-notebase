@@ -18,6 +18,8 @@ from .assign import Vault, assign_ids, collect_used, fix_links, name_index, repo
 from . import ids
 from .config import Config
 from .relocate import follow
+from .guard import check_places
+from .outward import check_outward
 from .lock import Busy, Lock
 from .report import Report
 from .safety import Backup
@@ -90,6 +92,18 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
         for r in moved:
             report.record(r)
         report.write(cfg.personal)
+        return report
+    problems = check_places(cfg)
+    if problems:
+        # 書き間違えた場所のファイルを改名したり、そこへノートを集めたりしないように、何も書かずに止める(F-55)
+        report = Report(dry_run=dry)
+        report.stopped = "設定の場所がおかしいので、同期を止めました: " + " / ".join(problems)
+        report.todo(f"設定の場所がおかしいので、同期を止めました。設定ファイル {cfg.config_path or 'config.yaml'} を"
+                    "直してください(下の警告)")
+        for w in problems + move_warnings:
+            report.warn(w)
+        if "個人" not in " ".join(problems):
+            report.write(cfg.personal)
         return report
     lock = Lock(cfg.lock_path)
     try:
@@ -176,6 +190,10 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
     elif cfg.shared:
         report.warn(f"共有 vault が見つかりません: {cfg.shared}(Box Drive が止まっていないか確かめてください)")
 
+    try:
+        check_outward(cfg, report)  # F-56: 外へ送る機能がオンになっていないか
+    except Exception as e:  # おまけが壊れても、核の同期は続ける
+        report.warn(f"外へ送る機能の確かめで止まりました({type(e).__name__}: {e})")
     update_daily(cfg.personal, cfg.shared, cfg.member, report, backup, dry, now, cfg.idle_seconds)  # F-33
     notice_new_version(cfg.personal, cfg.shared, report)
     report.write(cfg.personal)
