@@ -259,3 +259,76 @@ def test_value_hypotheses_from_table(box):
     assert "価値仮説 を補った" in report(box)
     run_once(box, now=NOW)
     assert text(d) == t                                     # 何度走らせても同じ
+
+
+# ---------- F-54: 着手の印で 進行中 にする ----------
+
+TEMPLATE = (Path(__file__).resolve().parents[2] / "vault/共有/_仕組み/templates/タスク.md").read_text(encoding="utf-8")
+BODY = TEMPLATE.split("---\n", 2)[2]
+
+
+def task(yu: Path, nid: str, name: str, body: str = BODY, status: str = "未着手") -> Path:
+    return write(yu / f"04_タスク/{nid}_{name}.md",
+                 f"---\nid: {nid}\nauthor: Yu\ntype: タスク\nstatus: {status}\ndue: 2026-11-30\n---\n{body}")
+
+
+def set_day(path: Path, day: str) -> None:
+    import os
+    t = datetime.fromisoformat(day + "T12:00:00+09:00").timestamp()
+    os.utime(path, (t, t))
+
+
+def started_rows(box):
+    from notesync.history import history_path, read_rows
+    return {r["名前"]: r["日時"][:10] for r in read_rows(history_path(box.shared, "Yu"))
+            if r["項目"] == "status" and r["後"] == "進行中"}
+
+
+def test_auto_start_by_marks(box):
+    yu = box.personal
+    write(box.shared / "_仕組み/templates/タスク.md", TEMPLATE)
+    plain_t = task(yu, "0QZ001001", "まだ")                                   # テンプレートのまま
+    wrote = task(yu, "0QZ002001", "書いた", BODY.replace("## 完了の条件\n", "## 完了の条件\n寸法が 0.1 以内\n"))
+    set_day(wrote, "2026-10-21")
+    checked = task(yu, "0QZ003001", "チェック", BODY.replace("## やること\n", "## やること\n- [x] 型を借りる\n"))
+    set_day(checked, "2026-10-22")
+    daily = task(yu, "0QZ004001", "デイリー")
+    write(yu / "00_日誌/デイリー/2026-10-20.md",
+          "# 2026-10-20\n\n## タイムライン\n- [ ] 09:00 - 10:00 [[0QZ004001_デイリー|デイリー]]\n")
+    write(yu / "00_日誌/デイリー/2026-10-30.md",            # 先の日付は見ない
+          "# 2026-10-30\n\n## タイムライン\n- [ ] 09:00 [[0QZ001001_まだ|まだ]]\n")
+    child = task(yu, "0QZ005001", "記録あり")
+    write(yu / "05_ナレッジ/0R9000001_結果.md",
+          '---\nid: 0R9000001\nauthor: Yu\ntype: 実験・試作記録\nparent: ["[[0QZ005001_記録あり|記録あり]]"]\n---\n')
+    done = task(yu, "0QZ006001", "終わった", BODY + "メモ\n", status="完了")
+    for p in (plain_t, daily, child):
+        set_day(p, "2026-10-19")
+    run_once(box, now=NOW)
+    assert "status: 未着手" in text(plain_t)
+    for p in (wrote, checked, daily, child):
+        assert "status: 進行中" in text(p)
+    assert "status: 完了" in text(done)
+    r = report(box)
+    assert "着手の印(本文の書き足し、2026-10-21)があるので status を 進行中 にした" in r
+    assert "着手の印(デイリーのタイムライン、2026-10-20)" in r
+    assert "着手の印(実験・試作記録「結果」、2026-10-22)" in r
+    # ノート履歴は同期した日でなく着手の日で書く(工程表の始まりになる)
+    assert started_rows(box) == {"書いた": "2026-10-21", "チェック": "2026-10-22",
+                                 "デイリー": "2026-10-20", "記録あり": "2026-10-22"}
+
+
+def test_auto_start_needs_template(box):
+    """テンプレートが見つからなければ、本文の書き足しは見ない(見間違えないように)。"""
+    p = task(box.personal, "0QZ002001", "書いた", BODY + "寸法が 0.1 以内\n")
+    run_once(box, now=NOW)
+    assert "status: 未着手" in text(p)
+
+
+def test_auto_start_ignores_old_template_and_refs(box):
+    write(box.shared / "_仕組み/templates/タスク.md", TEMPLATE)
+    old = ("## やること(手順や細かい仕事は Ctrl+L で - [ ] に)\n- [ ] \n## 完了の条件\n"
+           "## 先に読むもの\nQuickAdd が作るときに入れる\n- [[0QZ009001_昔のナレッジ|昔のナレッジ]]\n"
+           "## 類似・参考ナレッジ\n- [[0QZ009002_似たもの|似たもの]]\n")
+    p = task(box.personal, "0QZ002001", "古い", old)
+    run_once(box, now=NOW)
+    assert "status: 未着手" in text(p)
