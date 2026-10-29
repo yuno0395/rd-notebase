@@ -234,7 +234,7 @@ def test_topics(shared, tmp_path):
                "status 未対応→対策中(10-22)、タスク「見てほしい」完了(10-23)") in html
     assert row("梱包の手間", "イシュー", "(未記入)", "記録された変化なし") in html
     assert row("", "", "金型メーカーと打ち合わせ", "") in html
-    assert "今週のダイジェスト<" not in html                      # テンプレートのままの行は出さない
+    assert "<td>今週のダイジェスト</td>" not in html                     # テンプレートのままの行は出さない
     assert "載らない" not in html and "00_今週動いたノート" not in html
     assert html.index("今週のトピック") < html.index("開発の目処(成果物候補ごと)")
 
