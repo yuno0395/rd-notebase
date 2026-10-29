@@ -24,7 +24,7 @@ from .report import Report
 
 HISTORY_DIR = "_仕組み/記録/ノート履歴"
 COLUMNS = ["日時", "id", "名前", "種類", "項目", "前", "後"]
-WATCH = {"タスク": ("due", "status"), "イシュー": ("status", "resolution"), "プロジェクト": ("outlook",)}
+WATCH = {"タスク": ("due", "status"), "イシュー": ("status", "resolution")}
 
 
 def history_path(shared: Path, member: str) -> Path:

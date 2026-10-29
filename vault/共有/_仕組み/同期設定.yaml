@@ -5,14 +5,11 @@ keep_in_vault:
   pdf: true
   video: [mp4, webm, mov]
   video_max_mb: 20
-report_sections:             # 週報に載せる節。false で外す。見込みはいつも載せる
-  出荷準備度: true
-  成果物候補: true
+report_sections:             # 週報に載せる節。false で外す(Yu 2026-10-29)
+  開発の目処: true           # 成果物候補ごとの、方針リスクの解決数と未解決数
   候補の数: true
   マイルストーン: true
-  目的に沿わない: true
-  反論のついた仮説: true
-  同じノード: 自動           # ほかのプロジェクトがあるときだけ載せる
-  行き詰まり: true
+  中途半端な仕事: true       # priority 3・4 なのに一部だけ進めたイシュー
   担当者: true
-  機密: true
+  出荷準備度: false          # 開発の後の方で true にする
+  同じノード: false          # プロジェクトが2つ以上になったら 自動 にする

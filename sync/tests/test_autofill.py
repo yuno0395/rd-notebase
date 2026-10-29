@@ -200,13 +200,14 @@ def test_daily_note_notice(box):
     assert text(daily) == "# 2026-10-24\n\n## タイムライン\n- [ ] 09:00 打ち合わせ\n"   # 知らせがなくなれば消す
 
 
-def test_friday_outlook_reminder(box):
+def test_no_outlook_reminder(box):
+    """週報から見込みを外したので、金曜の「見込みを更新してください」も出さない(Yu 2026-10-29)。"""
     yu = box.personal
     friday = datetime(2026, 10, 30, 8, 0, tzinfo=ids.JST).timestamp()
     daily = write(yu / "00_日誌/デイリー/2026-10-30.md", "# 2026-10-30\n")
     run_once(box, now=friday)
-    assert "見込みを更新してください: [[0RA00A001_試しPJ|試しPJ]]" in text(daily)
-    assert "見込みを更新してください" in report(box)
+    assert "見込みを更新してください" not in text(daily)
+    assert "見込みを更新してください" not in report(box)
 
 
 def test_similar_references(box):

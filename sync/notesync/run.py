@@ -174,7 +174,7 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
     elif cfg.shared:
         report.warn(f"共有 vault が見つかりません: {cfg.shared}(Box Drive が止まっていないか確かめてください)")
 
-    update_daily(cfg.personal, cfg.shared, cfg.member, report, backup, dry, now, cfg.idle_seconds)  # F-30・F-33
+    update_daily(cfg.personal, cfg.shared, cfg.member, report, backup, dry, now, cfg.idle_seconds)  # F-33
     notice_new_version(cfg.personal, cfg.shared, report)
     report.write(cfg.personal)
     if not dry:

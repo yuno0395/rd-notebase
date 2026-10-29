@@ -1,4 +1,4 @@
-"""F-29・F-30: 管理者向けの週報(仕様書「管理者向けの週報」)。
+"""F-29: 管理者向けの週報(仕様書「管理者向けの週報」)。
 
 共有 vault のノートの属性と、ノート履歴(history.py)から、プロジェクトごとに作る。
 置き場所は個人設定の report(例: Box\\開発ノート_報告)の `<プロジェクト名>/<年-週>.html`。
@@ -6,7 +6,7 @@ Markdown と Excel に分けず、ブラウザで開く HTML 1つにする(Yu 20
 週報は、報告フォルダ(個人設定の report)を書いた PC なら誰のものでも作る。毎週月曜の最初の同期で作り、
 今週の分がもうあれば作らない。2台が同時に作らないよう、作る間は報告フォルダに札を置く。
 
-機密フォルダの中身は読まない。secret_refs の件数だけを出す。
+機密フォルダの中身は読まない。
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import yaml
 
 from . import ids
 from .autofill import Doc, Index, as_list, load_docs, milestones, plain, targets, to_date
-from .history import HISTORY_DIR, done_date, extensions, read_rows
+from .history import HISTORY_DIR, read_rows
 from .report import Report
 
 BIG = {"方針", "絞込", "出荷", "大"}
@@ -29,15 +29,15 @@ OPEN_TASK = {"未着手", "進行中", "待ち", "確認待ち"}
 DONE = {"完了", "中止"}
 OPEN_ISSUE = {"未対応", "対策中"}
 DROPPED = {"不採用", "中止"}
-WORK_TYPES = {"タスク", "イシュー", "実験・試作記録"}
-STALE_DAYS = 14
+SOLVED = {"低減済み", "解消"}
 CANDIDATE_CSV = "候補の数.csv"
 
-# 週報に載せる節(チーム設定 report_sections で選ぶ。Yu 2026-10-25)。見込みはいつも載せる。
+# 週報に載せる節(チーム設定 report_sections で選ぶ。Yu 2026-10-25)。
 # 値: true(載せる)/ false(外す)/ 自動(同じノード: ほかのプロジェクトがあるときだけ)
-SECTIONS = ["出荷準備度", "成果物候補", "候補の数", "マイルストーン", "目的に沿わない", "反論のついた仮説",
-            "同じノード", "行き詰まり", "担当者", "機密"]
-DEFAULT_SECTIONS = {k: True for k in SECTIONS} | {"同じノード": "自動"}
+# 開発の初めは出荷準備ではなく開発の目処が大事なので、出荷準備度は既定で外す。
+# 同じノードは、当面1つのプロジェクトで使うので既定で外す(Yu 2026-10-29)
+SECTIONS = ["開発の目処", "候補の数", "マイルストーン", "中途半端な仕事", "担当者", "出荷準備度", "同じノード"]
+DEFAULT_SECTIONS = {k: True for k in SECTIONS} | {"出荷準備度": False, "同じノード": False}
 
 
 def stage(doc: Doc) -> int:
@@ -53,9 +53,9 @@ def status(doc: Doc) -> str:
     return str(doc.fm.get("status") or "").strip()
 
 
-def is_dr(doc: Doc) -> bool:
-    """DR の議事録: kind: DR(DR 議事録のテンプレート)。前からのものは名前に DR を含むもの。"""
-    return str(doc.fm.get("kind") or "").strip().upper() == "DR" or "DR" in doc.name.upper()
+def is_policy_risk(doc: Doc) -> bool:
+    """開発の方向を大きく変えるリスク: impact 方針のイシュー(中止は数えない)。"""
+    return doc.type == "イシュー" and impact(doc) == "方針" and status(doc) != "中止"
 
 
 def owner(doc: Doc) -> str:
@@ -83,6 +83,7 @@ class ProjectReport:
     """1つのプロジェクトの週報。節(見出し・項目・表)を順にためて、HTML に書き出す(weekly_html.py)。"""
     name: str
     title: str = ""
+    request: str = ""   # プロジェクトの request_to_manager(管理者に判断してほしいこと)。空なら出さない
     blocks: list[tuple] = field(default_factory=list)
 
     def section(self, heading: str, lead: str = "") -> None:
@@ -123,9 +124,6 @@ class Builder:
         ts = targets(d.fm.get("parent")) + targets(d.fm.get("脅かす"))
         return [p for p in (self.index.resolve(t) for t in ts) if p]
 
-    def friends(self, d: Doc) -> list[Doc]:
-        return [f for f in (self.index.resolve(t) for t in targets(d.fm.get("friend"))) if f]
-
     def values(self, d: Doc) -> list[Doc]:
         """設計案が実現する価値の仮説。属性 価値仮説(Yu 2026-10-28)と、v0.54 までの friend の仮説。"""
         ts = targets(d.fm.get("価値仮説")) + targets(d.fm.get("friend"))
@@ -153,16 +151,6 @@ class Builder:
 
     # ---------- 成果物の軸(Yu 2026-10-28) ----------
 
-    def top_solution(self, s: Doc) -> Doc:
-        """s から parent をたどった、いちばん上の設計案(成果物候補)。"""
-        seen = {s.id}
-        while True:
-            up = [p for p in self.parents(s) if p.type == "設計案" and p.id not in seen]
-            if not up:
-                return s
-            s = up[0]
-            seen.add(s.id)
-
     def subtree(self, root: Doc) -> list[Doc]:
         """root とその下の設計案(部分案)。"""
         out, stack, seen = [], [root], set()
@@ -175,56 +163,52 @@ class Builder:
             stack += [c for c in self.children.get(s.id, []) if c.type == "設計案" and status(c) not in DROPPED]
         return out
 
-    def realized(self, root: Doc) -> list[Doc]:
-        """成果物候補とその部分案が friend でつないだ価値の仮説。"""
-        out: dict[str, Doc] = {}
-        for s in self.subtree(root):
-            for h in self.values(s):
-                out.setdefault(h.id, h)
-        # v0.52 までの書き方(設計案の parent が仮説)も読む
-        for s in self.subtree(root):
-            for h in self.parents(s):
-                if h.type == "仮説":
-                    out.setdefault(h.id, h)
-        return list(out.values())
+    def prospects(self, docs: list[Doc]) -> tuple[list[list[str]], int, int, tuple[int, int]]:
+        """開発の目処(Yu 2026-10-29): まだ不可能と決まっていない成果物候補(parent が目的の設計案で、
+        不採用・中止でないもの)ごとに、開発の方向を大きく変えるリスク(impact 方針のイシュー)の
+        解決した数と、まだ閉じていない数。候補とその下の部分の案を 脅かす(古い parent も)イシューを数える。
 
-    def hypothesis_ancestors(self, h: Doc) -> set[str]:
-        out, stack = set(), [h]
-        while stack:
-            x = stack.pop()
-            if x.id in out or x.type != "仮説":
-                continue
-            out.add(x.id)
-            stack += self.parents(x)
-        return out
-
-    def products(self, docs: list[Doc]) -> list[list[str]]:
-        """成果物候補(parent が目的の設計案)ごとに、実現していない価値の仮説と残りのイシュー。
-
-        仮説は木の末端(下に生きた仮説がないもの)を数える。上の仮説を friend にすれば、その下もすべて実現とみなす。
-        外れた仮説(上が外れたものも)は数えない。両方 0 なら、その候補で目的を果たせる見込み。"""
-        rows = []
+        返すもの: 表の行、不可能ではない候補の数、外した候補の数、どの案にもつかない方針リスク(解決, 未解決)。"""
+        rows, alive, dropped, in_any = [], 0, 0, set()
         for c in sorted(docs, key=lambda d: d.name):
-            if c.type != "設計案" or status(c) in DROPPED:
+            if c.type != "設計案":
                 continue
             goals = [p for p in self.parents(c) if p.type == "目的"]
             if not goals:
                 continue
-            goal_ids = {g.id for g in goals}
-            live = [h for h in self.docs if h.type == "仮説" and not self.gone_hypothesis(h)
-                    and goal_ids & {g.id for g in self.reach(h, "目的")}]
-            live_ids = {h.id for h in live}
-            leaves = [h for h in live
-                      if not any(k.type == "仮説" and k.id in live_ids for k in self.children.get(h.id, []))]
-            done = {h.id for h in self.realized(c)}
-            missing = [h for h in leaves if not (self.hypothesis_ancestors(h) & done)]
+            if status(c) in DROPPED:
+                dropped += 1
+                continue
+            alive += 1
             sols = {s.id for s in self.subtree(c)}
-            issues = [i for i in self.docs if i.type == "イシュー" and status(i) in OPEN_ISSUE
-                      and any(p.id in sols for p in self.parents(i))]
-            rows.append([c.name, status(c) or "候補", f"{len(leaves) - len(missing)}/{len(leaves)}",
-                         "、".join(sorted(h.name for h in missing)) or "なし",
-                         str(len(issues)), str(sum(1 for i in issues if impact(i) in BIG))])
-        return rows
+            risks = [i for i in self.docs if is_policy_risk(i) and any(p.id in sols for p in self.parents(i))]
+            in_any |= {i.id for i in risks}
+            solved = sum(1 for i in risks if status(i) in SOLVED)
+            rows.append(["、".join(sorted(g.name for g in goals)), c.name, status(c) or "候補",
+                         str(solved), str(len(risks) - solved)])
+        loose = [i for i in docs if is_policy_risk(i) and i.id not in in_any]
+        solved = sum(1 for i in loose if status(i) in SOLVED)
+        return rows, alive, dropped, (solved, len(loose) - solved)
+
+    def half_done(self, docs: list[Doc]) -> list[list[str]]:
+        """優先順位は低い(priority 3・4)のに、一部だけ進めて止まりかけているイシュー(Yu 2026-10-29)。
+        status が対策中か、下のタスクに完了・進行中のものがあり、まだ解消・低減済み・中止でないもの。"""
+        rows = []
+        for i in docs:
+            if i.type != "イシュー" or str(i.fm.get("priority") or "").strip() not in ("3", "4"):
+                continue
+            if status(i) in SOLVED | {"中止"}:
+                continue
+            tasks = [t for t in self.children.get(i.id, []) if t.type == "タスク" and status(t) != "中止"]
+            done = sum(1 for t in tasks if status(t) == "完了")
+            moving = sum(1 for t in tasks if status(t) in ("進行中", "待ち", "確認待ち"))
+            if not (status(i) == "対策中" or done or moving):
+                continue
+            ids_ = {i.id} | {t.id for t in tasks}
+            last = max((r["日時"][:10] for r in self.history if r.get("id") in ids_), default="")
+            rows.append([i.name, str(i.fm.get("priority")).strip(), owner(i),
+                         f"完了 {done}・進行中 {moving}・未着手 {len(tasks) - done - moving}", last])
+        return sorted(rows, key=lambda r: (r[4] or "9999", r[0]))
 
     def project_of(self, d: Doc) -> set[str]:
         top = d.rel.split("/")[0]
@@ -236,12 +220,6 @@ class Builder:
         return [d for d in self.docs if pj in self.project_of(d) or d.rel.startswith(pj + "/")]
 
     # ---------- 1枚目 ----------
-
-    def outlook_age(self, proj: Doc) -> int | None:
-        days = [r["日時"][:10] for r in self.history if r.get("id") == proj.id and r.get("項目") == "outlook"]
-        if not days:
-            return None
-        return (self.today - date.fromisoformat(max(days))).days
 
     def readiness(self, issues: list[Doc]) -> list[list[str]]:
         rows = []
@@ -279,53 +257,6 @@ class Builder:
 
     # ---------- 2枚目から ----------
 
-    def off_purpose(self, docs: list[Doc]) -> list[list[str]]:
-        rows = []
-        for d in docs:
-            if d.type not in WORK_TYPES or status(d) in DONE | {"解消"}:
-                continue
-            hyps = self.reach(d, "仮説")
-            if not hyps:
-                # 成果物候補(とその部分案)につく仕事は、その成果物が実現する仮説につながっているとみなす
-                for s in self.reach(d, "設計案"):
-                    hyps += self.realized(self.top_solution(s))
-            if not hyps:
-                rows.append([d.type, d.name, owner(d), "仮説につながっていない"])
-                continue
-            # 仮説は木になる(仮説の parent に仮説)。どの道でも、上のどこかに外れた仮説があれば外れたとみなす
-            gone = [self.gone_hypothesis(h) for h in hyps]
-            if all(gone):
-                rows.append([d.type, d.name, owner(d), f"外れた仮説につながっている({gone[0].name})"])
-        return rows
-
-    def gone_hypothesis(self, h: Doc, seen: set[str] | None = None) -> Doc | None:
-        """h から parent をたどった仮説(h を含む)のうち、外れたもの。目的より上へはたどらない。"""
-        seen = seen if seen is not None else set()
-        if h.id in seen or h.type != "仮説":
-            return None
-        seen.add(h.id)
-        if status(h) == "外れた":
-            return h
-        for p in self.parents(h):
-            g = self.gone_hypothesis(p, seen)
-            if g:
-                return g
-        return None
-
-    def challenged(self, docs: list[Doc]) -> list[list[str]]:
-        """反論(challenger)がついたまま検証中の仮説。下につながる仮説・イシューの数も出す。"""
-        rows = []
-        for h in docs:
-            if h.type != "仮説" or status(h) != "検証中":
-                continue
-            refs = [self.index.resolve(t) for t in targets(h.fm.get("challenger"))]
-            names = [r.name for r in refs if r] or [plain(x) for x in as_list(h.fm.get("challenger"))]
-            if not names:
-                continue
-            below = sum(1 for d in docs if d.type in ("仮説", "イシュー") and any(p.id == h.id for p in self.parents(d)))
-            rows.append([h.name, "、".join(names), str(below)])
-        return rows
-
     def same_nodes(self, pj: str, docs: list[Doc]) -> list[list[str]]:
         rows = []
         mine = [d for d in docs if d.type in ("イシュー", "タスク")]
@@ -339,59 +270,6 @@ class Builder:
                     names = "、".join(sorted(self.index.by_id[x].name for x in shared))
                     rows.append([d.name, "・".join(sorted(self.project_of(o))), o.name, names])
         return rows
-
-    def last_dr(self, pj: str) -> date | None:
-        days = [to_date(d.fm.get("date")) for d in self.in_project(pj)
-                if d.type == "議事録" and is_dr(d)]
-        days = [x for x in days if x and x <= self.today]
-        return max(days) if days else None
-
-    def changed_since(self, note_id: str, item: str, since: date) -> bool:
-        return any(r.get("id") == note_id and r.get("項目") == item and r["日時"][:10] > since.isoformat()
-                   for r in self.history)
-
-    def stuck(self, pj: str, docs: list[Doc]) -> list[list[str]]:
-        rows = []
-        dr = self.last_dr(pj)
-        tasks = [d for d in self.docs if d.type == "タスク"]
-        for i in docs:
-            if i.type != "イシュー" or impact(i) not in BIG or status(i) in {"解消", "中止"}:
-                continue
-            mine = [t for t in tasks if i in self.parents(t)]
-            done = [t for t in mine if done_date(self.history, t.id)]
-            if dr:
-                after = [t for t in done if done_date(self.history, t.id) > dr.isoformat()]
-                if len(after) >= 2 and not self.changed_since(i.id, "resolution", dr):
-                    rows.append([i.name, owner(i), f"DR({dr.isoformat()})のあと対策 {len(after)} 件完了、"
-                                 f"resolution は {STAGES[stage(i)]} のまま"])
-            if len(done) >= 2 and self.assembled_leaf(i):
-                rows.append([i.name, owner(i), f"対策 {len(done)} 件完了、原因が組み立て値のまま"
-                             f"({self.assembled_leaf(i)})"])
-        for t in tasks:
-            if pj not in self.project_of(t) and not any(pj in self.project_of(p) for p in self.reach(t, "イシュー")):
-                continue
-            n = extensions(self.history, t.id)
-            if n >= 2:
-                rows.append([t.name, owner(t), f"期限を {n} 回延ばした"])
-        return rows
-
-    def assembled_leaf(self, issue: Doc) -> str:
-        """friend からノードの parts を下へたどり、parts のない組み立て値の末端の名前。"""
-        seen, out = set(), []
-        level = [n for n in (self.index.resolve(t) for t in targets(issue.fm.get("friend"))) if n]
-        while level:
-            nxt = []
-            for n in level:
-                if n.id in seen:
-                    continue
-                seen.add(n.id)
-                parts = [p for p in (self.index.resolve(t) for t in targets(n.fm.get("parts"))) if p]
-                kind = str(n.fm.get("value_kind") or "").strip()
-                if not parts and kind.startswith("組み立て"):
-                    out.append(n.name)
-                nxt += parts
-            level = nxt
-        return "、".join(out)
 
     def people(self, docs: list[Doc]) -> list[list[str]]:
         # 確認を頼まれた: 確認待ちのタスクの review_request に名前があるもの(仕様書「確認待ち」)
@@ -440,50 +318,41 @@ class Builder:
         pj = proj.name
         docs = self.in_project(pj)
         show = self.shown(sections or DEFAULT_SECTIONS)
-        r = ProjectReport(pj, f"週報 {pj}({Week.of(self.today).label}、{self.today.isoformat()} 作成)")
-        outlook = str(proj.fm.get("outlook") or "").strip() or "(未記入)"
-        r.section("見込み")
-        r.items([("見込み", outlook, True),
-                 ("理由", str(proj.fm.get("outlook_reason") or "").strip() or "(未記入)", False),
-                 ("管理者に判断してほしいこと", str(proj.fm.get("request_to_manager") or "").strip() or "なし", False)])
-        age = self.outlook_age(proj)
-        if age is None or age > STALE_DAYS:
-            r.note("見込み未更新(2週間以上更新されていません)", warn=True)
-        if "出荷準備度" in show:
-            r.section("出荷準備度(目的ごと)", "impact 大のイシューのうち、DR で段階2(設計空間)以上と決まったものの割合")
-            r.table("出荷準備度", ["目的", "出荷準備度", "段階0 未把握", "段階1 現象", "段階2 設計空間", "段階3 原理"],
-                    self.readiness([d for d in docs if d.type == "イシュー"]))
-        if "成果物候補" in show:
-            r.section("成果物候補ごとの残り", "目的を果たす成果物の候補が、すべての価値の仮説を実現し、リスクを残していないか。"
-                      "実現していない仮説と残りのイシューが両方 0 になれば、その候補で目的を果たせる")
-            r.table("成果物候補", ["成果物候補", "status", "実現している仮説", "実現していない仮説", "残りのイシュー", "うち impact 大"],
-                    self.products(docs))
+        r = ProjectReport(pj, f"週報 {pj}({Week.of(self.today).label}、{self.today.isoformat()} 作成)",
+                          str(proj.fm.get("request_to_manager") or "").strip())
+        if "開発の目処" in show:
+            rows, alive, dropped, (solved, left) = self.prospects(docs)
+            r.section("開発の目処(成果物候補ごと)",
+                      "まだ不可能と決まっていない成果物候補ごとに、開発の方向を大きく変えるリスク(impact 方針のイシュー)の"
+                      "解決した数とまだ閉じていない数。閉じていないものが 0 になれば、その候補で開発の目処が立つ。"
+                      "解決は status が低減済み・解消のもの")
+            r.note(f"不可能ではない成果物候補: {alive} 件(不採用・中止にした候補: {dropped} 件)")
+            r.table("開発の目処", ["目的", "成果物候補", "status", "方針リスク 解決", "方針リスク 未解決"], rows,
+                    empty="成果物候補(parent が目的の設計案)がまだありません")
+            if solved or left:
+                r.note(f"どの候補にもつかない方針リスク(仮説を脅かすものなど): 解決 {solved} 件、未解決 {left} 件",
+                       warn=bool(left))
         if "候補の数" in show:
-            r.section("残っている候補の数", "開発の前半は、出荷準備度より候補が絞れていく様子で進み具合を見る")
+            r.section("残っている候補の数", "開発の前半は、候補が絞れていく様子で進み具合を見る")
             r.table("候補の数", ["候補の組", "推移"],
                     [[k, "→".join(str(x) for x in v)] for k, v in sorted(trend.items())])
         if "マイルストーン" in show:
             r.section("マイルストーン")
             r.table("マイルストーン", ["名前", "計画日", "見込み日", "ずれ"], self.milestones(proj))
-        if "目的に沿わない" in show:
-            r.section("目的に沿っていない仕事", "価値の仮説につながっていないもの、外れた仮説につながったまま動いているもの")
-            r.table("目的に沿わない", ["種類", "名前", "担当", "理由"], self.off_purpose(docs))
-        if "反論のついた仮説" in show:
-            r.section("反論のついた仮説(検証中のまま)", "前提を覆す事実がついたのに、まだ検証中の仮説")
-            r.table("反論のついた仮説", ["仮説", "反論", "すぐ下の仮説・イシュー"], self.challenged(docs))
-        if "同じノード" in show:
-            r.section("他のプロジェクトと同じノードを使うもの", "同じことを別々に試していないか")
-            r.table("同じノード", ["このプロジェクト", "相手のプロジェクト", "相手", "同じノード"], self.same_nodes(pj, docs))
-        if "行き詰まり" in show:
-            r.section("行き詰まりの候補", "動いているのに前に進んでいないもの")
-            r.table("行き詰まり", ["名前", "担当", "様子"], self.stuck(pj, docs))
+        if "中途半端な仕事" in show:
+            r.section("中途半端になっている仕事",
+                      "優先順位は低い(priority 3・4)のに、一部だけ進めたまま残っているイシュー。続けるか、中止にするかを決める")
+            r.table("中途半端な仕事", ["イシュー", "priority", "担当", "タスク", "最後に動いた日"], self.half_done(docs))
         if "担当者" in show:
             r.section("担当者ごとのタスク")
             r.table("担当者", ["担当", "進行中", "待ち", "期限切れ", "確認待ち", "確認を頼まれた"], self.people(docs))
-        if "機密" in show:
-            refs = sum(len(as_list(d.fm.get("secret_refs"))) for d in docs)
-            r.section("機密")
-            r.note(f"機密の事実への参照: {refs} 件(中身は載せません)")
+        if "出荷準備度" in show:
+            r.section("出荷準備度(目的ごと)", "開発の後の方で見る。impact 大のイシューのうち、DR で段階2(設計空間)以上と決まったものの割合")
+            r.table("出荷準備度", ["目的", "出荷準備度", "段階0 未把握", "段階1 現象", "段階2 設計空間", "段階3 原理"],
+                    self.readiness([d for d in docs if d.type == "イシュー"]))
+        if "同じノード" in show:
+            r.section("他のプロジェクトと同じノードを使うもの", "同じことを別々に試していないか")
+            r.table("同じノード", ["このプロジェクト", "相手のプロジェクト", "相手", "同じノード"], self.same_nodes(pj, docs))
         return r
 
 

@@ -88,17 +88,6 @@ document.querySelectorAll('input.filter').forEach(function(inp){
 NUM = re.compile(r"^[+-]?\d+(\.\d+)?(%.*| 日)?$")
 
 
-def outlook_class(v: str) -> str:
-    v = v.strip()
-    if v.startswith(("〇", "○", "◯")):
-        return "good"
-    if v.startswith("△"):
-        return "warn"
-    if v.startswith(("×", "✕", "x", "X")):
-        return "bad"
-    return ""
-
-
 def page(title: str, body: str) -> str:
     return ("<!doctype html>\n<html lang=\"ja\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
@@ -124,24 +113,10 @@ def render(report) -> str:
            "<p class=\"sub\">知見同期プログラムが共有 vault のノートから自動で作りました。"
            "表の見出しを押すと並べ替えられます。</p>"]
 
-    # 1枚目: 見込みと注意をカードで
-    first = sections[0] if sections and sections[0][0] == "見込み" else None
-    if first:
-        cards = []
-        for b in first[2]:
-            if b[0] == "items":
-                for k, v, strong in b[1]:
-                    if strong:
-                        cards.append(f"<div class=\"card\"><div class=\"k\">{escape(k)}</div>"
-                                     f"<div class=\"big {outlook_class(v)}\">{escape(v)}</div></div>")
-                    else:
-                        cards.append(f"<div class=\"card\"><div class=\"k\">{escape(k)}</div>"
-                                     f"<div class=\"v\">{escape(v)}</div></div>")
-        out.append("<div class=\"cards\">" + "".join(cards) + "</div>")
-        for b in first[2]:
-            if b[0] == "note":
-                out.append(f"<p class=\"note{' warn' if b[2] else ''}\">{escape(b[1])}</p>")
-        sections = sections[1:]
+    # 管理者に判断してほしいこと(書いてあるときだけ、いちばん上に)
+    if getattr(report, "request", ""):
+        out.append("<div class=\"cards\"><div class=\"card\"><div class=\"k\">管理者に判断してほしいこと</div>"
+                   f"<div class=\"v\">{escape(report.request)}</div></div></div>")
 
     # 目次(該当の件数つき)
     toc = []
@@ -173,12 +148,12 @@ def render(report) -> str:
                            + "".join(f"<th>{escape(c)}</th>" for c in header)
                            + "</tr></thead><tbody>" + "".join(row_html(r) for r in body) + "</tbody></table></div>")
     out.append("<footer>週報は毎週月曜の朝に作られます。中身は各ノートの属性から集めたもので、"
-               "見込み・理由・判断してほしいことの3行だけをプロジェクトのまとめ役が書いています。</footer>")
+               "判断してほしいことだけをプロジェクトのまとめ役が書いています。</footer>")
     return page(report.title, "".join(out))
 
 
 # 件数があっても注意ではない節(目次の件数を目立たせない)
-OK_SECTIONS = {"出荷準備度(目的ごと)", "成果物候補ごとの残り", "残っている候補の数", "マイルストーン", "担当者ごとのタスク"}
+OK_SECTIONS = {"出荷準備度(目的ごと)", "開発の目処(成果物候補ごと)", "残っている候補の数", "マイルストーン", "担当者ごとのタスク"}
 
 
 def write_report(path: Path, report) -> None:
