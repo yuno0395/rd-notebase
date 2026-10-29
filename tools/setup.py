@@ -377,6 +377,16 @@ def merged(*lists: list[str]) -> list[str]:
 
 
 PLUGIN_LIST = ".obsidian/community-plugins.json"
+HOTKEYS = ".obsidian/hotkeys.json"
+
+
+def dist_plugins(dist: Path):
+    """配布物の plugins.py(キーやコアプラグインの合わせ方)を読む。"""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("dist_plugins", dist / "plugins.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 @dataclass
@@ -389,6 +399,7 @@ class VaultPlan:
     put: list[str] = field(default_factory=list)       # 新しく置く
     replace: list[str] = field(default_factory=list)   # 上書きする
     plugin_list: list[str] | None = None               # 合わせた community-plugins.json
+    hotkeys: dict | None = None                        # 合わせた hotkeys.json(各自で足したキーを残す)
     migrations: list[tuple[str, Path]] = field(default_factory=list)
 
     @property
@@ -405,12 +416,14 @@ class VaultPlan:
             parts.append(f"上書き {len(self.replace)}")
         if self.plugin_list is not None:
             parts.append("プラグインの一覧を合わせる")
+        if self.hotkeys is not None:
+            parts.append("キーを合わせる")
         head = "作る" if self.new else (f"{self.old_version or '版なし'} → {self.version}" if self.old_version != self.version else f"{self.version} のまま")
         return f"{head}({'、'.join(parts) or '変わるファイルなし'})"
 
     @property
     def changes(self) -> bool:
-        return bool(self.put or self.replace or self.migrations or self.plugin_list is not None
+        return bool(self.put or self.replace or self.migrations or self.plugin_list is not None or self.hotkeys is not None
                     or self.old_version != self.version)
 
 
@@ -435,6 +448,12 @@ def plan_vault(dist: Path, kind: str, target: Path) -> VaultPlan:
             want = merged(have, read_list(f))
             if want != have:
                 vp.plugin_list = want
+            continue
+        if kind == "個人" and rel == HOTKEYS and dst.is_file():
+            have = dist_plugins(dist).read_json(dst)
+            want = dist_plugins(dist).merge_hotkeys(have if isinstance(have, dict) else {}, json.loads(f.read_text(encoding="utf-8")))
+            if want != have:
+                vp.hotkeys = want
             continue
         if not dst.exists():
             vp.put.append(rel)
@@ -461,7 +480,8 @@ def apply_vault(vp: VaultPlan, backups: Backups, label: str, ext: Ext | None = N
         if code != 0:
             raise Stop(f"版 {ver} の移し替えが失敗しました。版.txt は進めていません:\n{out[-800:]}")
         done.append(f"版 {ver} の移し替えを当てた")
-    backups.save(label, vp.target, vp.replace + ([PLUGIN_LIST] if vp.plugin_list is not None else []))
+    backups.save(label, vp.target, vp.replace + ([PLUGIN_LIST] if vp.plugin_list is not None else [])
+                 + ([HOTKEYS] if vp.hotkeys is not None else []))
     for rel in vp.put + vp.replace:
         dst = vp.target / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -472,6 +492,8 @@ def apply_vault(vp: VaultPlan, backups: Backups, label: str, ext: Ext | None = N
             (vp.target / d.relative_to(vp.src)).mkdir(parents=True, exist_ok=True)
     if vp.plugin_list is not None:
         (vp.target / PLUGIN_LIST).write_text(json.dumps(vp.plugin_list, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if vp.hotkeys is not None:
+        (vp.target / HOTKEYS).write_text(json.dumps(vp.hotkeys, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (vp.target / VERSION_FILE).parent.mkdir(parents=True, exist_ok=True)
     (vp.target / VERSION_FILE).write_text(vp.version + "\n", encoding="utf-8")
     if vp.put or vp.replace:
@@ -998,7 +1020,9 @@ class Setup:
                     self.log(f"{label}: {line}")
             elif settings.is_dir() and settings.resolve() != d.resolve():
                 for f in settings.rglob("*"):
-                    if f.is_file() and f.name != "community-plugins.json":
+                    if f.is_file() and f.relative_to(settings).as_posix() == "hotkeys.json":
+                        plugins.put_hotkeys(f, d / "hotkeys.json")  # 各自で足したキーは残す
+                    elif f.is_file() and f.name != "community-plugins.json":
                         (d / f.relative_to(settings)).parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(f, d / f.relative_to(settings))
                 if not (d / "community-plugins.json").is_file() and (settings / "community-plugins.json").is_file():

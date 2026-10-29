@@ -250,6 +250,41 @@ def set_core_plugins(target: Path) -> bool:
     return True
 
 
+def merge_hotkeys(have: dict, dist: dict) -> dict:
+    """配るキー(dist)を入れ直し、各自で足したキーは残す。同じキーを配る側も使っていたら、配る側を優先する。"""
+    def combo(k: dict) -> tuple:
+        return (tuple(sorted(k.get("modifiers", []))), str(k.get("key", "")).lower())
+    taken = {combo(k) for keys in dist.values() for k in keys}
+    out = {}
+    for cmd, keys in have.items():
+        if cmd in dist or not isinstance(keys, list):
+            continue
+        out[cmd] = [k for k in keys if isinstance(k, dict) and combo(k) not in taken]
+    out.update(dist)
+    return out
+
+
+def read_json(f: Path):
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def put_hotkeys(src: Path, dst: Path) -> bool:
+    """配る hotkeys.json(src)を各自の hotkeys.json(dst)に合わせて書く。変えたら True。"""
+    dist = read_json(src)
+    if not isinstance(dist, dict):
+        return False
+    have = read_json(dst)
+    want = merge_hotkeys(have if isinstance(have, dict) else {}, dist)
+    if want == have:
+        return False
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.write_text(json.dumps(want, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    return True
+
+
 def install(vault: Path, config: str, source: Path) -> list[str]:
     """source(配布物の プラグイン/)の本体を vault/config にコピーして有効にする。したことを返す。"""
     target = vault / config
@@ -263,6 +298,9 @@ def install(vault: Path, config: str, source: Path) -> list[str]:
             if not f.is_file() or f.name == "community-plugins.json":
                 continue
             rel = f.relative_to(settings)
+            if rel.as_posix() == "hotkeys.json":
+                put_hotkeys(f, target / rel)  # 各自で足したキーは残す
+                continue
             (target / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(f, target / rel)
         done.append("配る設定(app.json・hotkeys.json・プラグインの設定)を入れた")

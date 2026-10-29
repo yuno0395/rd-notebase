@@ -191,6 +191,10 @@ def test_new_version_and_backups(team, monkeypatch):
     personal = box / "個人" / "開発ノート_Yu"
     readme = personal / "00_README.md"
     readme.write_text("自分で書き換えた README\n", encoding="utf-8", newline="\n")  # 仕組みのファイルは版で上書きされる
+    hk = personal / ".obsidian" / "hotkeys.json"
+    keys = json.loads(hk.read_text(encoding="utf-8"))
+    keys["mine:x"] = [{"modifiers": ["Alt"], "key": "X"}]                     # 自分で足したキー
+    hk.write_text(json.dumps(keys), encoding="utf-8")
     note = personal / "02_ノード" / "0RDGPG001_水.md"
     note.write_text("---\nid: 0RDGPG001\n---\n", encoding="utf-8")
     code, s, ui = run("管理者", aenv, ["1", "9.9.21", "", "n"])  # 新しい版(1回目は上書きがなく控えはない)
@@ -198,7 +202,8 @@ def test_new_version_and_backups(team, monkeypatch):
     assert code == 0, out
     assert st.read_version(shared) == "9.9.21" and st.read_version(personal) == "9.9.21"
     assert readme.read_text(encoding="utf-8") != "自分で書き換えた README\n"
-    assert note.read_text(encoding="utf-8") == "---\nid: 0RDGPG001\n---\n"   # ノートは触らない
+    assert note.read_text(encoding="utf-8") == "---\nid: 0RDGPG001\n---\n"
+    assert json.loads(hk.read_text(encoding="utf-8"))["mine:x"] == [{"modifiers": ["Alt"], "key": "X"}]  # 版を当てても残る   # ノートは触らない
     backs = s.backups.previous()
     assert len(backs) == 1
     with zipfile.ZipFile(backs[-1] / "個人vault.zip") as z:

@@ -175,3 +175,32 @@ def test_set_core_plugins(tmp_path):
     assert plugins.set_core_plugins(d)
     core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
     assert core["file-explorer"] is True and core["templates"] is False and core["outline"] is False
+
+
+def test_merge_hotkeys():
+    """配るキーは入れ直し、各自で足したキーは残す。同じキーは配る側を優先する。"""
+    dist = {"a:new": [{"modifiers": ["Mod"], "key": "N"}], "file-explorer:new-file": []}
+    have = {
+        "a:new": [{"modifiers": ["Mod"], "key": "M"}],            # 配るコマンドを自分で変えた → 配る方に戻る
+        "mine:x": [{"modifiers": ["Mod", "Shift"], "key": "X"}],  # 自分で足した → 残る
+        "mine:y": [{"modifiers": ["Mod"], "key": "n"}],           # 配るキーと同じ → 外れる
+    }
+    out = plugins.merge_hotkeys(have, dist)
+    assert out["a:new"] == dist["a:new"] and out["file-explorer:new-file"] == []
+    assert out["mine:x"] == have["mine:x"] and out["mine:y"] == []
+
+
+def test_install_keeps_own_hotkeys_in_shared(tmp_path):
+    vault = tmp_path / "共有"
+    settings = vault / plugins.SHARED_SETTINGS
+    settings.mkdir(parents=True)
+    (settings / "hotkeys.json").write_text(json.dumps({"a:new": [{"modifiers": ["Mod"], "key": "N"}]}), encoding="utf-8")
+    (settings / "community-plugins.json").write_text("[]", encoding="utf-8")
+    cfg = vault / ".obsidian-123456_pc1"
+    cfg.mkdir()
+    (cfg / "hotkeys.json").write_text(json.dumps({"mine:x": [{"modifiers": ["Alt"], "key": "X"}]}), encoding="utf-8")
+    src = tmp_path / "プラグイン"
+    src.mkdir()
+    plugins.install(vault, cfg.name, src)
+    keys = json.loads((cfg / "hotkeys.json").read_text(encoding="utf-8"))
+    assert "a:new" in keys and keys["mine:x"] == [{"modifiers": ["Alt"], "key": "X"}]
