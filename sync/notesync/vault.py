@@ -112,9 +112,13 @@ def notes(root: Path) -> list[Note]:
     return [load_note(root, p, rel) for p, rel in iter_md(root)]
 
 
+# 同期プログラムがプロジェクトのフォルダに作るファイル(工程表、F-53)。id をつけず、人は書き換えない
+GENERATED_PREFIX = "00_工程表_"
+
+
 def is_root_doc(note: Note) -> bool:
-    """vault 直下の 00_ で始まる案内ファイル(README・仕様書・同期レポートなど)。"""
-    return note.top == "" and note.stem.startswith("00_")
+    """vault 直下の 00_ で始まる案内ファイル(README・仕様書・同期レポートなど)と、同期プログラムが作る工程表。"""
+    return (note.top == "" and note.stem.startswith("00_")) or note.stem.startswith(GENERATED_PREFIX)
 
 
 def needs_id(note: Note) -> bool:

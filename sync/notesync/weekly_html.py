@@ -191,6 +191,81 @@ def kplex_svg(f: dict) -> str:
     return "".join(out)
 
 
+def gantt_svg(plan, today=None) -> str:
+    """工程表(F-53)。左にタスクの名前、右に日付の軸。上に節目、下にイシューごとのタスクの棒。"""
+    from datetime import date as _date, timedelta
+    today = today or _date.today()
+    days = [d for b in plan.bars for d in (b.start, b.end)] + [d for _, p, f in plan.stones for d in (p, f) if d] + [today]
+    lo, hi = min(days), max(days)
+    lo = lo - timedelta(days=lo.weekday())            # 月曜から
+    hi = hi + timedelta(days=7 - hi.weekday())
+    span = max((hi - lo).days, 7)
+    LW, W, RH, TOP = 240, 1000, 22, 34
+    PW = W - LW - 12
+
+    def x(d):
+        return LW + PW * (d - lo).days / span
+
+    rows = []   # (kind, data)
+    if plan.stones:
+        rows.append(("head", "マイルストーン"))
+        rows += [("stone", s) for s in plan.stones]
+    group = None
+    for b in plan.bars:
+        if b.group != group:
+            group = b.group
+            rows.append(("head", group))
+        rows.append(("bar", b))
+    H = TOP + len(rows) * RH + 12
+    out = [f'<svg class="kp gt" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" role="img" '
+           f'aria-label="工程表 {escape(plan.project)}"><title>工程表 {escape(plan.project)}</title>']
+    # 軸: 週の線と、月の初めの日付
+    d = lo
+    while d <= hi:
+        gx = x(d)
+        out.append(f'<path class="ln" d="M{gx:.1f} {TOP - 6} L{gx:.1f} {H - 8}" style="opacity:.5"/>')
+        if span <= 140 or d.day <= 7 or d == lo:   # 20週までは毎週、それより長ければ月の初めだけ
+            out.append(f'<text class="zone" x="{gx + 2:.1f}" y="{TOP - 12}">{d.month}/{d.day}</text>')
+        d += timedelta(days=7)
+    tx = x(today)
+    out.append(f'<path d="M{tx:.1f} {TOP - 6} L{tx:.1f} {H - 8}" style="stroke:var(--accent);stroke-width:1.5;stroke-dasharray:4 3"/>'
+               f'<text class="zone" x="{tx + 3:.1f}" y="{H - 2}">今日</text>')
+    for k, (kind, data) in enumerate(rows):
+        y = TOP + k * RH
+        if kind == "head":
+            out.append(f'<text x="4" y="{y + 15}" font-weight="700">{escape(short(data, 18))}</text>')
+            continue
+        if kind == "stone":
+            name, p, f = data
+            out.append(f'<text x="14" y="{y + 15}">{escape(short(name, 17))}</text>')
+            late = bool(p and f and f > p)
+            for day, filled in ((p, False), (f, True)):
+                if not day or (filled and day == p):
+                    continue
+                cx, cy = x(day), y + RH / 2
+                color = "var(--bad)" if filled and late else "var(--fg)"
+                fill = color if filled else "var(--card)"
+                out.append(f'<g><title>{escape(name)} {"見込み" if filled else "計画"} {day.isoformat()}</title>'
+                           f'<path d="M{cx:.1f} {cy - 7} L{cx + 7:.1f} {cy} L{cx:.1f} {cy + 7} L{cx - 7:.1f} {cy} Z" '
+                           f'style="fill:{fill};stroke:{color};stroke-width:1.5"/></g>')
+            continue
+        b = data
+        out.append(f'<text x="14" y="{y + 15}">{escape(short(b.name, 17))}</text>')
+        x0, x1 = x(b.start), x(b.end + timedelta(days=1))
+        style = {"完了": "fill:var(--good);opacity:.75", "中止": "fill:var(--muted);opacity:.5",
+                 }.get(b.state, "fill:var(--accent)")
+        dash = ";stroke:var(--fg);stroke-dasharray:3 2" if b.guessed else ""
+        tip = f"{b.name}: {b.start.isoformat()} 〜 {b.end.isoformat()}({b.state}{'、推定' if b.guessed else ''})"
+        out.append(f'<g><title>{escape(tip)}</title><rect x="{x0:.1f}" y="{y + 5}" width="{max(x1 - x0, 3):.1f}" '
+                   f'height="{RH - 10}" rx="3" style="{style}{dash}"/></g>')
+        if b.due and lo <= b.due <= hi:
+            dx = x(b.due + timedelta(days=1))
+            out.append(f'<g><title>期日 {b.due.isoformat()}</title><path d="M{dx:.1f} {y + 3} L{dx:.1f} {y + RH - 3}" '
+                       f'style="stroke:var(--warn);stroke-width:2"/></g>')
+    out.append("</svg>")
+    return "".join(out)
+
+
 def page(title: str, body: str) -> str:
     return ("<!doctype html>\n<html lang=\"ja\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
@@ -239,6 +314,8 @@ def render(report) -> str:
                 out.append(f"<p class=\"note{' warn' if b[2] else ''}\">{escape(b[1])}</p>")
             elif b[0] == "items":
                 out.append("<ul>" + "".join(f"<li>{escape(k)}: {escape(v)}</li>" for k, v, _ in b[1]) + "</ul>")
+            elif b[0] == "gantt":
+                out.append(f"<div class=\"fig gantt\">{gantt_svg(b[1], b[2])}</div>")
             elif b[0] == "figs":
                 out.append("<div class=\"figs\">" + "".join(f"<div class=\"fig\">{kplex_svg(f)}</div>" for f in b[1])
                            + "</div>")
@@ -259,7 +336,8 @@ def render(report) -> str:
 
 
 # 件数があっても注意ではない節(目次の件数を目立たせない)
-OK_SECTIONS = {"今週のトピック", "出荷準備度(目的ごと)", "開発の目処(成果物候補ごと)", "残っている候補の数", "マイルストーン", "担当者ごとのタスク"}
+OK_SECTIONS = {"今週のトピック", "出荷準備度(目的ごと)", "開発の目処(成果物候補ごと)", "残っている候補の数", "マイルストーン", "工程表",
+               "担当者ごとのタスク"}
 
 
 def write_report(path: Path, report) -> None:

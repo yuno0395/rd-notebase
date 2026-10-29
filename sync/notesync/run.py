@@ -10,6 +10,7 @@ from .autofill import run_autofill
 from .boxcopies import report_box_copies, tidy_layout_copies
 from .heavy import keep_rules, move_heavy
 from .history import record_history
+from .schedule import update_schedules
 from .weekly import maybe_weekly
 from .daily import update_daily
 from .recover import report_pending
@@ -154,7 +155,7 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
     tidy_layout_copies(cfg.personal, report, backup, dry)  # 2台で使うとできる画面配置の複製
 
     # おまけの自動入力(F-26・F-27・F-31)。集める前に書いて、同じ同期で共有に届ける
-    run_autofill(cfg.personal, cfg.shared, report, backup, dry, now, cfg.idle_seconds, fresh)
+    started = run_autofill(cfg.personal, cfg.shared, report, backup, dry, now, cfg.idle_seconds, fresh)
 
     # 集約と再配布(F-05〜11、F-14、F-15)
     if cfg.shared and cfg.shared.exists():
@@ -166,7 +167,8 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
                       state=state, dry_run=dry, now=now, idle_seconds=cfg.idle_seconds,
                       data_root=cfg.shared_data, keep=keep_rules(cfg.shared), fresh=fresh)
         run_share(ctx)
-        record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now)  # F-31・F-32
+        record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now, started)  # F-31・F-32・F-54
+        update_schedules(cfg.personal, cfg.shared, cfg.member, report, backup, dry, now, cfg.idle_seconds)  # F-53
         maybe_weekly(cfg.shared, cfg.report_dir, now, report, dry)  # F-29(誰の PC でも作る)
         report_pending(cfg.shared, cfg.shared_data, report)  # F-35
         if not dry:
