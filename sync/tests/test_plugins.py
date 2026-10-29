@@ -58,7 +58,7 @@ def test_install_shared_vault_copies_bodies_and_settings(tmp_path):
     t = vault / cfg
     assert (t / "plugins/quickadd/main.js").read_text(encoding="utf-8") == "// quickadd 1.0.0"
     assert (t / "plugins/quickadd/LICENSE").is_file()
-    assert (t / "plugins/quickadd/data.json").read_text(encoding="utf-8") == '{"x": 1}'  # 配る設定
+    assert json.loads((t / "plugins/quickadd/data.json").read_text(encoding="utf-8"))["x"] == 1  # 配る設定(QuickAdd は合わせる)
     assert (t / "hotkeys.json").is_file()
     assert not (t / "plugins/k-plex").exists()  # この vault の一覧にないものは入れない
     # 自分で足した my-own は残し、配布物にない omnisearch は有効にしない
@@ -80,7 +80,7 @@ def test_install_personal_vault_uses_its_own_list_and_skips_same_version(tmp_pat
     assert (ob / "plugins/quickadd/main.js").read_text(encoding="utf-8") == "// quickadd 1.1.0"  # 版が違えば入れ替える
     assert "手元" in (ob / "plugins/periodic-notes/main.js").read_text(encoding="utf-8")  # 同じ版は触らない
     assert (ob / "plugins/periodic-notes/data.json").read_text(encoding="utf-8") == '{"mine": true}'
-    assert done == ["quickadd を入れた(1.0.0 → 1.1.0)"]
+    assert done[0] == "quickadd を入れた(1.0.0 → 1.1.0)" and "コアプラグイン" in done[1] and len(done) == 2
 
 
 def test_config_dirs(tmp_path):
@@ -157,3 +157,77 @@ def test_pack_license_from_api(tmp_path, monkeypatch):
     p = tmp_path / "dist" / plugins.PLUGIN_DIR
     assert (p / "templater-obsidian/LICENSE").read_bytes() == AGPL
     assert errors == []
+
+
+def test_set_core_plugins(tmp_path):
+    """コアプラグインは決まりのものだけ変え、ほかは各自のまま。古い一覧の形も読む。"""
+    d = tmp_path / ".obsidian"
+    assert plugins.set_core_plugins(d)  # ないときは Obsidian の既定から作る
+    core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+    assert core["daily-notes"] is False and core["templates"] is False and core["canvas"] is False
+    assert core["bases"] is True and core["file-explorer"] is True
+    assert not plugins.set_core_plugins(d)  # 2回目は何も変えない
+    (d / "core-plugins.json").write_text(json.dumps({"daily-notes": True, "word-count": False}), encoding="utf-8")
+    assert plugins.set_core_plugins(d)
+    core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+    assert core["daily-notes"] is False and core["word-count"] is False  # 各自が切ったものは切ったまま
+    (d / "core-plugins.json").write_text(json.dumps(["file-explorer", "templates"]), encoding="utf-8")
+    assert plugins.set_core_plugins(d)
+    core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+    assert core["file-explorer"] is True and core["templates"] is False and core["outline"] is False
+
+
+def test_merge_hotkeys():
+    """配るキーは入れ直し、各自で足したキーは残す。同じキーは配る側を優先する。"""
+    dist = {"a:new": [{"modifiers": ["Mod"], "key": "N"}], "file-explorer:new-file": []}
+    have = {
+        "a:new": [{"modifiers": ["Mod"], "key": "M"}],            # 配るコマンドを自分で変えた → 配る方に戻る
+        "mine:x": [{"modifiers": ["Mod", "Shift"], "key": "X"}],  # 自分で足した → 残る
+        "mine:y": [{"modifiers": ["Mod"], "key": "n"}],           # 配るキーと同じ → 外れる
+    }
+    out, notes = plugins.merge_hotkeys(have, dist)
+    assert out["a:new"] == dist["a:new"] and out["file-explorer:new-file"] == []
+    assert out["mine:x"] == have["mine:x"] and out["mine:y"] == []
+    assert any("ぶつかりました: Ctrl+N" in n and "「y」" in n for n in notes)  # ぶつかったら知らせる
+    assert any("戻しました" in n and "Ctrl+M" in n for n in notes)
+    # 前の版で配って、この版でなくしたコマンドは「自分で足したもの」として残さない
+    out, _ = plugins.merge_hotkeys({"old:cmd": [{"modifiers": ["Alt"], "key": "O"}]}, dist, sent=["old:cmd"])
+    assert "old:cmd" not in out
+
+
+def test_merge_menu_and_quickadd(tmp_path):
+    """右クリックメニュー(Commander)と QuickAdd も、自分で足した分を残す。"""
+    src, me = tmp_path / "配る", tmp_path / ".obsidian"
+    for d in (src / "plugins/cmdr", src / "plugins/quickadd", me / "plugins/cmdr", me / "plugins/quickadd"):
+        d.mkdir(parents=True)
+    w = lambda f, o: f.write_text(json.dumps(o, ensure_ascii=False), encoding="utf-8")
+    w(src / "plugins/cmdr/data.json", {"editorMenu": [{"id": "a", "name": "ノードにする"}], "pageHeader": []})
+    w(src / "plugins/quickadd/data.json", {"choices": [{"id": "n1", "name": "新しいノート"}], "version": "2", "migrations": {"m1": True}})
+    w(me / "plugins/cmdr/data.json", {"editorMenu": [{"id": "a", "name": "古い名前"}, {"id": "mine", "name": "自分の"}], "leftRibbon": [{"id": "r"}]})
+    w(me / "plugins/quickadd/data.json", {"choices": [{"id": "n1", "name": "古い"}, {"id": "q", "name": "自分の"}], "migrations": {"m2": True}})
+    changed, notes = plugins.merge_settings(src, me)
+    cmdr = json.loads((me / "plugins/cmdr/data.json").read_text(encoding="utf-8"))
+    assert [x["name"] for x in cmdr["editorMenu"]] == ["ノードにする", "自分の"] and cmdr["leftRibbon"] == [{"id": "r"}]
+    qa = json.loads((me / "plugins/quickadd/data.json").read_text(encoding="utf-8"))
+    assert [x["name"] for x in qa["choices"]] == ["新しいノート", "自分の"] and qa["migrations"] == {"m1": True, "m2": True}
+    # 次の版で配る項目をなくしたら、各自のほうからも消える(自分で足したものは残る)
+    w(src / "plugins/cmdr/data.json", {"editorMenu": [], "pageHeader": []})
+    plugins.merge_settings(src, me)
+    cmdr = json.loads((me / "plugins/cmdr/data.json").read_text(encoding="utf-8"))
+    assert [x["id"] for x in cmdr["editorMenu"]] == ["mine"]
+
+
+def test_install_keeps_own_hotkeys_in_shared(tmp_path):
+    vault = tmp_path / "共有"
+    settings = vault / plugins.SHARED_SETTINGS
+    settings.mkdir(parents=True)
+    (settings / "hotkeys.json").write_text(json.dumps({"a:new": [{"modifiers": ["Mod"], "key": "N"}]}), encoding="utf-8")
+    (settings / "community-plugins.json").write_text("[]", encoding="utf-8")
+    cfg = vault / ".obsidian-123456_pc1"
+    cfg.mkdir()
+    (cfg / "hotkeys.json").write_text(json.dumps({"mine:x": [{"modifiers": ["Alt"], "key": "X"}]}), encoding="utf-8")
+    src = tmp_path / "プラグイン"
+    src.mkdir()
+    plugins.install(vault, cfg.name, src)
+    keys = json.loads((cfg / "hotkeys.json").read_text(encoding="utf-8"))
+    assert "a:new" in keys and keys["mine:x"] == [{"modifiers": ["Alt"], "key": "X"}]
