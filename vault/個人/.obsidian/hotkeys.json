@@ -95,5 +95,13 @@
       ],
       "key": "S"
     }
+  ],
+  "templater-obsidian:_仕組み/templates/_コマンド/今の仕事を確かめる.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "J"
+    }
   ]
 }
