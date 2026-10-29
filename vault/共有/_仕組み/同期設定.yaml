@@ -6,6 +6,7 @@ keep_in_vault:
   video: [mp4, webm, mov]
   video_max_mb: 20
 report_sections:             # 週報に載せる節。false で外す(Yu 2026-10-29)
+  今週のトピック: true       # 台帳に選んだノートと手書きのダイジェスト
   開発の目処: true           # 成果物候補ごとの、方針リスクの解決数と未解決数
   候補の数: true
   マイルストーン: true

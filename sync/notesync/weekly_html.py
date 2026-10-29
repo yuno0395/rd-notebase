@@ -54,6 +54,18 @@ input.filter{width:100%;max-width:320px;padding:6px 8px;margin:4px 0 8px;border:
 border-radius:6px;background:var(--bg);color:var(--fg);font:inherit}
 ul.weeks{padding-left:20px}
 footer{margin-top:48px;color:var(--muted);font-size:12px}
+.figs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,480px),1fr));gap:12px;margin:12px 0}
+.fig{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card)}
+.fig svg{width:100%;height:auto;display:block}
+.kp text{font:12px "Yu Gothic UI","Meiryo",system-ui,sans-serif;fill:var(--fg)}
+.kp .zone{font-size:11px;fill:var(--muted)}
+.kp .ln{stroke:var(--line);stroke-width:1.2;fill:none}
+.kp .c{fill:var(--card);stroke:var(--line)}
+.kp .goal{fill:var(--head);stroke:var(--line)}
+.kp .me{fill:var(--card);stroke:var(--accent);stroke-width:2.5}
+.kp .hyp{fill:var(--card);stroke:var(--good);stroke-width:1.5}
+.kp .off{opacity:.45;stroke-dasharray:4 3}
+.kp text.dark{fill:#1f2328}.kp text.light{fill:#fff}
 @media (max-width:640px){nav ol{columns:1}}
 @media print{nav,input.filter{display:none}th::after{content:""}h2{break-after:avoid}}
 """
@@ -86,6 +98,97 @@ document.querySelectorAll('input.filter').forEach(function(inp){
 """
 
 NUM = re.compile(r"^[+-]?\d+(\.\d+)?(%.*| 日)?$")
+
+
+# K-Plex のカードの色(priority。仕様書「全体像の把握(K-Plex)」と同じ)
+PRIO_FILL = {1: ("#e5484d", "light"), 2: ("#f08c00", "light"), 3: ("#f8e46e", "dark"), 4: ("#c9cbd3", "dark")}
+FIG_MAX = 6      # 1列に出すカードの数。多ければ「ほか n 件」
+
+
+def short(s: str, n: int = 12) -> str:
+    return s if len(s) <= n else s[:n - 1] + "…"
+
+
+def kplex_svg(f: dict) -> str:
+    """成果物候補を中心にした K-Plex 風の図。上に目的、左に実現する仮説、右に脅かすイシュー、下に部分の案。
+
+    イシューは priority で色をつけ、方針リスクは太字にする。解決したもの(低減済み・解消)と外れた仮説は薄く点線にする。"""
+    W, CW, CH, GAP = 640, 176, 30, 8
+    LX, MX, RX = 8, (W - CW) // 2, W - CW - 8
+
+    def col(items):
+        extra = max(0, len(items) - FIG_MAX)
+        return items[:FIG_MAX], extra
+
+    hyps, hx = col(f["hyps"])
+    issues, ix = col(f["issues"])
+    parts, px = col(f["parts"])
+    side = max(len(hyps) + (1 if hx else 0), len(issues) + (1 if ix else 0), 1)
+    top = 28
+    side_h = side * (CH + GAP)
+    mid_y = top + max(52, (side_h - CH) // 2)   # 目的の下。左右が長ければその真ん中
+    parts_y = mid_y + CH + 28
+    H = max(top + side_h, parts_y + len(parts) * (CH + GAP) + (18 if px else 0)) + 12
+    out = [f'<svg class="kp" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" role="img" '
+           f'aria-label="{escape(f["name"])} の構造">',
+           f'<title>{escape(f["name"])}</title>',
+           f'<text class="zone" x="{LX}" y="16">左 = 実現する価値の仮説</text>',
+           f'<text class="zone" x="{RX + CW}" y="16" text-anchor="end">右 = 脅かすイシュー</text>']
+    cx, cy = MX + CW // 2, mid_y + CH // 2
+
+    def card(x, y, label, cls="c", text_cls="", bold=False, tip=""):
+        weight = ' font-weight="700"' if bold else ""
+        return (f'<g><title>{escape(tip or label)}</title><rect class="{cls}" x="{x}" y="{y}" width="{CW}" height="{CH}" rx="6"/>'
+                f'<text class="{text_cls}" x="{x + CW / 2}" y="{y + CH / 2 + 4}" text-anchor="middle"{weight}>'
+                f'{escape(short(label))}</text></g>')
+
+    # 上: 目的
+    gy = top - 6
+    out.append(f'<path class="ln" d="M{cx} {gy + CH} L{cx} {mid_y}"/>')
+    out.append(card(MX, gy, f["goal"] or "目的", "goal", tip=f"目的: {f['goal']}"))
+    # 左右
+    def side_cards(items, x, kind):
+        y0 = top + 12 if side_h > CH else top
+        for k, it in enumerate(items):
+            y = y0 + k * (CH + GAP)
+            ex = x + CW if kind == "hyp" else x
+            out.append(f'<path class="ln" d="M{ex} {y + CH / 2} C{(ex + (MX if kind == "hyp" else MX + CW)) / 2} {y + CH / 2},'
+                       f'{(ex + (MX if kind == "hyp" else MX + CW)) / 2} {cy},{MX if kind == "hyp" else MX + CW} {cy}"/>')
+            if kind == "hyp":
+                name, gone = it
+                out.append(card(x, y, name, "hyp off" if gone else "hyp", tip=name + ("(外れた)" if gone else "")))
+            else:
+                name, p, solved, policy = it
+                fill, tc = PRIO_FILL.get(p, ("", ""))
+                cls = "c off" if solved else "c"
+                rect = card(x, y, name, cls, tc if fill and not solved else "", bold=policy,
+                            tip=f"{name}(priority {p or '-'}{'、方針' if policy else ''}{'、解決' if solved else ''})")
+                if fill and not solved:
+                    rect = rect.replace(f'class="{cls}"', f'class="{cls}" style="fill:{fill};stroke:{fill}"', 1)
+                out.append(rect)
+        return y0 + len(items) * (CH + GAP)
+    if not hyps:
+        out.append(f'<text class="zone" x="{LX + 4}" y="{top + 28}">まだつながっていない</text>')
+    if not issues:
+        out.append(f'<text class="zone" x="{RX + CW - 4}" y="{top + 28}" text-anchor="end">なし</text>')
+    ly = side_cards(hyps, LX, "hyp")
+    if hx:
+        out.append(f'<text class="zone" x="{LX + 4}" y="{ly + 12}">ほか {hx} 件</text>')
+    ry = side_cards(issues, RX, "issue")
+    if ix:
+        out.append(f'<text class="zone" x="{RX + CW - 4}" y="{ry + 12}" text-anchor="end">ほか {ix} 件</text>')
+    # 下: 部分の案
+    for k, name in enumerate(parts):
+        y = parts_y + k * (CH + GAP)
+        out.append(f'<path class="ln" d="M{cx - CW / 2 + 12} {mid_y + CH} L{cx - CW / 2 + 12} {y + CH / 2} L{MX + 24} {y + CH / 2}"/>')
+        out.append(card(MX + 24, y, name, tip=f"部分の案: {name}").replace(f'width="{CW}"', f'width="{CW - 24}"', 1)
+                   .replace(f'x="{MX + 24 + CW / 2}"', f'x="{MX + 24 + (CW - 24) / 2}"', 1))
+    if px:
+        out.append(f'<text class="zone" x="{MX + 28}" y="{parts_y + len(parts) * (CH + GAP) + 10}">ほか {px} 件</text>')
+    # 中心: 成果物候補
+    out.append(card(MX, mid_y, f["name"], "me", bold=True, tip=f"{f['name']}({f['status']})"))
+    out.append("</svg>")
+    return "".join(out)
 
 
 def page(title: str, body: str) -> str:
@@ -136,6 +239,9 @@ def render(report) -> str:
                 out.append(f"<p class=\"note{' warn' if b[2] else ''}\">{escape(b[1])}</p>")
             elif b[0] == "items":
                 out.append("<ul>" + "".join(f"<li>{escape(k)}: {escape(v)}</li>" for k, v, _ in b[1]) + "</ul>")
+            elif b[0] == "figs":
+                out.append("<div class=\"figs\">" + "".join(f"<div class=\"fig\">{kplex_svg(f)}</div>" for f in b[1])
+                           + "</div>")
             elif b[0] == "table":
                 _, name, header, body, empty = b
                 if not body:
@@ -153,7 +259,7 @@ def render(report) -> str:
 
 
 # 件数があっても注意ではない節(目次の件数を目立たせない)
-OK_SECTIONS = {"出荷準備度(目的ごと)", "開発の目処(成果物候補ごと)", "残っている候補の数", "マイルストーン", "担当者ごとのタスク"}
+OK_SECTIONS = {"今週のトピック", "出荷準備度(目的ごと)", "開発の目処(成果物候補ごと)", "残っている候補の数", "マイルストーン", "担当者ごとのタスク"}
 
 
 def write_report(path: Path, report) -> None:

@@ -205,6 +205,41 @@ def test_prospects(tmp_path):
     html = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
     assert row("予兆検知", "A案クランプ式", "候補", "1", "1") in html
     assert row("予兆検知", "B案ねじ止め式", "候補", "0", "0") in html
+    # 候補ごとの K-Plex 風の図: 中心に候補、左に仮説、右に脅かすイシュー、下に部分の案
+    assert html.count('<svg class="kp"') == 2
+    assert "<title>A案クランプ式</title>" in html and "部分の案: 電池ユニット" in html
+    assert "クランプが成り立つか(priority -、方針、解決)" in html
     assert "<td>C案</td>" not in html
     assert "不可能ではない成果物候補: 2 件(不採用・中止にした候補: 1 件)" in html
     assert "どの候補にもつかない方針リスク(仮説を脅かすものなど): 解決 0 件、未解決 1 件" in html
+
+
+def test_topics(shared, tmp_path):
+    """今週のトピック(Yu 2026-10-29): 台帳の本文に PL が選んだノートとダイジェストを書き、
+    週報に今週の動き(ノート履歴の7日分と、下のタスクの完了)を添えて載せる。"""
+    p = next((shared / PJ).glob("0RA001001_*.md"))
+    p.write_text(p.read_text(encoding="utf-8").replace(
+        "本文\n",
+        "## 今週のトピック\n説明の行\n- [[0RB001001_ヒケ|ヒケ]]: 保圧を上げたらヒケが半分になった\n"
+        "- [[0RB006001_梱包の手間]]\n- [[  ]]: 今週のダイジェスト\n- 金型メーカーと打ち合わせ\n\n![[00_今週動いたノート.base]]\n## 次の章\n- [[0RB003001_迷子]]: 載らない\n"),
+        encoding="utf-8")
+    with (shared / "_仕組み/記録/ノート履歴/Yu.csv").open("a", encoding="utf-8") as f:
+        f.write("2026-10-22 09:00,0RB001001,ヒケ,イシュー,status,未対応,対策中\n"
+                "2026-10-23 09:00,0RB201001,見てほしい,タスク,status,進行中,完了\n"
+                "2026-10-10 09:00,0RB001001,ヒケ,イシュー,resolution,,現象\n")   # 先週より前は出さない
+    out = tmp_path / "報告"
+    make_weekly(shared, out, date(2026, 10, 26), Report())
+    html = (out / PJ / "2026-W44.html").read_text(encoding="utf-8")
+    assert row("ヒケ", "イシュー", "保圧を上げたらヒケが半分になった",
+               "status 未対応→対策中(10-22)、タスク「見てほしい」完了(10-23)") in html
+    assert row("梱包の手間", "イシュー", "(未記入)", "記録された変化なし") in html
+    assert row("", "", "金型メーカーと打ち合わせ", "") in html
+    assert "今週のダイジェスト<" not in html                      # テンプレートのままの行は出さない
+    assert "載らない" not in html and "00_今週動いたノート" not in html
+    assert html.index("今週のトピック") < html.index("開発の目処(成果物候補ごと)")
+
+
+def test_topics_empty(shared, tmp_path):
+    out = tmp_path / "報告"
+    make_weekly(shared, out, date(2026, 10, 26), Report())
+    assert "今週は書かれていません" in (out / PJ / "2026-W44.html").read_text(encoding="utf-8")

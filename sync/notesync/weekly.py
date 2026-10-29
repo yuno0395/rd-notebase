@@ -12,14 +12,15 @@ Markdown と Excel に分けず、ブラウザで開く HTML 1つにする(Yu 20
 from __future__ import annotations
 
 import csv
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import yaml
 
-from . import ids
-from .autofill import Doc, Index, as_list, load_docs, milestones, plain, targets, to_date
+from . import frontmatter, ids
+from .autofill import LINK, Doc, Index, as_list, load_docs, milestones, plain, targets, to_date
 from .history import HISTORY_DIR, read_rows
 from .report import Report
 
@@ -30,13 +31,14 @@ DONE = {"完了", "中止"}
 OPEN_ISSUE = {"未対応", "対策中"}
 DROPPED = {"不採用", "中止"}
 SOLVED = {"低減済み", "解消"}
+TOPIC_SECTION = "今週のトピック"   # プロジェクトの本文の見出し。PL が選んだノートとダイジェストを書く(Yu 2026-10-29)
 CANDIDATE_CSV = "候補の数.csv"
 
 # 週報に載せる節(チーム設定 report_sections で選ぶ。Yu 2026-10-25)。
 # 値: true(載せる)/ false(外す)/ 自動(同じノード: ほかのプロジェクトがあるときだけ)
 # 開発の初めは出荷準備ではなく開発の目処が大事なので、出荷準備度は既定で外す。
 # 同じノードは、当面1つのプロジェクトで使うので既定で外す(Yu 2026-10-29)
-SECTIONS = ["開発の目処", "候補の数", "マイルストーン", "中途半端な仕事", "担当者", "出荷準備度", "同じノード"]
+SECTIONS = ["今週のトピック", "開発の目処", "候補の数", "マイルストーン", "中途半端な仕事", "担当者", "出荷準備度", "同じノード"]
 DEFAULT_SECTIONS = {k: True for k in SECTIONS} | {"出荷準備度": False, "同じノード": False}
 
 
@@ -56,6 +58,11 @@ def status(doc: Doc) -> str:
 def is_policy_risk(doc: Doc) -> bool:
     """開発の方向を大きく変えるリスク: impact 方針のイシュー(中止は数えない)。"""
     return doc.type == "イシュー" and impact(doc) == "方針" and status(doc) != "中止"
+
+
+def prio(doc: Doc) -> int | None:
+    v = str(doc.fm.get("priority") or "").strip()
+    return int(v) if v in ("1", "2", "3", "4") else None
 
 
 def owner(doc: Doc) -> str:
@@ -98,6 +105,10 @@ class ProjectReport:
 
     def table(self, name: str, header: list[str], body: list[list[str]], empty: str = "なし") -> None:
         self.blocks.append(("table", name, header, [[str(c) for c in r] for r in body], empty))
+
+    def figs(self, items: list[dict]) -> None:
+        """成果物候補ごとの K-Plex 風の図(weekly_html.py が SVG にする)。"""
+        self.blocks.append(("figs", items))
 
     def tables(self) -> dict[str, list[list[str]]]:
         return {b[1]: [b[2]] + b[3] for b in self.blocks if b[0] == "table"}
@@ -163,13 +174,14 @@ class Builder:
             stack += [c for c in self.children.get(s.id, []) if c.type == "設計案" and status(c) not in DROPPED]
         return out
 
-    def prospects(self, docs: list[Doc]) -> tuple[list[list[str]], int, int, tuple[int, int]]:
+    def prospects(self, docs: list[Doc]) -> tuple[list[list[str]], int, int, tuple[int, int], list[dict]]:
         """開発の目処(Yu 2026-10-29): まだ不可能と決まっていない成果物候補(parent が目的の設計案で、
         不採用・中止でないもの)ごとに、開発の方向を大きく変えるリスク(impact 方針のイシュー)の
         解決した数と、まだ閉じていない数。候補とその下の部分の案を 脅かす(古い parent も)イシューを数える。
 
-        返すもの: 表の行、不可能ではない候補の数、外した候補の数、どの案にもつかない方針リスク(解決, 未解決)。"""
-        rows, alive, dropped, in_any = [], 0, 0, set()
+        返すもの: 表の行、不可能ではない候補の数、外した候補の数、どの案にもつかない方針リスク(解決, 未解決)、
+        候補ごとの図(K-Plex で候補を中心にした形: 上に目的、左に実現する仮説、右に脅かすイシュー、下に部分の案)。"""
+        rows, alive, dropped, in_any, figs = [], 0, 0, set(), []
         for c in sorted(docs, key=lambda d: d.name):
             if c.type != "設計案":
                 continue
@@ -186,9 +198,26 @@ class Builder:
             solved = sum(1 for i in risks if status(i) in SOLVED)
             rows.append(["、".join(sorted(g.name for g in goals)), c.name, status(c) or "候補",
                          str(solved), str(len(risks) - solved)])
+            subtree = self.subtree(c)
+            hyps: dict[str, Doc] = {}
+            for x in subtree:
+                for h in self.values(x) + [p for p in self.parents(x) if p.type == "仮説"]:
+                    hyps.setdefault(h.id, h)
+            threats = [i for i in self.docs if i.type == "イシュー" and status(i) != "中止"
+                       and any(p.id in sols for p in self.parents(i))]
+            threats.sort(key=lambda i: (status(i) in SOLVED, not is_policy_risk(i), prio(i) or 9, i.name))
+            figs.append({
+                "goal": "、".join(sorted(g.name for g in goals)),
+                "name": c.name, "status": status(c) or "候補",
+                "hyps": [(h.name, status(h) == "外れた") for h in sorted(hyps.values(), key=lambda h: h.name)],
+                "parts": [x.name for x in sorted((k for k in self.children.get(c.id, [])
+                                                   if k.type == "設計案" and status(k) not in DROPPED),
+                                                  key=lambda k: k.name)],
+                "issues": [(i.name, prio(i), status(i) in SOLVED, is_policy_risk(i)) for i in threats],
+            })
         loose = [i for i in docs if is_policy_risk(i) and i.id not in in_any]
         solved = sum(1 for i in loose if status(i) in SOLVED)
-        return rows, alive, dropped, (solved, len(loose) - solved)
+        return rows, alive, dropped, (solved, len(loose) - solved), figs
 
     def half_done(self, docs: list[Doc]) -> list[list[str]]:
         """優先順位は低い(priority 3・4)のに、一部だけ進めて止まりかけているイシュー(Yu 2026-10-29)。
@@ -292,6 +321,50 @@ class Builder:
                 c[2] += 1
         return [[k, *map(str, v)] for k, v in sorted(counts.items())]
 
+    def topics(self, proj: Doc) -> list[list[str]]:
+        """今週のトピック(Yu 2026-10-29)。プロジェクトの本文「## 今週のトピック」の箇条書き
+        (- [[ノート]]: ダイジェスト)を読み、ノートごとに今週の動き(ノート履歴の7日分)を添える。
+        ダイジェストは PL の手書き。プログラムは選ばない。"""
+        _, body = frontmatter.split(proj.text)
+        inside, rows = False, []
+        since = (self.today - timedelta(days=7)).isoformat()
+        for line in body.splitlines():
+            m = re.match(r"^(#{1,6})\s+(.*?)\s*$", line)
+            if m:
+                inside = m.group(2) == TOPIC_SECTION
+                continue
+            t = line.strip()
+            if not inside or not re.match(r"^[-*+]\s+", t) or "![[" in t:
+                continue
+            t = re.sub(r"^[-*+]\s+(\[[ xX]\]\s+)?", "", t)
+            link = LINK.search(t)
+            if link and not link.group(1).strip():
+                continue   # テンプレートのままの行(- [[  ]]: 今週のダイジェスト)
+            doc = self.index.resolve(link.group(1).strip()) if link else None
+            if link:
+                name = doc.name if doc else plain(link.group(0))
+                digest = (t[:link.start()] + t[link.end():]).strip(" :：、-—")
+            else:
+                name, digest = "", t
+            if not (name or digest):
+                continue
+            rows.append([name, doc.type if doc else "", digest or "(未記入)", self.moves(doc, since) if doc else ""])
+        return rows
+
+    def moves(self, doc: Doc, since: str) -> str:
+        """doc と、その下のタスク(parent が doc)の、since より後の変化(ノート履歴)。"""
+        kids = {t.id: t for t in self.children.get(doc.id, []) if t.type == "タスク"}
+        out = []
+        for r in self.history:
+            day = r.get("日時", "")[:10]
+            if day <= since or day > self.today.isoformat():
+                continue
+            if r.get("id") == doc.id:
+                out.append(f"{r.get('項目')} {r.get('前') or '(空)'}→{r.get('後')}({day[5:]})")
+            elif r.get("id") in kids and r.get("項目") == "status" and r.get("後") == "完了":
+                out.append(f"タスク「{kids[r['id']].name}」完了({day[5:]})")
+        return "、".join(out) or "記録された変化なし"
+
     def milestones(self, proj: Doc) -> list[list[str]]:
         rows = []
         for name, plan, fc in milestones(proj):
@@ -320,8 +393,12 @@ class Builder:
         show = self.shown(sections or DEFAULT_SECTIONS)
         r = ProjectReport(pj, f"週報 {pj}({Week.of(self.today).label}、{self.today.isoformat()} 作成)",
                           str(proj.fm.get("request_to_manager") or "").strip())
+        if "今週のトピック" in show:
+            r.section("今週のトピック", "まとめ役が今週動いたノートから選び、ダイジェストを書いたもの。今週の動きは記録から自動で添える")
+            r.table("今週のトピック", ["トピック", "種類", "今週のダイジェスト", "今週の動き"], self.topics(proj),
+                    empty="今週は書かれていません(台帳の「今週のトピック」に書く)")
         if "開発の目処" in show:
-            rows, alive, dropped, (solved, left) = self.prospects(docs)
+            rows, alive, dropped, (solved, left), figs = self.prospects(docs)
             r.section("開発の目処(成果物候補ごと)",
                       "まだ不可能と決まっていない成果物候補ごとに、開発の方向を大きく変えるリスク(impact 方針のイシュー)の"
                       "解決した数とまだ閉じていない数。閉じていないものが 0 になれば、その候補で開発の目処が立つ。"
@@ -332,6 +409,8 @@ class Builder:
             if solved or left:
                 r.note(f"どの候補にもつかない方針リスク(仮説を脅かすものなど): 解決 {solved} 件、未解決 {left} 件",
                        warn=bool(left))
+            if figs:
+                r.figs(figs)
         if "候補の数" in show:
             r.section("残っている候補の数", "開発の前半は、候補が絞れていく様子で進み具合を見る")
             r.table("候補の数", ["候補の組", "推移"],

@@ -1,0 +1,24 @@
+# 今週のトピックを選ぶための一覧(仕様書「管理者向けの週報」、Yu 2026-10-29)。
+# この7日に書き換えたノートを新しい順に並べる。台帳の「今週のトピック」に埋め込んで使う。
+filters:
+  and:
+    - file.ext == "md"
+    - file.mtime > now() - "7d"
+    - '!file.inFolder("_仕組み")'
+    - '!file.inFolder("99_archive")'
+    - '!file.inFolder("00_週報")'
+    - type != "プロジェクト"
+    - type != "週報"
+    - type != "デイリー"
+views:
+  - type: table
+    name: 今週動いたノート
+    order:
+      - file.name
+      - type
+      - status
+      - author
+      - file.mtime
+    sort:
+      - property: file.mtime
+        direction: DESC
