@@ -21,12 +21,11 @@ from . import ids
 from .report import Report
 from .safety import Backup
 from .state import digest
-from .vault import SYSTEM_DIR, box_copy_of, is_hidden, iter_md, read, write
+from .vault import DIST, SYSTEM_DIR, box_copy_of, is_hidden, iter_md, read, write
 
 ATTACH = f"{SYSTEM_DIR}/attachments"
 DATA_PREFIX = "開発データ/"
 PERSONAL_DIR = "_個人"
-DIST = "90_共有"
 
 DEFAULT_KEEP = {
     "images": ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"],

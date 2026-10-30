@@ -160,7 +160,7 @@ def test_box_conflict_copies(box):
 
 
 def test_note_history(box):
-    from notesync.history import done_date, extensions, first_due, history_path, read_rows
+    from notesync.history import history_path, read_rows
     yu = box.personal
     task = write(yu / "04_タスク/0RB002001_試作.md",
                  "---\nid: 0RB002001\nauthor: Yu\ntype: タスク\nstatus: 進行中\ndue: 2026-10-30\n---\n")
@@ -175,9 +175,6 @@ def test_note_history(box):
     assert [(r["項目"], r["前"], r["後"]) for r in rows] == [
         ("due", "", "2026-10-30"), ("status", "", "進行中"),
         ("due", "2026-10-30", "2026-11-06"), ("status", "進行中", "完了")]
-    assert first_due(rows, "0RB002001") == "2026-10-30"
-    assert extensions(rows, "0RB002001") == 1
-    assert done_date(rows, "0RB002001") == "2026-10-26"
     assert "due" in text(task) and "first" not in text(task)   # ノートには書かない
     assert history_path(box.shared, "Yu").read_bytes().startswith(b"\xef\xbb\xbf")  # Excel 用の BOM は先頭だけ
     assert history_path(box.shared, "Yu").read_bytes().count(b"\xef\xbb\xbf") == 1

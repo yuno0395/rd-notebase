@@ -1,7 +1,0 @@
-{
-  "shouldFollowObsidianAttachmentLocation": false,
-  "customTokensStr": "registerCustomToken('attachDir', (ctx) => {\n  const inAttach = ctx.noteFilePath.match(/^_仕組み\\/attachments\\/(.+)\\/[^\\/]+$/);\n  if (inAttach) return inAttach[1];\n  const file = ctx.app.vault.getFileByPath(ctx.noteFilePath);\n  const id = file && ctx.app.metadataCache.getFileCache(file)?.frontmatter?.id;\n  if (id) return String(id);\n  if (ctx.noteFilePath.startsWith('00_日誌/')) return '日誌/' + ctx.noteFileName;\n  return '';\n});\n",
-  "attachmentFolderPath": "_仕組み/attachments/{{attachDir}}",
-  "generatedAttachmentFileName": "{{originalAttachmentFileName}}",
-  "version": "17.0.0"
-}

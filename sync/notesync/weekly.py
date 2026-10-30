@@ -28,7 +28,6 @@ BIG = {"方針", "絞込", "出荷", "大"}
 STAGES = ["未把握", "現象", "設計空間", "原理"]
 OPEN_TASK = {"未着手", "進行中", "待ち", "確認待ち"}
 DONE = {"完了", "中止"}
-OPEN_ISSUE = {"未対応", "対策中"}
 DROPPED = {"不採用", "中止", "変更"}   # 変更: イシューの対策で考え方を変え、新しい候補に置き換えた案(Yu 2026-10-29)
 SOLVED = {"低減済み", "解消"}
 TOPIC_SECTION = "今週のトピック"   # プロジェクトの本文の見出し。PL が選んだノートとダイジェストを書く(Yu 2026-10-29)
@@ -113,9 +112,6 @@ class ProjectReport:
     def figs(self, items: list[dict]) -> None:
         """成果物候補ごとの K-Plex 風の図(weekly_html.py が SVG にする)。"""
         self.blocks.append(("figs", items))
-
-    def tables(self) -> dict[str, list[list[str]]]:
-        return {b[1]: [b[2]] + b[3] for b in self.blocks if b[0] == "table"}
 
 
 class Builder:

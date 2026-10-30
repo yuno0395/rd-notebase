@@ -360,23 +360,6 @@ def same(a: Path, b: Path) -> bool:
         return False
 
 
-def read_list(path: Path) -> list[str]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
-    return [x for x in data if isinstance(x, str)] if isinstance(data, list) else []
-
-
-def merged(*lists: list[str]) -> list[str]:
-    out: list[str] = []
-    for lst in lists:
-        for x in lst:
-            if x not in out:
-                out.append(x)
-    return out
-
-
 PLUGIN_LIST = ".obsidian/community-plugins.json"
 CONFIG = ".obsidian"
 
@@ -451,8 +434,9 @@ def plan_vault(dist: Path, kind: str, target: Path) -> VaultPlan:
         k = kind_of(rel, rules)
         dst = target / rel
         if kind == "個人" and rel == PLUGIN_LIST and dst.is_file():
-            have = read_list(dst)
-            want = merged(have, read_list(f))
+            pl = dist_plugins(dist)
+            have = pl.read_list(dst)
+            want = pl.merge(have, pl.read_list(f))
             if want != have:
                 vp.plugin_list = want
             continue
@@ -1030,9 +1014,7 @@ class Setup:
             if settings.is_dir() and settings.resolve() != d.resolve():
                 rels = [f.relative_to(settings).as_posix() for f in settings.rglob("*") if f.is_file()]
                 self.backups.save(label.replace(" ", "") + "_設定", d, rels)
-            sys.path.insert(0, str(self.dist))
-            import importlib
-            plugins = importlib.import_module("plugins")
+            plugins = dist_plugins(self.dist)
             if (source / "プラグインの出典.md").is_file():
                 for line in plugins.install(vault, config, source):
                     self.say_note(label, line)

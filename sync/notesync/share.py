@@ -24,19 +24,15 @@ from datetime import datetime
 from pathlib import Path
 
 from . import frontmatter, ids
-from .assign import LINK
+from .frontmatter import LINK, as_list, link_targets
 from .report import Report
 from .safety import Backup
 from .heavy import DEFAULT_KEEP, is_heavy, to_personal, to_shared
 from .state import State, digest, digest_text
-from .vault import SKIP_DIRS, box_copy_of, is_hidden, read, write
+from .vault import DIST, OWN_DIRS, SKIP_DIRS, box_copy_of, is_hidden, read, write
 
-OWN_DIRS = ("01_目的", "01_設計案", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
-DIST = "90_共有"
 ARCHIVE = "99_archive"
 COMMON = "共通"
-# 共有 vault の一番上で、プロジェクトのフォルダではないもの
-SHARED_SYSTEM = SKIP_DIRS | {"00_inbox", "00_週報", ARCHIVE}
 BIG_IMPACT = {"方針", "絞込", "出荷", "大"}  # 「大」は v0.22 までの書き方
 # 設計案は v0.54 から 01_設計案/(古い type のソリューション・設計記録も)
 TYPE_DIR = {"目的": "01_目的", "仮説": "01_目的", "設計案": "01_設計案", "ソリューション": "01_設計案",
@@ -115,23 +111,6 @@ def scan(root: Path, tops: tuple[str, ...] | None = None, skip_tops: set[str] = 
         text = read(p)
         out.setdefault(file_id, []).append(
             Item(root, rel.as_posix(), file_id, name, frontmatter.load(text), text))
-    return out
-
-
-def as_list(value) -> list[str]:
-    if value is None or value == "":
-        return []
-    if isinstance(value, list):
-        return [str(x) for x in value if x is not None and str(x).strip()]
-    return [str(value)]
-
-
-def link_targets(value) -> list[str]:
-    """属性の値から [[ ]] の行き先(| の左)を取り出す。リンクでなければ値そのもの。"""
-    out = []
-    for v in as_list(value):
-        found = [m.group(1).strip() for m in LINK.finditer(v)]
-        out += found or [v.strip()]
     return out
 
 

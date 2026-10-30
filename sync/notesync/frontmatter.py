@@ -11,6 +11,28 @@ import re
 import yaml
 
 
+# [[行き先]] と [[行き先|表示名]](# や ^ のつくもの・まだ閉じていないものは除く)
+LINK = re.compile(r"\[\[([^\[\]|#^\n]+)(\|[^\[\]\n]*)?\]\]")
+
+
+def as_list(value) -> list[str]:
+    """属性の値を文字の並びにする。空なら []、1つなら [値]。"""
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return [str(x) for x in value if x is not None and str(x).strip()]
+    return [str(value)]
+
+
+def link_targets(value) -> list[str]:
+    """属性の値から [[ ]] の行き先(| の左)を取り出す。リンクでなければ値そのもの。"""
+    out = []
+    for v in as_list(value):
+        found = [m.group(1).strip() for m in LINK.finditer(v)]
+        out += found or [v.strip()]
+    return out
+
+
 def split(text: str) -> tuple[str | None, str]:
     """(属性欄の中身, 本文) に分ける。属性欄がなければ (None, text)。"""
     if not text.startswith("---"):

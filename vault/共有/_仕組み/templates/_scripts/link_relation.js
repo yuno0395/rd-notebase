@@ -8,34 +8,10 @@
 // すでに入っているノートは二度足さない。まだファイルのないリンクは足さない(先に Ctrl+K などで作る)。
 
 const T = "_仕組み/templates/";
-const ID_PREFIX = /^[0-9A-Z]{6}[0-9A-Z]+_/i;
 const LABEL = { friend: "関係(friend)", challenger: "反論(challenger)", 価値仮説: "価値仮説" };
 
-function typeOf(app, file) {
-  const t = String(app.metadataCache.getFileCache(file)?.frontmatter?.type || "").trim();
-  return t === "設計記録" || t === "ソリューション" ? "設計案" : t;
-}
-
-function nameOf(file) {
-  return file.basename.replace(ID_PREFIX, "");
-}
-
-function linkOf(file, shown) {
-  return `[[${file.basename}|${shown ?? nameOf(file)}]]`;
-}
-
-function asList(v) {
-  if (v === undefined || v === null || v === "") return [];
-  return (Array.isArray(v) ? v : [v]).map((x) => String(x).trim()).filter((x) => x);
-}
-
-function resolve(app, target, from) {
-  return app.metadataCache.getFirstLinkpathDest(target.split("|")[0].trim(), from);
-}
-
-function flow(values) {
-  return "[" + values.map((v) => JSON.stringify(v)).join(", ") + "]";
-}
+// 共通の関数(nameOf・resolve など)は make_note.js のものを使う。link_relation を呼ぶときに入れる
+let M;
 
 // 属性欄の key の行を value にする。行末の説明(# …)は残す。続く `  - …` の行も置き換える。なければ最後に足す。
 function setKey(text, key, value) {
@@ -63,19 +39,19 @@ function targetOf(app, ed, note) {
     const line = ed.getLine(cur.line);
     for (const m of line.matchAll(/\[\[([^\[\]\n]+?)\]\]/g)) {
       if (cur.ch < m.index || cur.ch > m.index + m[0].length) continue;
-      const file = resolve(app, m[1], note.path);
+      const file = M.resolve(app, m[1], note.path);
       return file ? { file } : { error: "このリンクにはまだノートがありません。先に Ctrl+K などで作ってください" };
     }
     return { error: "[[ ]] の上で使うか、つなぐノートの名前を選んでください" };
   }
   const key = word.replace(/^\[\[|\]\]$/g, "").split("|")[0].trim();
-  const direct = resolve(app, key, note.path);
+  const direct = M.resolve(app, key, note.path);
   if (direct) return { file: direct };
   const low = key.toLowerCase();
   const same = app.vault.getMarkdownFiles().filter((f) => {
     if (f.path.startsWith(T)) return false;
     const fm = app.metadataCache.getFileCache(f)?.frontmatter;
-    return nameOf(f).toLowerCase() === low || asList(fm?.aliases).some((a) => a.toLowerCase() === low);
+    return M.nameOf(f).toLowerCase() === low || M.asList(fm?.aliases).some((a) => a.toLowerCase() === low);
   });
   if (same.length === 1) return { file: same[0] };
   if (same.length > 1) return { error: `「${key}」という名前のノートが ${same.length} つあります。[[ ]] の上で使ってください` };
@@ -85,6 +61,7 @@ function targetOf(app, ed, note) {
 async function link_relation(tp, role) {
   const app = tp.app;
   const { Notice } = tp.obsidian;
+  M = tp.user.make_note;
   if (!LABEL[role]) throw new Error(`知らないつなぎ方です: ${role}`);
   const view = app.workspace.activeEditor;
   if (!view?.editor || !view.file) {
@@ -106,20 +83,20 @@ async function link_relation(tp, role) {
     return;
   }
   const fm = app.metadataCache.getFileCache(note)?.frontmatter || {};
-  if (role === "friend" && typeOf(app, note) === "設計案" && typeOf(app, file) === "仮説") role = "価値仮説";
-  const values = asList(fm[role]);
+  if (role === "friend" && M.typeOf(app, note) === "設計案" && M.typeOf(app, file) === "仮説") role = "価値仮説";
+  const values = M.asList(fm[role]);
   const already = values.some((v) => {
     const t = (v.match(/\[\[([^\]]+)\]\]/) || [])[1];
-    return t && resolve(app, t, note.path)?.path === file.path;
+    return t && M.resolve(app, t, note.path)?.path === file.path;
   });
   if (already) {
-    new Notice(`「${nameOf(file)}」はもう${LABEL[role]}に入っています`);
+    new Notice(`「${M.nameOf(file)}」はもう${LABEL[role]}に入っています`);
     return;
   }
   // 入っていた値はそのまま残し、後ろに足す
-  const next = values.concat([linkOf(file)]);
-  await app.vault.process(note, (text) => setKey(text, role, flow(next)));
-  new Notice(`「${nameOf(file)}」を${LABEL[role]}につなぎました`);
+  const next = values.concat([M.linkOf(file)]);
+  await app.vault.process(note, (text) => setKey(text, role, M.flow(next)));
+  new Notice(`「${M.nameOf(file)}」を${LABEL[role]}につなぎました`);
 }
 
 module.exports = link_relation;

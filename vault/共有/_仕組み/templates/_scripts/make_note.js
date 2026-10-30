@@ -482,6 +482,6 @@ async function fromNote(tp, kind, note, rawName) {
   return file;
 }
 
-make_note.fromNote = fromNote;
-make_note.typeOf = typeOf;
+// ほかのスクリプト(link_node.js・link_relation.js・K-Plex の QuickAdd)も、tp.user.make_note から使う
+Object.assign(make_note, { fromNote, typeOf, nameOf, linkOf, asList, resolve, flow, placeLink });
 module.exports = make_note;

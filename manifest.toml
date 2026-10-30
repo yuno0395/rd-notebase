@@ -40,6 +40,11 @@ include = [
   { from = "vault/共有/00_タスク一覧.base", to = "00_タスク一覧.base" },
   { from = "vault/共有/00_設計案一覧.base", to = "00_設計案一覧.base" },
   { from = "vault/共有/00_ノード一覧.base", to = "00_ノード一覧.base" },
+  # 共有と同じ中身のプラグイン設定は、共有の 配る設定 から写す
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/k-plex/data.json", to = ".obsidian/plugins/k-plex/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-excalidraw-plugin/data.json", to = ".obsidian/plugins/obsidian-excalidraw-plugin/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-custom-attachment-location/data.json", to = ".obsidian/plugins/obsidian-custom-attachment-location/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-front-matter-title-plugin/data.json", to = ".obsidian/plugins/obsidian-front-matter-title-plugin/data.json" },
 ]
 system = [
   "00_README.md",
@@ -65,6 +70,8 @@ include = [
   { from = "vault/共有/_仕組み/templates/_scripts", to = "_仕組み/templates/_scripts" },
   { from = "vault/共有/_仕組み/templates/_コマンド", to = "_仕組み/templates/_コマンド" },
   { from = "vault/共有/_仕組み/tools/同期プログラム/メンバー.csv", to = "_仕組み/tools/メンバー.csv" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-excalidraw-plugin/data.json", to = "_仕組み/設定/.obsidian/plugins/obsidian-excalidraw-plugin/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-custom-attachment-location/data.json", to = "_仕組み/設定/.obsidian/plugins/obsidian-custom-attachment-location/data.json" },
 ]
 system = [
   "_仕組み/templates/*",
