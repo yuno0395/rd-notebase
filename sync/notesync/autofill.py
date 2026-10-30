@@ -1,7 +1,7 @@
 """おまけの自動入力。壊れても核(id 付け・集約・再配布)は止めない(仕様書「核とおまけ」)。
 
 - F-31: イシューの priority を impact と speed(と lead_weeks)から計算して書く。
-- F-26: タスク・実験・試作記録の「リスクはどう変わったか」(古いノートは「残ったリスク」)にあるイシューの
+- F-26: タスク・実験・試作記録の「リスクはどう変わったか」「判定」にあるイシューの
   previous が空なら、そのノートを入れる。
 - F-27: イシューの generation を previous をたどって計算し、空なら入れ、食い違えば知らせる。
 - F-54: 着手の印(本文の書き足し・デイリーのタイムライン・下の記録・- [x])があるタスクを 進行中 にする。
@@ -34,7 +34,7 @@ PRIORITY = {
 }
 IMPACTS = {"方針", "絞込", "出荷", "中", "小", "未判定"}
 SPEEDS = {"すぐ", "時間がかかる"}
-RISK_SECTIONS = ("リスクはどう変わったか", "残ったリスク", "判定")
+RISK_SECTIONS = ("リスクはどう変わったか", "判定")
 
 
 @dataclass
@@ -49,9 +49,7 @@ class Doc:
 
     @property
     def type(self) -> str:
-        t = str(self.fm.get("type") or "").strip()
-        # v0.37 までの設計記録と v0.54 までのソリューションは設計案(Yu 2026-10-25、2026-10-28)
-        return "設計案" if t in ("設計記録", "ソリューション") else t
+        return str(self.fm.get("type") or "").strip()
 
     @property
     def stem(self) -> str:
@@ -187,8 +185,6 @@ def milestones(proj: Doc) -> list[tuple[str, date | None, date | None]]:
     """プロジェクトの節目 (名前, 計画日, 見込み日)。
 
     本文「## 期間・主な節目」の表(| 節目 | 計画日 | 見込み日 |)を読む。
-    v0.48 までの属性 milestones: [{name, plan, forecast}] も読み続ける
-    (Obsidian のプロパティ欄が入れ子を扱えず赤くなるため本文の表に移した。Yu 2026-10-26)。
     """
     out: list[tuple[str, date | None, date | None]] = []
     _, body = frontmatter.split(proj.text)
@@ -205,14 +201,6 @@ def milestones(proj: Doc) -> list[tuple[str, date | None, date | None]]:
             continue
         cells += [""] * 3
         out.append((plain(cells[0]), to_date(cells[1]), to_date(cells[2])))
-    if out:
-        return out
-    stones = proj.fm.get("milestones") or []
-    if isinstance(stones, list):
-        for s in stones:
-            if isinstance(s, dict):
-                out.append((str(s.get("name") or "").strip(), to_date(s.get("plan")),
-                            to_date(s.get("forecast"))))
     return out
 
 
@@ -239,10 +227,6 @@ def deadline(issue: Doc, projects: dict[str, Doc], today: date) -> tuple[date, s
 def priority_of(issue: Doc, projects: dict[str, Doc], today: date, report: Report) -> int | None:
     impact = str(issue.fm.get("impact") or "").strip() or "未判定"
     speed = str(issue.fm.get("speed") or "").strip() or "すぐ"
-    if impact == "大":
-        impact = "出荷"
-        report.todo(f"impact の書き直し: {issue.link} の impact「大」は v0.22 までの書き方です。"
-                    "出荷として priority を計算しました。方針・絞込・出荷から選び直してください")
     if impact not in IMPACTS or speed not in SPEEDS:
         report.todo(f"impact か speed が読めません: {issue.link}(impact: {impact}、speed: {speed})。priority を入れていません")
         return None
@@ -312,7 +296,7 @@ VALUE_SECTION = "価値の仮説を実現できるか"
 
 
 def fill_value_hypotheses(docs: list[Doc], index: Index, w: Writer) -> None:
-    """表(や v0.56 までの文章)の [[仮説]] を、属性 価値仮説 に足す。足すだけで消さない(Yu 2026-10-29)。"""
+    """表の [[仮説]] を、属性 価値仮説 に足す。足すだけで消さない(Yu 2026-10-29)。"""
     for d in docs:
         if not d.own or d.type != "設計案":
             continue
@@ -501,12 +485,7 @@ def fill_references(docs: list[Doc], index: Index, w: Writer) -> None:
 NOT_STARTED = {"", "未着手"}
 DAILY_DIR = "00_日誌/デイリー"
 TIMELINE = "タイムライン"
-REFS_SECTIONS = ("類似・参考ナレッジ", "先に読むもの")   # 同期プログラムが足す欄なので、書き足しに数えない
-# 前の版のテンプレートの説明の行(古いタスクを書き足しと見間違えないように)
-OLD_TEMPLATE_LINES = {
-    "QuickAdd が作るときに入れる",
-    "似たことをした過去のナレッジ・イシュー(同じノードを使うもの)。同期プログラムがあとで足す。自分で見つけたら [[ ]] で書く",
-}
+REFS_SECTIONS = ("類似・参考ナレッジ",)   # 同期プログラムが足す欄なので、書き足しに数えない
 CHECKED = re.compile(r"^\s*[-*]\s+\[[xX]\]")
 
 
@@ -546,7 +525,7 @@ def added_text(task: Doc, template: set[str]) -> tuple[bool, bool]:
         if CHECKED.match(ln):
             checked = True
         t = ln.strip()
-        if skip or not t or t in template or t in OLD_TEMPLATE_LINES:
+        if skip or not t or t in template:
             continue
         if re.fullmatch(r"[-*]\s*(\[ \])?\s*", t):
             continue      # 空の箇条書き

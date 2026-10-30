@@ -173,7 +173,7 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
 
     # 集約と再配布(F-05〜11、F-14、F-15)
     if cfg.shared and cfg.shared.exists():
-        state = State(cfg.state_path, cfg.old_state_path)
+        state = State(cfg.state_path)
         if state.broken:
             report.warn("前回同期の記録が壊れていたので、見比べて作り直しました(F-34)")
         ctx = Context(member=cfg.member, personal=cfg.personal, shared=cfg.shared,

@@ -30,7 +30,7 @@ def box(tmp_path):
           "---\nid: 0RA00C001\nauthor: Yu\ntype: イシュー\nproject: [別PJ]\n---\n")
 
     yu = root / "個人_Yu"
-    write(yu / "_仕組み/記録/私.yaml", 'name: Yu\ncode: "001"\n')
+    write(yu / "_仕組み/個人設定.md", '---\nname: Yu\n---\n')
     write(yu / "02_ノード/0RB001001_水.md", "---\nid: 0RB001001\ntype: ノード\n---\n水の話\n")
     write(yu / "03_イシュー/0RB002001_ヒケ.md",
           f"---\nid: 0RB002001\ntype: イシュー\nimpact: 出荷\nproject: [{PJ}]\n---\n[[0RB001001_水|水]] が原因\n")
@@ -47,10 +47,11 @@ def box(tmp_path):
           "---\nid: 0RB007001\ntype: ノード\n---\n[[0RC001001_顧客図面]] を見た\n")
 
     sato = root / "個人_佐藤"
-    write(sato / "_仕組み/記録/私.yaml", 'name: 佐藤\ncode: "002"\n')
+    write(sato / "_仕組み/個人設定.md", '---\nname: 佐藤\n---\n')
     write(sato / "02_ノード/0RB101002_鉄.md", "---\nid: 0RB101002\ntype: ノード\n---\n")
 
     secret = root / "機密_顧客A"
+    (secret / "_仕組み").mkdir(parents=True)
     write(secret / "06_事実/0RC001001_顧客図面.md", "---\nid: 0RC001001\n---\n")
 
     def cfg(member):
@@ -341,12 +342,12 @@ def test_skips_while_other_pc_syncs(box):
 
 
 def test_design_options_go_to_their_own_folder(box):
-    """設計案は 01_設計案/ へ集める。古い type(ソリューション・設計記録)も同じ(仕様書 v0.54)。"""
+    """設計案は 01_設計案/ へ集める(仕様書 v0.54)。目的の場所にあっても 01_設計案/ へ。"""
     yu = box["yu"].personal
     write(yu / "01_目的/0RB201001_予兆検知.md", f"---\nid: 0RB201001\ntype: 目的\nproject: [{PJ}]\n---\n")
     goal = '["[[0RB201001_予兆検知|予兆検知]]"]'
     write(yu / "01_設計案/0RB202001_A案.md", f"---\nid: 0RB202001\ntype: 設計案\nparent: {goal}\n---\n")
-    write(yu / "01_目的/0RB203001_B案.md", f"---\nid: 0RB203001\ntype: ソリューション\nparent: {goal}\n---\n")
+    write(yu / "01_目的/0RB203001_B案.md", f"---\nid: 0RB203001\ntype: 設計案\nparent: {goal}\n---\n")
     run_once(box["yu"])
     s = files(box["shared"])
     assert f"{PJ}/01_目的/0RB201001_予兆検知.md" in s

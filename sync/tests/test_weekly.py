@@ -22,8 +22,8 @@ def write(path: Path, body: str) -> Path:
     return path
 
 
-def note(shared, folder, nid, name, fm):
-    return write(shared / folder / f"{nid}_{name}.md", f"---\nid: {nid}\n{fm}---\n本文\n")
+def note(shared, folder, nid, name, fm, body="本文\n"):
+    return write(shared / folder / f"{nid}_{name}.md", f"---\nid: {nid}\n{fm}---\n{body}")
 
 
 @pytest.fixture
@@ -31,9 +31,9 @@ def shared(tmp_path):
     s = tmp_path / "共有"
     write(s / "_仕組み/同期設定.yaml", "report_runner: yu\n")
     note(s, PJ, "0RA001001", PJ,
-         "type: プロジェクト\nmembers: [Yu, 佐藤]\nstatus: 進行中\nmilestones:\n"
-         "  - {name: DR1, plan: 2026-11-07, forecast: 2026-11-21}\noutlook: △\n"
-         "outlook_reason: 金型の納期が2週遅れ\nrequest_to_manager: 試作費の追加を判断してほしい\n")
+         "type: プロジェクト\nmembers: [Yu, 佐藤]\nstatus: 進行中\noutlook: △\n"
+         "outlook_reason: 金型の納期が2週遅れ\nrequest_to_manager: 試作費の追加を判断してほしい\n",
+         "本文\n## 期間・主な節目\n| 節目 | 計画日 | 見込み日 |\n| --- | --- | --- |\n| DR1 | 2026-11-07 | 2026-11-21 |\n")
     note(s, f"{PJ}/01_目的", "0RA002001", "部品コスト3割減", "type: 目的\nproject: [樹脂カバー]\n")
     note(s, f"{PJ}/01_目的", "0RA003001", "3割減なら採用される",
          'type: 仮説\nstatus: 検証中\nparent: ["[[0RA002001_部品コスト3割減]]"]\n')
@@ -74,8 +74,8 @@ def shared(tmp_path):
     # kind: DR なら名前に DR がなくても DR とみなす
     note(s, f"{PJ}/議事録", "0RB301001", "仕様の見直し", "type: 議事録\nkind: DR\ndate: 2026-10-01\n")
     note(s, f"{PJ}/議事録", "0RB302001", "打ち合わせ", "type: 議事録\ndate: 2026-10-05\n")
-    # 設計案の候補は同じ parent で一組になる。ソリューション(v0.54 まで)・設計記録(v0.37 まで)も設計案として数える
-    for i, (tp, st) in enumerate([("設計案", "候補"), ("ソリューション", "不採用"), ("設計記録", "候補")]):
+    # 設計案の候補は同じ parent で一組になる
+    for i, (tp, st) in enumerate([("設計案", "候補"), ("設計案", "不採用"), ("設計案", "候補")]):
         note(s, f"{PJ}/01_設計案", f"0RB40{i}001", f"センサー案{i}",
              f'type: {tp}\nstatus: {st}\nparent: ["[[0RA003001_3割減なら採用される]]"]\n')
     # 別のプロジェクトが同じノードを使う

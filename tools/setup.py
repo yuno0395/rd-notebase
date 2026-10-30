@@ -1004,12 +1004,7 @@ class Setup:
         source = self.dist / "プラグイン"
         def go():
             d = vault / config
-            if not d.is_dir():
-                d.mkdir(parents=True)
-                for old in self.legacy_dirs(vault):
-                    shutil.copytree(old, d, dirs_exist_ok=True)  # 画面の配置などを引き継ぐ
-                    self.log(f"{label}: {old.name} の中身を {config} に写した")
-                    break
+            d.mkdir(parents=True, exist_ok=True)
             settings = vault / SETTINGS
             if settings.is_dir() and settings.resolve() != d.resolve():
                 rels = [f.relative_to(settings).as_posix() for f in settings.rglob("*") if f.is_file()]
@@ -1046,10 +1041,6 @@ class Setup:
         except OSError:
             return True
         return seen != read_version(self.dist / "共有")
-
-    def legacy_dirs(self, vault: Path) -> list[Path]:
-        names = [f".obsidian-{self.number}", f".obsidian-{self.me}"]
-        return [vault / n for n in names if (vault / n).is_dir()]
 
     def plan_program(self) -> None:
         dst = self.env.program

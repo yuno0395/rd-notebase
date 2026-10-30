@@ -1,7 +1,7 @@
 // Ctrl+D: 開いているノートの図を開く。なければ作る(仕様書「図とパワーポイント」)。
 // 図は _仕組み/attachments/<id>/fig_<ノートのファイル名>.excalidraw.md(タブで何の図か分かるように。Yu 2026-10-27)。
 // 例 0RDGPG4XGV_保圧を変えて試作する.md → fig_0RDGPG4XGV_保圧を変えて試作する.excalidraw.md
-// 前の名前 図.excalidraw.md の図や、ノートの名前を変える前の fig_ の図は、開くときにいまの名前へ変える
+// ノートの名前を変える前の fig_ の図は、開くときにいまの名前へ変える
 // (Obsidian の名前の変更なので、ノートの引用も直る。書き出した SVG・PNG も同じ名前にする)。
 // 同期のあとでも、同期プログラムが共有の古い名前の図を消すので二重にならない(要件書 F-51)。
 // ひな形はノートの種類で選ぶ(なければ 図.excalidraw.md の 16:9 の枠1つ)。
@@ -15,8 +15,6 @@ const FIG_TEMPLATE = "_仕組み/templates/図.excalidraw.md";
 const TEMPLATES = {
   "ナレッジ": "_仕組み/templates/ナレッジ図.excalidraw.md",
   "設計案": "_仕組み/templates/トレードオフ曲線.excalidraw.md",
-  "設計記録": "_仕組み/templates/トレードオフ曲線.excalidraw.md",
-  "ソリューション": "_仕組み/templates/トレードオフ曲線.excalidraw.md",
 };
 // 枠の名前 → 引用を入れる見出し(左から探す)
 const HEADINGS = {
@@ -60,7 +58,7 @@ async function open_figure(tp) {
   await leaf.setViewState({ type: "excalidraw", state: { file: fig.path }, active: true });
 }
 
-// いまの名前 → 同じ id の fig_ の図(ノートの名前を変えた後)→ 前の名前 図.excalidraw.md の順に探す。
+// いまの名前 → 同じ id の fig_ の図(ノートの名前を変えた後)の順に探す。
 function findFigure(app, dir, path, id) {
   const exact = app.vault.getAbstractFileByPath(path);
   if (exact) return exact;
@@ -68,8 +66,7 @@ function findFigure(app, dir, path, id) {
   const figs = (folder?.children || [])
     .filter((f) => f.name.startsWith("fig_") && f.name.endsWith(".excalidraw.md"))
     .sort((a, b) => (b.name.startsWith(`fig_${id}`) - a.name.startsWith(`fig_${id}`)) || a.name.localeCompare(b.name));
-  if (figs.length) return figs[0];
-  return app.vault.getAbstractFileByPath(`${dir}/図.excalidraw.md`);
+  return figs[0] || null;
 }
 
 // 古い名前の図をいまの名前にする。先に SVG・PNG を変える(Excalidraw が名前をそろえる設定でも重ならない)。

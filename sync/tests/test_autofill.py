@@ -37,7 +37,7 @@ def box(tmp_path):
           "## 期間・主な節目\n節目ごとに1行\n| 節目 | 計画日 | 見込み日 |\n| --- | --- | --- |\n"
           "| DR1 | 2026-11-07 | 2026-11-14 |\n| 量産開始 | 2027-04-01 | 2027-04-01 |\n")
     yu = root / "個人_Yu"
-    write(yu / "_仕組み/記録/私.yaml", 'name: Yu\ncode: "001"\n')
+    write(yu / "_仕組み/個人設定.md", '---\nname: Yu\n---\n')
     c = Config(member="Yu", personal=yu, shared=shared, backup_dir=tmp_path / "backup",
                state_dir=tmp_path / "state", idle_seconds=0)
     c.code = member_code(c)
@@ -69,13 +69,6 @@ def test_priority_keeps_other_lines_and_updates(box):
     assert "priority: 2" in text(box.shared / f"{PJ}/03_イシュー/0RB001001_ヒケ.md")
 
 
-def test_old_big_impact_is_shipping_and_reported(box):
-    p = issue(box.personal, "0RB001001", "ヒケ", "impact: 大\nspeed: 時間がかかる\n")
-    run_once(box, now=NOW)
-    assert "priority: 3" in text(p)
-    assert "impact「大」は v0.22 までの書き方です" in report(box)
-
-
 def test_lead_weeks_raises_to_1(box):
     # 次のマイルストーン DR1 の見込み 2026-11-14 まで 3 週。4 週かかるので priority 1
     near = issue(box.personal, "0RB001001", "認証", "impact: 出荷\nspeed: 時間がかかる\nlead_weeks: 4\n")
@@ -91,16 +84,6 @@ def test_lead_weeks_uses_named_milestone(box):
     run_once(box, now=NOW)
     assert "priority: 1" in text(p)
     assert "期限から逆算して priority 1 にした" in report(box)
-
-
-def test_lead_weeks_reads_old_milestones_property(box):
-    # v0.48 までの属性 milestones: [{name, plan, forecast}] も読み続ける
-    write(box.shared / f"{PJ}/0RA00A001_{PJ}.md",
-          "---\nid: 0RA00A001\ntype: プロジェクト\nmembers: [Yu]\nmilestones:\n"
-          "  - {name: DR1, plan: 2026-11-07, forecast: 2026-11-14}\n---\n")
-    p = issue(box.personal, "0RB001001", "認証", "impact: 出荷\nspeed: 時間がかかる\nlead_weeks: 4\n")
-    run_once(box, now=NOW)
-    assert "priority: 1" in text(p)
 
 
 def test_previous_and_generation(box):
@@ -317,15 +300,5 @@ def test_auto_start_by_marks(box):
 def test_auto_start_needs_template(box):
     """テンプレートが見つからなければ、本文の書き足しは見ない(見間違えないように)。"""
     p = task(box.personal, "0QZ002001", "書いた", BODY + "寸法が 0.1 以内\n")
-    run_once(box, now=NOW)
-    assert "status: 未着手" in text(p)
-
-
-def test_auto_start_ignores_old_template_and_refs(box):
-    write(box.shared / "_仕組み/templates/タスク.md", TEMPLATE)
-    old = ("## やること(手順や細かい仕事は Ctrl+L で - [ ] に)\n- [ ] \n## 完了の条件\n"
-           "## 先に読むもの\nQuickAdd が作るときに入れる\n- [[0QZ009001_昔のナレッジ|昔のナレッジ]]\n"
-           "## 類似・参考ナレッジ\n- [[0QZ009002_似たもの|似たもの]]\n")
-    p = task(box.personal, "0QZ002001", "古い", old)
     run_once(box, now=NOW)
     assert "status: 未着手" in text(p)

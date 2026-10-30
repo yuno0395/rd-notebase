@@ -32,10 +32,6 @@ const COUNTERMEASURES = ["タスク", "実験・試作記録"];
 // 設計案の上に来るもの
 const SOLUTION_PARENTS = ["目的", "仮説", "設計案"];
 
-// v0.37 までの設計記録と v0.54 までのソリューションは、設計案として扱う(Yu 2026-10-28)
-function normType(t) {
-  return t === "設計記録" || t === "ソリューション" ? "設計案" : t;
-}
 
 const KINDS = {
   イシュー: { type: "イシュー", template: T + "イシュー.md", folder: "03_イシュー" },
@@ -65,8 +61,7 @@ function findSame(app, type, name) {
     if (f.path.startsWith(T)) return false;
     const fm = app.metadataCache.getFileCache(f)?.frontmatter;
     if (!fm) return false;
-    const t = String(fm.type || "").trim();
-    if (normType(t) !== type) return false;
+    if (String(fm.type || "").trim() !== type) return false;
     return nameOf(f).toLowerCase() === key || asList(fm.aliases).some((a) => a.toLowerCase() === key);
   });
 }
@@ -101,8 +96,7 @@ function flow(values) {
 }
 
 function typeOf(app, file) {
-  const t = String(app.metadataCache.getFileCache(file)?.frontmatter?.type || "").trim();
-  return normType(t);
+  return String(app.metadataCache.getFileCache(file)?.frontmatter?.type || "").trim();
 }
 
 // 今のノートか、その parent をたどった先にある目的(近いものから。5段まで)
@@ -197,11 +191,11 @@ function changeLinks(app, issue) {
     .filter((t) => t)
     .map((t) => resolve(app, t, f.path))
     .filter((d) => d);
-  for (const t of targets(issue, "脅かす").concat(targets(issue, "parent"))) {
+  for (const t of targets(issue, "脅かす")) {
     const ty = typeOf(app, t);
     if (ty === "設計案") {
       targets(t, "parent").forEach((f) => add(parents, f));
-      targets(t, "価値仮説").concat(targets(t, "friend"))
+      targets(t, "価値仮説")
         .filter((f) => typeOf(app, f) === "仮説").forEach((f) => add(hyps, f));
     } else if (ty === "仮説") {
       add(hyps, t);
@@ -316,7 +310,7 @@ function initialValues(app, kind, note) {
 async function placeFor(app, kind, note) {
   const folder = KINDS[kind].folder;
   const fs = app.vault.adapter;
-  if ((await fs.exists("_仕組み/個人設定.md")) || (await fs.exists("_仕組み/記録/私.yaml"))) return folder; // 個人 vault
+  if (await fs.exists("_仕組み/個人設定.md")) return folder; // 個人 vault
   // 共有 vault で仮運用しているとき: 今のノートのプロジェクト、なければ 共通
   const project = (kind === "イシュー" ? projectFor(app, note) : asList(app.metadataCache.getFileCache(note)?.frontmatter?.project))[0];
   const top = note.path.split("/")[0];

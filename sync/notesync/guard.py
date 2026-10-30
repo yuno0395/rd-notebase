@@ -11,18 +11,15 @@ import os
 from pathlib import Path
 
 SYSTEM_DIR = "_仕組み"
-FACT_DIR = "06_事実"
 
 
 def _key(p: Path) -> str:
     return os.path.normcase(os.path.normpath(str(p)))
 
 
-def looks_like_vault(root: Path, kind: str) -> bool:
-    """vault の印があるか。どれも _仕組み/ を持つ。機密は古い形(06_事実/ だけ)も認める。"""
-    if (root / SYSTEM_DIR).is_dir():
-        return True
-    return kind == "機密" and (root / FACT_DIR).is_dir()
+def looks_like_vault(root: Path) -> bool:
+    """vault の印があるか。どれも _仕組み/ を持つ。"""
+    return (root / SYSTEM_DIR).is_dir()
 
 
 def _too_broad(root: Path) -> bool:
@@ -55,10 +52,9 @@ def check_places(cfg) -> list[str]:
     for label, root in slots:
         if not root.exists():
             continue
-        kind = "機密" if label.startswith("機密") else ""
         if _too_broad(root):
             problems.append(f"{label} が {root} になっています。ドライブやホーム、Box の一番上は vault にできません")
-        elif not looks_like_vault(root, kind):
+        elif not looks_like_vault(root):
             problems.append(f"{label} の {root} に vault の印(_仕組み フォルダ)がありません。"
                             "場所を書き間違えていないか確かめてください")
     for i, (la, a) in enumerate(slots):

@@ -77,7 +77,7 @@ function pick(tp, items, initial) {
 async function createNode(tp, name) {
   const app = tp.app;
   // 共有 vault で仮運用しているときは 共通/02_ノード、個人 vault では 02_ノード
-  const personal = (await app.vault.adapter.exists("_仕組み/個人設定.md")) || (await app.vault.adapter.exists("_仕組み/記録/私.yaml"));
+  const personal = await app.vault.adapter.exists("_仕組み/個人設定.md");
   const folder = !personal && app.vault.getAbstractFileByPath("共通/02_ノード") ? "共通/02_ノード" : "02_ノード";
   if (!app.vault.getAbstractFileByPath(folder)) await app.vault.createFolder(folder);
   const template = app.vault.getAbstractFileByPath(NODE_TEMPLATE);

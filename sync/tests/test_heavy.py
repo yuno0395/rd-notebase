@@ -38,7 +38,7 @@ def box(tmp_path):
 
     def cfg(member, code, data_dir):
         personal = root / f"個人_{member}"
-        write(personal / "_仕組み/記録/私.yaml", f'name: {member}\ncode: "{code}"\n')
+        write(personal / "_仕組み/個人設定.md", f'---\nname: {member}\n---\n')
         c = Config(member=member, personal=personal, shared=shared, shared_data=data_dir,
                    backup_dir=tmp_path / f"backup_{member}", state_dir=tmp_path / f"state_{member}",
                    idle_seconds=0)

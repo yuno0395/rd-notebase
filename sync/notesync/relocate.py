@@ -222,7 +222,7 @@ def follow(cfg, dry: bool = False) -> tuple[list[str], list[str]]:
     for kind, path, idx in slots:
         if path.exists():
             # vault の印のない場所(書き間違い)には vault_id.txt を作らない(F-55。作ると vault に見えてしまう)
-            vid = ensure_id(path) if looks_like_vault(path, kind) else read_id(path)
+            vid = ensure_id(path) if looks_like_vault(path) else read_id(path)
             if vid:
                 rec[_key(path)] = vid
             continue

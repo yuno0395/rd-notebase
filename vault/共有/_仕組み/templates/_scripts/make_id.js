@@ -3,20 +3,15 @@
 // Crockford Base32(数字と大文字。I・L・O・U を除く)で表す。名前順 = 作成順になる。
 // 人の記号は、各自が決めた6桁の数字を36進数(0〜9・A〜Z)にした4文字(229999 → 4XGV。Yu 2026-10-25)。
 // 次の順に探す。
-//   1. 個人 vault: _仕組み/個人設定.md の number(古い vault は _仕組み/記録/私.yaml の code)
+//   1. 個人 vault: _仕組み/個人設定.md の number
 //   2. 共有・機密 vault: 設定フォルダ名 .obsidian-<番号>_<PCの記号>(例 .obsidian-229999_aa11234567)の
 //      先頭の6桁の番号を36進数に(名前ではなく番号で見分ける。1人が複数の PC を使うので、
 //      PC ごとに設定フォルダを分ける。Yu 2026-10-26)。_<PCの記号> のない .obsidian-229999 も読む
-//   3. v0.49 までの .obsidian-<名前> は、その名前を
-//      _仕組み/tools/同期プログラム/メンバー.csv(機密は _仕組み/tools/メンバー.csv)で引く
-//      (2列目が6桁の数字なら36進数に、古い3文字の記号ならそのまま)
 // 同じ人が同じ秒に作るときは、ぶつからないように1秒ずつずらす。
 
 const ABC = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const EPOCH_MS = Date.UTC(2025, 11, 31, 15, 0, 0); // 2026-01-01 00:00 JST
-const MEMBER_CSV = ["_仕組み/tools/同期プログラム/メンバー.csv", "_仕組み/tools/メンバー.csv"];
 const MY_SETTINGS = "_仕組み/個人設定.md";
-const OLD_MY_YAML = "_仕組み/記録/私.yaml";
 const B36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 // 6桁の数字 → 36進数4文字。6桁でなければ null
@@ -31,16 +26,9 @@ function codeFromNumber(num) {
   return s;
 }
 
-// メンバー.csv の値: 6桁の数字なら36進数に、古い3文字の記号はそのまま
-function codeOf(value) {
-  const v = String(value || "").trim();
-  return codeFromNumber(v) || v.toUpperCase();
-}
-
-// 個人 vault か(個人設定.md か、古い 私.yaml があるか)
+// 個人 vault か(個人設定.md があるか)
 async function isPersonal(app) {
-  const fs = app.vault.adapter;
-  return (await fs.exists(MY_SETTINGS)) || (await fs.exists(OLD_MY_YAML));
+  return await app.vault.adapter.exists(MY_SETTINGS);
 }
 
 function encodeTime(sec) {
@@ -62,9 +50,6 @@ async function memberCode(app) {
       if (!code) throw new Error(`個人設定.md の number は6桁の数字にしてください(今は ${num})`);
       return code;
     }
-  } else if (await fs.exists(OLD_MY_YAML)) {
-    const m = (await fs.read(OLD_MY_YAML)).match(/^code:\s*["']?([0-9A-Za-z]+)/m);
-    if (m) return m[1].toUpperCase();
   }
   const dir = app.vault.configDir; // 例: .obsidian-229999_aa11234567
   const name = dir.startsWith(".obsidian-") ? dir.slice(".obsidian-".length) : "";
@@ -74,27 +59,11 @@ async function memberCode(app) {
     if (!code) throw new Error(`設定フォルダ ${dir} の番号は6桁の数字にしてください(例: .obsidian-229999_aa11234567)`);
     return code;
   }
-  if (name) {
-    for (const path of MEMBER_CSV) {
-      if (!(await fs.exists(path))) continue;
-      for (const line of (await fs.read(path)).split(/\r?\n/).slice(1)) {
-        const [n, code] = line.split(",").map((x) => (x || "").trim());
-        if (n === name && code) return codeOf(code);
-      }
-    }
-  }
   // 何が足りないかを言う(共有 vault には個人設定.md がないので、設定フォルダの名前で人を見分ける)
-  if (!name) {
-    throw new Error(
-      `人の記号が見つかりません。いまの設定フォルダは ${dir} です。` +
-      "共有・機密 vault は、設定 → ファイルとリンク →「設定フォルダを上書き」を .obsidian-<自分の6桁の番号>_<PCの記号>(例: .obsidian-229999_aa11234567)にして開き直してください。" +
-      "個人 vault なら _仕組み/個人設定.md に number(6桁の数字)を書いてください。"
-    );
-  }
   throw new Error(
-    `人の記号が見つかりません。設定フォルダ ${dir} の名前「${name}」が、` +
-    "メンバー.csv(_仕組み/tools/同期プログラム/メンバー.csv)にありません。" +
-    "設定フォルダを .obsidian-<自分の6桁の番号>_<PCの記号>(例: .obsidian-229999_aa11234567)にして開き直してください。"
+    `人の記号が見つかりません。いまの設定フォルダは ${dir} です。` +
+    "共有・機密 vault は、設定 → ファイルとリンク →「設定フォルダを上書き」を .obsidian-<自分の6桁の番号>_<PCの記号>(例: .obsidian-229999_aa11234567)にして開き直してください。" +
+    "個人 vault なら _仕組み/個人設定.md に number(6桁の数字)を書いてください。"
   );
 }
 
