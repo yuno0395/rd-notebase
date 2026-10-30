@@ -7,6 +7,9 @@
   (`![[成形品.jpg]]` など)、`_仕組み/attachments/<id>/成形品.jpg` の形に直す。
 - 日誌(00_日誌/ のデイリー・週報)には id がないので、ファイル名(日付)のフォルダ
   `_仕組み/attachments/日誌/<ファイル名>/` を使う(例 `日誌/2026-10-26/`、`日誌/2026-W43/`)。
+- 図(`_仕組み/attachments/<id>/fig_….excalidraw.md`)に貼った画像も、前の版の決まりでは直下に入っていた
+  (図の属性欄には id がないため)。図のあるフォルダの添付として `_仕組み/attachments/<id>/` へ移し、
+  図の中のリンク(Embedded Files)を直す。
 - 書いている途中のノートは触らない。inbox など、id も日誌のフォルダもないノートの添付は動かさない。
 """
 
@@ -88,6 +91,11 @@ class Fixer:
             if not folder and rel.parts[0] == DIARY_TOP:
                 folder = f"{DIARY_DIR}/{p.stem}"
             out.append((p, rel.as_posix(), folder))
+        # 図は自分の入っているフォルダ(<id> や 日誌/<日付>)の添付を使う
+        for p in sorted(self.base.rglob("*.excalidraw.md")) if self.base.exists() else []:
+            if p.parent == self.base or box_copy_of(p)[0]:
+                continue
+            out.append((p, p.relative_to(self.root).as_posix(), p.parent.relative_to(self.base).as_posix()))
         return out
 
     def links(self, text: str):
