@@ -111,6 +111,7 @@ def test_admin_first_time(team):
         cal = json.loads((d / "plugins/obsidian-custom-attachment-location/data.json").read_text(encoding="utf-8"))
         assert cal["attachmentFolderPath"] == "_仕組み/attachments/{{attachDir}}"
         assert cal["shouldFollowObsidianAttachmentLocation"] is False and "attachDir" in cal["customTokensStr"]
+        assert "_仕組み\\/attachments" in cal["customTokensStr"]   # 図に貼った画像は図のフォルダへ
         exc = json.loads((d / "plugins/obsidian-excalidraw-plugin/data.json").read_text(encoding="utf-8"))
         assert exc["compress"] is False and exc["onceOffCompressFlagReset"] is True and exc["autoexportSVG"] is True
         core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))

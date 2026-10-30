@@ -99,3 +99,31 @@ def test_inbox_attachment_stays(tmp_path):
     write(v / "00_inbox/メモ.md", "![[成形品.jpg]]\n")
     run_once(c, dry_run=False, now=NOW)
     assert (v / "_仕組み/attachments/成形品.jpg").exists()
+
+
+def test_figure_image_moves_to_figure_folder(tmp_path):
+    """図(_仕組み/attachments/<id>/fig_….excalidraw.md)に貼って直下に入った画像は、図のフォルダへ移す。"""
+    c, v = setup(tmp_path)
+    nid = "0RB001001"
+    write(v / f"03_イシュー/{nid}_ヒケ.md", f"---\nid: {nid}\nauthor: Yu\n---\n"
+          f"![[_仕組み/attachments/{nid}/fig_{nid}_ヒケ.excalidraw#^clippedframe=frame1]]\n")
+    fig = v / f"_仕組み/attachments/{nid}/fig_{nid}_ヒケ.excalidraw.md"
+    write(fig, "---\nexcalidraw-plugin: parsed\n---\n# Excalidraw Data\n\n## Embedded Files\n"
+          "4f1e2a: [[Pasted Image 20261030.png]]\n\n%%\n## Drawing\n```json\n{}\n```\n%%\n")
+    write(v / "_仕組み/attachments/Pasted Image 20261030.png", b"png")
+    run_once(c, dry_run=False, now=NOW)
+    assert (v / f"_仕組み/attachments/{nid}/Pasted Image 20261030.png").read_bytes() == b"png"
+    assert not (v / "_仕組み/attachments/Pasted Image 20261030.png").exists()
+    assert f"4f1e2a: [[_仕組み/attachments/{nid}/Pasted Image 20261030.png]]" in fig.read_text(encoding="utf-8")
+
+
+def test_figure_image_in_own_folder_stays(tmp_path):
+    c, v = setup(tmp_path)
+    nid = "0RB001001"
+    fig = v / f"_仕組み/attachments/{nid}/fig_{nid}_ヒケ.excalidraw.md"
+    body = f"## Embedded Files\n4f1e2a: [[_仕組み/attachments/{nid}/a.png]]\n"
+    write(fig, body)
+    write(v / f"_仕組み/attachments/{nid}/a.png", b"png")
+    run_once(c, dry_run=False, now=NOW)
+    assert fig.read_text(encoding="utf-8") == body
+    assert (v / f"_仕組み/attachments/{nid}/a.png").exists()
