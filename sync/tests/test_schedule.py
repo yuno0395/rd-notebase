@@ -23,7 +23,7 @@ def write(path: Path, body: str) -> Path:
 
 def setup(tmp_path):
     shared, personal = tmp_path / "共有", tmp_path / "個人"
-    (personal / "90_共有").mkdir(parents=True)
+    personal.mkdir(parents=True)
     ledger = write(shared / PJ / f"0RA001001_{PJ}.md",
                    "---\nid: 0RA001001\ntype: プロジェクト\nmembers: [Yu]\nstatus: 進行中\n---\n"
                    "## 期間・主な節目\n説明\n\n| 節目 | 計画日 | 見込み日 |\n| --- | --- | --- |\n"
@@ -62,8 +62,8 @@ def test_writes_gantt_and_embeds_once(tmp_path):
     assert "保圧を変える :done, 2026-10-20, 5d" in text
     assert "リブを足す :active, 2026-10-27, 7d" in text          # 今日まで伸ばす
     assert "まだ" not in text.split("```")[1]                       # 着手していないものは出さない
-    # 各自の 90_共有 にも置く(台帳の埋め込みが切れないように)
-    assert (personal / "90_共有" / PJ / f"00_工程表_{PJ}.md").read_text(encoding="utf-8") == text
+    # 各自の個人 vault の同じ場所にも置く(台帳の埋め込みが切れないように)
+    assert (personal / PJ / f"00_工程表_{PJ}.md").read_text(encoding="utf-8") == text
     # 台帳の節目の表の下に1回だけ埋め込む
     body = ledger.read_text(encoding="utf-8")
     assert body.count(f"![[00_工程表_{PJ}]]") == 1

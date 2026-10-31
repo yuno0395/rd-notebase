@@ -13,9 +13,9 @@ from . import frontmatter, ids
 from .frontmatter import LINK
 from .report import Report
 from .safety import Backup
-from .vault import GUIDE_DIRS, NO_ID_DIRS, Note, is_root_doc, iter_md, needs_id, notes, read, write
+from .vault import GUIDE_DIRS, NO_ID_DIRS, Note, is_root_doc, iter_md, needs_id, notes, read, theirs_file, write
 
-NO_LINK_FIX_DIRS = {"90_共有"} | GUIDE_DIRS  # 他の人のノートの写しと、配布物の案内は書き換えない
+NO_LINK_FIX_DIRS = GUIDE_DIRS  # 配布物の案内は書き換えない(他の人のノートは member で見分けて書き換えない)
 
 
 @dataclass
@@ -49,13 +49,15 @@ def valid_id(text: str | None) -> bool:
 
 def assign_ids(v: Vault, member: str, code: str, used: set[str], report: Report,
                backup: Backup, dry_run: bool, now: float, idle_seconds: int,
-               fresh: set[str] = frozenset()) -> dict[str, str]:
+               fresh: set[str] = frozenset(), shared_stems: set[str] = frozenset()) -> dict[str, str]:
     """id のないノートに id をつける。戻り値は {古いファイル名: 新しいファイル名}。
-    fresh(F-28: 作ったばかりでテンプレートのままのノートの id)には author も書かない。"""
+    fresh(F-28: 作ったばかりでテンプレートのままのノートの id)には author も書かない。
+    shared_stems(共有 vault にあるファイル名)にも author を書かない。author のないまま配られた他の人のノートだから
+    (自分のノートは共有へ出す前に author を書いている)。"""
     renamed: dict[str, str] = {}
     for n in notes(v.root):
         if not needs_id(n):
-            if has_id_without_author(n) and (n.file_id or "").upper() not in fresh:
+            if has_id_without_author(n) and (n.file_id or "").upper() not in fresh and n.stem not in shared_stems:
                 fill_author(v, n, member, report, backup, dry_run, now, idle_seconds)
             continue
         if idle_seconds > 0 and now - n.path.stat().st_mtime < idle_seconds:
@@ -138,7 +140,7 @@ def report_same_names(vaults: list[Vault], report: Report) -> None:
 
 
 def fix_links(v: Vault, index: dict[str, set[str]], stems: set[str], report: Report,
-              backup: Backup, dry_run: bool) -> int:
+              backup: Backup, dry_run: bool, member: str = "") -> int:
     """名前だけのリンク [[水]] を、id つきの [[0RAYFN001_水|水]] に直す。
 
     直すのは、そのファイル名のノートがなく、名前か別名で1つのノートに決まるときだけ。
@@ -159,8 +161,8 @@ def fix_links(v: Vault, index: dict[str, set[str]], stems: set[str], report: Rep
     by_id.update(local)
     changed_files = 0
     for path, rel in iter_md(v.root):
-        if rel.parts[0] in NO_LINK_FIX_DIRS:
-            continue
+        if rel.parts[0] in NO_LINK_FIX_DIRS or theirs_file(path, member):
+            continue  # 配布物の案内と、他の人のノート(共有の中身に戻るので書き換えない)
         if len(rel.parts) == 1 and rel.name.startswith("00_"):
             continue  # 直下の案内ファイルと同期レポート
         text = read(path)

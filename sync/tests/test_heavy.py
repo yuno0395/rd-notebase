@@ -56,7 +56,7 @@ def cloud(tmp_path):
 
 
 def issue(c, nid="0RB001001", project=PJ, body="") -> Path:
-    return write(c.personal / f"03_イシュー/{nid}_ヒケ.md",
+    return write(c.personal / f"{project}/03_イシュー/{nid}_ヒケ.md",
                  f"---\nid: {nid}\nauthor: {c.member}\ntype: イシュー\nimpact: 出荷\nspeed: すぐ\n"
                  f"project: [{project}]\n---\n{body}")
 
@@ -107,7 +107,7 @@ def test_promote_to_project_and_shared_link_form(cloud):
     assert "file:///" not in s
     # 佐藤に配るときは、佐藤の PC の file:/// に直す
     run_once(cloud["sato"], now=NOW + 180)
-    got = text(cloud["sato"].personal / f"90_共有/{PJ}/03_イシュー/0RB001001_ヒケ.md")
+    got = text(cloud["sato"].personal / f"{PJ}/03_イシュー/0RB001001_ヒケ.md")
     assert f"[成形条件.xlsx]({file_url(cloud['sato'].shared_data / PJ / '0RB001001/成形条件.xlsx')})" in got
     # 次の同期で、同じ内容とみなされて競合にならない
     run_once(yu, now=NOW + 240)

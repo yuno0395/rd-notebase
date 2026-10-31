@@ -19,8 +19,10 @@
           "discoverExistingNotesBeforeCreate": false,
           "folder": {
             "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
+            "folders": [
+              "01_目的"
+            ],
+            "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
             "chooseFromSubfolders": false
           },
@@ -50,8 +52,10 @@
           "discoverExistingNotesBeforeCreate": false,
           "folder": {
             "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
+            "folders": [
+              "01_目的"
+            ],
+            "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
             "chooseFromSubfolders": false
           },
@@ -81,8 +85,10 @@
           "discoverExistingNotesBeforeCreate": false,
           "folder": {
             "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
+            "folders": [
+              "01_設計案"
+            ],
+            "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
             "chooseFromSubfolders": false
           },
@@ -178,8 +184,10 @@
           "discoverExistingNotesBeforeCreate": false,
           "folder": {
             "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
+            "folders": [
+              "03_イシュー"
+            ],
+            "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
             "chooseFromSubfolders": false
           },
@@ -209,8 +217,10 @@
           "discoverExistingNotesBeforeCreate": false,
           "folder": {
             "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
+            "folders": [
+              "04_タスク"
+            ],
+            "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
             "chooseFromSubfolders": false
           },
@@ -240,8 +250,10 @@
           "discoverExistingNotesBeforeCreate": false,
           "folder": {
             "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
+            "folders": [
+              "04_タスク"
+            ],
+            "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
             "chooseFromSubfolders": false
           },
@@ -271,8 +283,10 @@
           "discoverExistingNotesBeforeCreate": false,
           "folder": {
             "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
+            "folders": [
+              "04_タスク"
+            ],
+            "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
             "chooseFromSubfolders": false
           },
@@ -302,8 +316,10 @@
           "discoverExistingNotesBeforeCreate": false,
           "folder": {
             "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
+            "folders": [
+              "04_タスク"
+            ],
+            "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
             "chooseFromSubfolders": false
           },
@@ -333,8 +349,10 @@
           "discoverExistingNotesBeforeCreate": false,
           "folder": {
             "enabled": true,
-            "folders": [],
-            "chooseWhenCreatingNote": true,
+            "folders": [
+              "05_ナレッジ"
+            ],
+            "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
             "chooseFromSubfolders": false
           },

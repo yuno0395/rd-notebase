@@ -14,10 +14,14 @@ SYSTEM_DIR = "_仕組み"
 SKIP_DIRS = {SYSTEM_DIR, ".trash"}
 # id をつけないフォルダ(デイリー・週報・inbox。仕様書「id をつけないもの」)
 GUIDE_DIRS = {"00_マニュアル"}  # 配布物の案内(仕組みの正本で上書きされる)。id をつけず、書き換えない
-NO_ID_DIRS = {"00_日誌", "00_inbox", "00_週報", "90_共有", "99_archive"} | GUIDE_DIRS
-# 個人 vault で自分が書くノートのフォルダと、配られた写しのフォルダ
-OWN_DIRS = ("01_目的", "01_設計案", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
-DIST = "90_共有"
+NO_ID_DIRS = {"00_日誌", "00_inbox", "00_週報", "99_archive"} | GUIDE_DIRS
+# 種類ごとのフォルダの名前。個人 vault も共有 vault と同じ並び(<プロジェクト>/03_イシュー/ や 共通/02_ノード/)にする
+TYPE_FOLDERS = ("01_目的", "01_設計案", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ")
+COMMON = "共通"
+# ノートを置かない一番上のフォルダ。ここ以外(共通・プロジェクトのフォルダ・99_archive)のノートが、集めて配る相手
+NOT_NOTE_TOPS = {"00_日誌", "00_inbox", "00_週報"} | GUIDE_DIRS | SKIP_DIRS
+# v0.66 までの「配られた他の人のノート」の置き場。v0.67 でなくした(tools/migrate_v067.py で移す)
+OLD_DIST = "90_共有"
 
 
 @dataclass
@@ -30,6 +34,35 @@ class Note:
     fm_id: str | None  # 属性欄の id
     aliases: list[str]
     top: str           # 一番上のフォルダ名(直下なら "")
+
+
+def plain_name(value: str) -> str:
+    """[[0RAYFN001_Yu|Yu]] や Yu を、名前 Yu にする。"""
+    t = frontmatter.link_targets(value)
+    t = t[0] if t else value
+    return ids.split_filename(t)[1] if ids.split_filename(t)[0] else t
+
+
+def authors_of(fm: dict) -> list[str]:
+    """書いた人。まとめたノードは [佐藤, Yu] のように並ぶ(先頭が最初に書いた人)。"""
+    return [plain_name(a).strip() for a in frontmatter.as_list(fm.get("author")) if a.strip()]
+
+
+def is_theirs(fm: dict, member: str) -> bool:
+    """他の人のノートか。author に自分が入っていなければ他の人のもの(配られたもの)。
+    author が空のノートは自分のもの(同期プログラムがあとで author を書く)。"""
+    a = authors_of(fm)
+    return bool(a) and member not in a
+
+
+def theirs_file(path: Path, member: str) -> bool:
+    """個人 vault のファイルが他の人のノートか(属性欄の author で見分ける)。"""
+    if not member or not path.name.endswith(".md"):
+        return False
+    try:
+        return is_theirs(frontmatter.load(read(path)), member)
+    except (OSError, UnicodeDecodeError):
+        return False
 
 
 def is_hidden(part: str) -> bool:

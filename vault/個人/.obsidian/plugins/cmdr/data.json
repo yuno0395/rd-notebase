@@ -83,6 +83,12 @@
       "icon": "compass",
       "name": "今の仕事を確かめる(Ctrl+J)",
       "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/自分も作成者に入れて書く.md",
+      "icon": "user-plus",
+      "name": "自分も作成者に入れて書く",
+      "mode": "desktop"
     }
   ],
   "pageHeader": [
@@ -90,6 +96,20 @@
       "id": "templater-obsidian:_仕組み/templates/_コマンド/今すぐ共有へ.md",
       "icon": "send",
       "name": "今すぐ共有へ(Ctrl+Shift+S)",
+      "mode": "desktop"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/自分も作成者に入れて書く.md",
+      "icon": "user-plus",
+      "name": "自分も作成者に入れて書く",
+      "mode": "desktop"
+    }
+  ],
+  "fileMenu": [
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/自分も作成者に入れて書く.md",
+      "icon": "user-plus",
+      "name": "自分も作成者に入れて書く",
       "mode": "desktop"
     }
   ]

@@ -1,13 +1,17 @@
-"""F-05〜11、F-14、F-15: 共有 vault へ集め(集約)、各自の 90_共有/ へ配る(再配布)。
+"""F-05〜11、F-14、F-15、F-57: 共有 vault へ集め(集約)、各自の個人 vault へ配る(再配布)。
+
+個人 vault は共有 vault と同じ並び(<プロジェクト>/03_イシュー/、共通/02_ノード/ など)にする(v0.67)。
+自分のノートも配られた他の人のノートも、共有と同じ場所に置く。自分のものか他の人のものかは author で見分ける。
 
 前回同期したときの内容のハッシュを覚えておき(state.py)、3つを見比べて決める。
 
-| 個人側 | 共有側 | 自分のノート(01〜05)        | 配られたノート(90_共有/)        |
-| ------ | ------ | ---------------------------- | ------------------------------- |
-| 変わった | そのまま | 共有へコピー(集約)          | 編集しないよう知らせる          |
-| そのまま | 変わった | 個人へコピー(他の人の書き足し) | 90_共有/ へコピー(再配布)     |
-| 変わった | 変わった | 競合ファイルを置いて知らせる  | 共有に合わせる(元は backup へ)  |
+| 個人側 | 共有側 | 自分のノート                    | 他の人のノート(配られたもの)      |
+| ------ | ------ | ------------------------------- | --------------------------------- |
+| 変わった | そのまま | 共有へコピー(集約)             | 共有の中身に戻す(元は backup へ)  |
+| そのまま | 変わった | 個人へコピー(他の人の書き足し) | 個人へコピー(再配布)             |
+| 変わった | 変わった | 競合ファイルを置いて知らせる     | 共有に合わせる(元は backup へ)    |
 
+自分のノートが振り分け先と違うフォルダにあれば、振り分け先へ移す(F-57)。
 ノートを消すことはしない。99_archive への移動だけを共有へ反映する(F-09)。
 ノートの名前を変えたときは、id で同じノートと分かるので、もう片方のファイルも同じ名前に移す。
 添付(`_仕組み/attachments/<id>/`)は名前が変わると別のファイルに見えるので、前回同期した添付が片方から
@@ -29,13 +33,13 @@ from .report import Report
 from .safety import Backup
 from .heavy import DEFAULT_KEEP, is_heavy, to_personal, to_shared
 from .state import State, digest, digest_text
-from .vault import DIST, OWN_DIRS, SKIP_DIRS, sync_copy_of, is_hidden, read, write
+from .vault import (COMMON, NOT_NOTE_TOPS, SKIP_DIRS, TYPE_FOLDERS, authors_of, is_hidden, is_theirs,
+                    plain_name, read, sync_copy_of, write)
 
 ARCHIVE = "99_archive"
-COMMON = "共通"
 BIG_IMPACT = {"方針", "絞込", "出荷"}
 TYPE_DIR = {"目的": "01_目的", "仮説": "01_目的", "設計案": "01_設計案", "ノード": "02_ノード",
-            "イシュー": "03_イシュー", "タスク": "04_タスク"}
+            "イシュー": "03_イシュー", "タスク": "04_タスク", "ナレッジ": "05_ナレッジ"}
 CONFLICT_MARK = "_競合_"
 WINDOW = "窓口"           # 機密の窓口(機密フォルダごとに1つ。見てよい人と社内の当事者だけを書く)
 WINDOW_DIR = "機密の窓口"
@@ -67,7 +71,7 @@ class Item:
     @property
     def authors(self) -> list[str]:
         """書いた人。まとめたノードは [佐藤, Yu] のように並ぶ(先頭が最初に書いた人)。"""
-        return [plain_name(a).strip() for a in as_list(self.fm.get("author")) if a.strip()]
+        return authors_of(self.fm)
 
     @property
     def author(self) -> str:
@@ -110,13 +114,6 @@ def scan(root: Path, tops: tuple[str, ...] | None = None, skip_tops: set[str] = 
         out.setdefault(file_id, []).append(
             Item(root, rel.as_posix(), file_id, name, frontmatter.load(text), text))
     return out
-
-
-def plain_name(value: str) -> str:
-    """[[0RAYFN001_Yu|Yu]] や Yu を、名前 Yu にする。"""
-    t = link_targets(value)
-    t = t[0] if t else value
-    return ids.split_filename(t)[1] if ids.split_filename(t)[0] else t
 
 
 @dataclass
@@ -201,11 +198,14 @@ class Context:
             return COMMON
         if t == "プロジェクト":
             return item.name
+        # project が書いてあればそれを使う(目的・イシューのほか、親のないノートにも作るときに書く。v0.67)
+        ps = [plain_name(p) for p in as_list(item.fm.get("project"))]
+        if len(ps) > 1 or COMMON in ps:
+            return COMMON
+        if ps:
+            return ps[0]
         if t in ("イシュー", "目的"):
-            ps = [plain_name(p) for p in as_list(item.fm.get("project"))]
-            if t == "イシュー" and (len(ps) > 1 or COMMON in ps):
-                return COMMON
-            return ps[0] if len(ps) == 1 else None
+            return None
         for target in link_targets(item.fm.get("parent")):
             parent = self.resolve(target)
             if parent:
@@ -275,7 +275,8 @@ def destination(ctx: Context, item: Item) -> str | None:
     project = ctx.project_of(item)
     if project is None:
         return None
-    folder = TYPE_DIR.get(item.type) or (item.top if item.top in OWN_DIRS else "")
+    parts = item.rel.split("/")[:-1]
+    folder = TYPE_DIR.get(item.type) or next((x for x in parts if x in TYPE_FOLDERS), "")
     if item.type == "プロジェクト":
         return f"{project}/{item.filename}"
     if item.type == "ノード":
@@ -351,7 +352,10 @@ def sync_pair(ctx: Context, key: str, p: Path, s: Path, p_rel: str, s_rel: str,
         return
 
     def done(h: str) -> None:
-        ctx.state.set(key, {"p": p_rel, "s": s_rel, "h": h})
+        rec_new = {"p": p_rel, "s": s_rel, "h": h}
+        if mode == "down":
+            rec_new["m"] = "down"  # 配った他の人のノート(author が空でも見分けられるように)
+        ctx.state.set(key, rec_new)
 
     if pe and not se:  # 共有にまだない(消されていても、削除は反映しない)
         ctx.copy(p, s, ctx.shared)
@@ -368,16 +372,18 @@ def sync_pair(ctx: Context, key: str, p: Path, s: Path, p_rel: str, s_rel: str,
     if hp == hs:
         return done(hp)
     if mode == "down":
-        if last is not None and hs == last:
-            ctx.report.todo(f"90_共有 の編集: {p_rel} は次に共有が変わると上書きされます。"
-                            "書き足すなら自分のフォルダ(01〜05)へ移してください")
-            return
+        # 他の人のノートは読むだけ。手元で変わっていたら共有の中身に戻す(変えた中身は backup に残る)
         ctx.copy(s, p, ctx.personal)
-        if last is not None and hp != last:
-            ctx.report.record(f"再配布: 共有/{s_rel} → {p_rel}(90_共有 での編集は backup に残しました)")
+        if last is not None and hs == last:
+            ctx.report.todo(f"他の人のノート: {p_rel} が手元で変わっていたので、共有の中身に戻しました(変えた中身は backup に)。"
+                            "書き足すなら、右クリックの「自分も作成者に入れて書く」を使ってください")
+            ctx.count("戻した")
+        elif last is not None and hp != last:
+            ctx.report.record(f"再配布: 共有/{s_rel} → {p_rel}(手元での変更は backup に残しました)")
+            ctx.count("再配布")
         else:
             ctx.report.record(f"再配布: 共有/{s_rel} → {p_rel}")
-        ctx.count("再配布")
+            ctx.count("再配布")
         return done(hs)
 
     if rec and "c" in rec:  # 前に競合した。人がまとめた側を正にする
@@ -487,15 +493,59 @@ def build_index(ctx: Context, *groups: dict[str, list[Item]]) -> None:
                     ctx.by_name.setdefault(n.strip().lower(), set()).add(i)
 
 
+def their_note(ctx: Context, item: Item, in_shared: bool) -> bool:
+    """個人 vault のノートが、配られた他の人のノートか。author に自分がいなければ他の人のもの。
+    author が空でも、共有に同じファイル名のノートがあれば他の人のもの(自分のノートは共有へ出す前に author を
+    書くので、author のないまま共有にあるのは、共有 vault で直接作られたもの)。"""
+    if is_theirs(item.fm, ctx.member):
+        return True
+    rec = ctx.state.get(f"note:{item.id}")
+    return not item.authors and (in_shared or bool(rec and rec.get("m") == "down"))
+
+
+def put_in_place(ctx: Context, item: Item) -> Item:
+    """F-57: 自分のノートが振り分け先(共有と同じ場所)と違うフォルダにあれば、そこへ移す。
+    テンプレートを使わずに作った、project や parent を直した、などで場所がずれたとき。"""
+    if item.top == ARCHIVE:
+        return item
+    project = ctx.project_of(item)
+    if project is None or (project != COMMON and item.type != "プロジェクト" and project not in ctx.projects):
+        return item  # 振り分け先が決まらない(check_conditions が知らせる)
+    dest = destination(ctx, item)
+    if not dest or dest == item.rel or recent(ctx, item.path):
+        return item
+    if (ctx.personal / dest).exists():
+        ctx.report.todo(f"置き場所: {item.rel} を {dest} へ移せません(同じ名前のファイルがあります)")
+        return item
+    old_dir = item.path.parent
+    ctx.move(item.path, ctx.personal / dest)
+    ctx.report.record(f"置き場所を直した: {item.rel} → {dest}")
+    ctx.count("置き場所")
+    if ctx.dry_run:
+        return item
+    # 空になった一番上の種類のフォルダ(v0.66 までの 03_イシュー/ など)は片付ける
+    if old_dir.parent == ctx.personal and old_dir.name in TYPE_FOLDERS and not any(old_dir.iterdir()):
+        old_dir.rmdir()
+    return Item(item.root, dest, item.id, item.name, item.fm, item.text)
+
+
 def run_share(ctx: Context) -> None:
     from .merge import check_duplicates, quiet_same_names, read_choices
 
-    mine = scan(ctx.personal, tops=OWN_DIRS + (ARCHIVE,))
+    shared = scan(ctx.shared, skip_tops=SKIP_DIRS | {"00_inbox", "00_週報"})
+    # 個人 vault のノートを、自分のものと配られた他の人のものに分ける(どちらも共有と同じ場所にある)
+    mine: dict[str, list[Item]] = {}
+    theirs: dict[str, Item] = {}
+    for note_id, items in scan(ctx.personal, skip_tops=NOT_NOTE_TOPS).items():
+        same_file = any(o.filename == items[0].filename for o in shared.get(note_id, []))
+        if their_note(ctx, items[0], same_file):
+            theirs[note_id] = items[0]
+        else:
+            mine[note_id] = items
     for items in mine.values():
         for it in items:
             # author は id 付けの手順で書く(試し運転ではまだ書いていない)
             it.fm.setdefault("author", ctx.member) if not it.author else None
-    shared = scan(ctx.shared, skip_tops=SKIP_DIRS | {"00_inbox", "00_週報"})
     build_index(ctx, mine, shared)
     for items in shared.values():
         for it in items:
@@ -546,6 +596,8 @@ def run_share(ctx: Context) -> None:
         if note_id in ctx.fresh and not rec and not in_shared:
             ctx.report.record(f"作ったばかりでテンプレートのままなので、まだ集めていません: {item.rel}")
             continue
+
+        item = put_in_place(ctx, item)  # F-57: 振り分け先と違うフォルダにあれば移す
 
         reason = check_conditions(ctx, item)
         if reason is not None:
@@ -609,10 +661,15 @@ def run_share(ctx: Context) -> None:
                 continue  # 配っていなかったものは、archive に入ってからは配らない
         elif item.top not in projects:
             continue
-        p_rel = f"{DIST}/{item.rel}"
-        if rec and rec.get("p") != p_rel and (ctx.personal / rec["p"]).exists():
-            ctx.move(ctx.personal / rec["p"], ctx.personal / p_rel)
-            ctx.report.record(f"再配布: 共有で移されたので {rec['p']} → {p_rel}")
+        p_rel = item.rel  # 共有と同じ場所に置く
+        here = theirs.get(note_id)
+        cur = here.rel if here else (rec.get("p") if rec else None)
+        if cur and cur != p_rel and (ctx.personal / cur).exists():
+            if (ctx.personal / p_rel).exists():
+                ctx.report.todo(f"他の人のノート: {cur} を 共有と同じ {p_rel} へ移せません(同じ名前のファイルがあります)")
+                continue
+            ctx.move(ctx.personal / cur, ctx.personal / p_rel)
+            ctx.report.record(f"再配布: 共有と同じ場所へ移した {cur} → {p_rel}")
             if ctx.dry_run:
                 continue
         sync_pair(ctx, key, ctx.personal / p_rel, item.path, p_rel, item.rel, "down", p_rel)

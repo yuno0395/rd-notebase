@@ -6,6 +6,7 @@ aliases: [<%* const nm = tp.file.title.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, ""); if
 date: <% tp.date.now("YYYY-MM-DD") %>
 attendees: []         # 判定した人
 parent: []            # 目的
+project: [<%* tR += await tp.user.place_note(tp) %>] # 親がないときだけ。Ctrl+N で選んだプロジェクトが入る(親があれば空のまま)
 ---
 ## 議題
 判定するイシュー(イシュー一覧の「DR 用」ビューから)

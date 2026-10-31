@@ -44,8 +44,15 @@ async function open_figure(tp) {
   const name = `fig_${note.basename}`;
   const path = `${dir}/${name}.excalidraw.md`;
   let fig = findFigure(app, dir, path, id);
-  // 90_共有/ は他の人のノートの写しなので、名前は変えずに開くだけ(書いた人の側で変わって届く)
-  if (fig && fig.path !== path && !note.path.startsWith("90_共有/")) fig = await renameFigure(app, fig, dir, name);
+  // 他の人のノート(author に自分がいない)の図は、名前を変えずに開くだけ(書いた人の側で変わって届く)。
+  // 図がなければ作らない(作っても共有へは出ないため)
+  const O = tp.user.others_note;
+  const theirs = O && O.isTheirs(app, note, await O.myName(app));
+  if (fig && fig.path !== path && !theirs) fig = await renameFigure(app, fig, dir, name);
+  if (!fig && theirs) {
+    new Notice("他の人のノートなので、図は作りません。書き足すときは「自分も作成者に入れて書く」を押してから Ctrl+D");
+    return;
+  }
   if (!fig) {
     let tpl = TEMPLATES[fm?.type];
     if (!tpl || !app.vault.getAbstractFileByPath(tpl)) tpl = FIG_TEMPLATE; // 機密 vault などひな形がないとき

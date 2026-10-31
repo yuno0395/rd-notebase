@@ -23,7 +23,7 @@ def write(path: Path, body: str) -> Path:
 
 
 def issue(yu: Path, nid: str, name: str, extra: str = "") -> Path:
-    return write(yu / f"03_イシュー/{nid}_{name}.md",
+    return write(yu / f"{PJ}/03_イシュー/{nid}_{name}.md",
                  f"---\nid: {nid}\nauthor: Yu\ntype: イシュー\nproject: [{PJ}]\n{extra}---\n## リスク\n")
 
 
@@ -89,7 +89,7 @@ def test_lead_weeks_uses_named_milestone(cloud):
 def test_previous_and_generation(cloud):
     yu = cloud.personal
     issue(yu, "0RB001001", "ヒケ", "impact: 出荷\nspeed: すぐ\n")
-    write(yu / "04_タスク/0RB002001_リブを足す.md",
+    write(yu / f"{PJ}/04_タスク/0RB002001_リブを足す.md",
           '---\nid: 0RB002001\nauthor: Yu\ntype: タスク\nparent: ["[[0RB001001_ヒケ|ヒケ]]"]\n---\n'
           "## リスクはどう変わったか\n- [[0RB003001_そり|そり]] が出るかも\n## 次\n[[0RB004001_無関係]]\n")
     child = issue(yu, "0RB003001", "そり", "impact: 出荷\nspeed: すぐ\n")
@@ -99,7 +99,7 @@ def test_previous_and_generation(cloud):
     assert 'previous: ["[[0RB002001_リブを足す|リブを足す]]"]' in t
     assert "generation: 2" in t
     assert "previous" not in text(other)                 # リスクの欄の外のリンクは見ない
-    assert "generation" not in text(yu / "03_イシュー/0RB001001_ヒケ.md")  # 元のイシューには書かない
+    assert "generation" not in text(yu / f"{PJ}/03_イシュー/0RB001001_ヒケ.md")  # 元のイシューには書かない
     assert "previous を補った: [[0RB003001_そり|そり]]" in report(cloud)
 
 
@@ -126,17 +126,17 @@ def test_dry_run_writes_nothing(cloud):
 def test_conflict_copies(cloud):
     yu = cloud.personal
     issue(yu, "0RB001001", "ヒケ", "impact: 出荷\nspeed: すぐ\n")
-    write(yu / "03_イシュー/0RB001001_ヒケ (Yu's conflicted copy 2026-10-24).md", "x")
+    write(yu / f"{PJ}/03_イシュー/0RB001001_ヒケ (Yu's conflicted copy 2026-10-24).md", "x")
     write(yu / "00_日誌/デイリー/2026-10-24 (1).md", "x")
     write(yu / "00_日誌/デイリー/2026-10-24.md", "x")
-    write(yu / "02_ノード/部品 (2).md", "元がないので数えない")
+    write(yu / "共通/02_ノード/部品 (2).md", "元がないので数えない")
     write(cloud.shared / f"{PJ}/03_イシュー/メモ (競合 Yu).md", "x")
     run_once(cloud, now=NOW)
     r = report(cloud)
-    assert "競合の複製: 個人/03_イシュー/0RB001001_ヒケ (Yu's conflicted copy 2026-10-24).md があります。" \
-           "個人/03_イシュー/0RB001001_ヒケ.md と見比べて" in r
+    assert f"競合の複製: 個人/{PJ}/03_イシュー/0RB001001_ヒケ (Yu's conflicted copy 2026-10-24).md があります。" \
+           f"個人/{PJ}/03_イシュー/0RB001001_ヒケ.md と見比べて" in r
     assert "競合の複製: 個人/00_日誌/デイリー/2026-10-24 (1).md" in r
-    assert "競合の複製: 個人/02_ノード" not in r      # 元がない番号つきは複製と見なさない
+    assert "競合の複製: 個人/共通/02_ノード" not in r      # 元がない番号つきは複製と見なさない
     assert "競合の複製: 共有/試しPJ/03_イシュー/メモ (競合 Yu).md があります。中身を確かめて" in r
     # 複製には id をつけず、共有にも集めない
     assert not list(cloud.shared.rglob("*conflicted*"))
@@ -145,7 +145,7 @@ def test_conflict_copies(cloud):
 def test_note_history(cloud):
     from notesync.history import history_path, read_rows
     yu = cloud.personal
-    task = write(yu / "04_タスク/0RB002001_試作.md",
+    task = write(yu / f"{PJ}/04_タスク/0RB002001_試作.md",
                  "---\nid: 0RB002001\nauthor: Yu\ntype: タスク\nstatus: 進行中\ndue: 2026-10-30\n---\n")
     run_once(cloud, now=NOW)
     t = text(task)
@@ -167,14 +167,14 @@ def test_daily_note_notice(cloud):
     from notesync.daily import TITLE
     yu = cloud.personal
     daily = write(yu / "00_日誌/デイリー/2026-10-24.md", "# 2026-10-24\n\n## タイムライン\n- [ ] 09:00 打ち合わせ\n")
-    write(yu / "05_ナレッジ/0RB005001_保圧.md", "---\nid: 0RB005001\nauthor: Yu\ntype: ナレッジ\n---\n")
+    write(yu / f"{PJ}/05_ナレッジ/0RB005001_保圧.md", "---\nid: 0RB005001\nauthor: Yu\ntype: ナレッジ\n---\n")
     run_once(cloud, now=NOW)
     t = text(daily)
     assert t.startswith(f"# 2026-10-24\n\n{TITLE}\n> - 共有されていない: 未入力: [[0RB005001_保圧|保圧]] の")
     assert "## タイムライン\n- [ ] 09:00 打ち合わせ" in t
     run_once(cloud, now=NOW)
     assert text(daily).count(TITLE) == 1                     # 書き換えて、重ねない
-    write(yu / "05_ナレッジ/0RB005001_保圧.md",
+    write(yu / f"{PJ}/05_ナレッジ/0RB005001_保圧.md",
           '---\nid: 0RB005001\nauthor: Yu\ntype: ナレッジ\nvisibility: 個人\n---\n')
     run_once(cloud, now=NOW)
     assert text(daily) == "# 2026-10-24\n\n## タイムライン\n- [ ] 09:00 打ち合わせ\n"   # 知らせがなくなれば消す
@@ -203,10 +203,10 @@ def test_similar_references(cloud):
           '---\nid: 0RA400001\nauthor: 佐藤\ntype: ナレッジ\nusefulness: C\n'
           'risk_reduction:\n  - "[[0RA200001_前のヒケ]] 出荷→小"\n---\n')
     nid = ids.encode_time(ids.seconds_since_epoch(datetime.fromtimestamp(NOW, tz=ids.JST)) - 3600) + "001"
-    p = write(yu / f"03_イシュー/{nid}_今のヒケ.md",
+    p = write(yu / f"{PJ}/03_イシュー/{nid}_今のヒケ.md",
               f'---\nid: {nid}\nauthor: Yu\ntype: イシュー\nimpact: 出荷\nspeed: すぐ\nproject: [{PJ}]\n'
               'friend: ["[[0RA100001_ヒケ量]]"]\n---\n## リスク\n## 類似・参考ナレッジ\n説明の行\n\n## 次\n')
-    old = write(yu / "03_イシュー/0A0000001_古いヒケ.md",
+    old = write(yu / f"{PJ}/03_イシュー/0A0000001_古いヒケ.md",
                 f'---\nid: 0A0000001\nauthor: Yu\ntype: イシュー\nimpact: 出荷\nspeed: すぐ\nproject: [{PJ}]\n'
                 'friend: ["[[0RA100001_ヒケ量]]"]\n---\n## 類似・参考ナレッジ\n')
     run_once(cloud, now=NOW)
@@ -222,11 +222,11 @@ def test_similar_references(cloud):
 def test_value_hypotheses_from_table(cloud):
     """F-52: 設計案の表の [[仮説]] を 価値仮説 に足す。足すだけで消さない。"""
     yu = cloud.personal
-    write(yu / "01_目的/0RC001001_電池で3年動く.md", "---\nid: 0RC001001\nauthor: Yu\ntype: 仮説\n---\n")
-    write(yu / "01_目的/0RC002001_工事なしで付く.md",
+    write(yu / f"{PJ}/01_目的/0RC001001_電池で3年動く.md", "---\nid: 0RC001001\nauthor: Yu\ntype: 仮説\n---\n")
+    write(yu / f"{PJ}/01_目的/0RC002001_工事なしで付く.md",
           "---\nid: 0RC002001\nauthor: Yu\ntype: 仮説\naliases: [工事不要]\n---\n")
-    write(yu / "02_ノード/0RC003001_電池.md", "---\nid: 0RC003001\nauthor: Yu\ntype: ノード\n---\n")
-    d = write(yu / "01_設計案/0RC009001_A案.md",
+    write(yu / "共通/02_ノード/0RC003001_電池.md", "---\nid: 0RC003001\nauthor: Yu\ntype: ノード\n---\n")
+    d = write(yu / f"{PJ}/01_設計案/0RC009001_A案.md",
               '---\nid: 0RC009001\nauthor: Yu\ntype: 設計案\n価値仮説: ["[[0RC002001_工事なしで付く|工事なしで付く]]"]\n---\n'
               "## 価値の仮説を実現できるか\n| 価値の仮説 | どう実現するか | 前提 |\n| --- | --- | --- |\n"
               "| [[0RC001001_電池で3年動く\\|電池で3年動く]] | 1日1回だけ起きる | [[0RC003001_電池\\|電池]] が 2000mAh |\n"
@@ -248,7 +248,7 @@ BODY = TEMPLATE.split("---\n", 2)[2]
 
 
 def task(yu: Path, nid: str, name: str, body: str = BODY, status: str = "未着手") -> Path:
-    return write(yu / f"04_タスク/{nid}_{name}.md",
+    return write(yu / f"{PJ}/04_タスク/{nid}_{name}.md",
                  f"---\nid: {nid}\nauthor: Yu\ntype: タスク\nstatus: {status}\ndue: 2026-11-30\n---\n{body}")
 
 
@@ -278,7 +278,7 @@ def test_auto_start_by_marks(cloud):
     write(yu / "00_日誌/デイリー/2026-10-30.md",            # 先の日付は見ない
           "# 2026-10-30\n\n## タイムライン\n- [ ] 09:00 [[0QZ001001_まだ|まだ]]\n")
     child = task(yu, "0QZ005001", "記録あり")
-    write(yu / "05_ナレッジ/0R9000001_結果.md",
+    write(yu / f"{PJ}/05_ナレッジ/0R9000001_結果.md",
           '---\nid: 0R9000001\nauthor: Yu\ntype: 実験・試作記録\nparent: ["[[0QZ005001_記録あり|記録あり]]"]\n---\n')
     done = task(yu, "0QZ006001", "終わった", BODY + "メモ\n", status="完了")
     for p in (plain_t, daily, child):

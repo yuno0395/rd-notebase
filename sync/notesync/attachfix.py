@@ -25,9 +25,8 @@ from .heavy import ATTACH, MDLINK, WIKI, free_name
 from .report import Report
 from .safety import Backup
 from .state import digest
-from .vault import sync_copy_of, iter_md, read, write
+from .vault import sync_copy_of, iter_md, read, theirs_file, write
 
-SKIP_TOPS = {"90_共有"}  # 他の人のノートの写しは書き換えない
 DIARY_TOP = "00_日誌"
 DIARY_DIR = "日誌"  # _仕組み/attachments/日誌/<ファイル名>/
 
@@ -66,8 +65,9 @@ def form(path: str, md: bool) -> str:
 
 class Fixer:
     def __init__(self, root: Path, renamed: dict[str, str], report: Report, backup: Backup,
-                 dry_run: bool, now: float, idle_seconds: int):
+                 dry_run: bool, now: float, idle_seconds: int, member: str = ""):
         self.root = root
+        self.member = member
         self.renamed = renamed
         self.report = report
         self.backup = backup
@@ -84,8 +84,8 @@ class Fixer:
         試し運転では振るはずの id を使う。"""
         out = []
         for p, rel in iter_md(self.root):
-            if rel.parts[0] in SKIP_TOPS:
-                continue
+            if theirs_file(p, self.member):
+                continue  # 他の人のノートは書き換えない
             stem = self.renamed.get(p.stem, p.stem)
             folder = ids.split_filename(stem)[0]
             if not folder and rel.parts[0] == DIARY_TOP:
@@ -189,8 +189,8 @@ class Fixer:
 
 
 def fix_attachments(root: Path, renamed: dict[str, str], report: Report, backup: Backup,
-                    dry_run: bool, now: float, idle_seconds: int) -> None:
+                    dry_run: bool, now: float, idle_seconds: int, member: str = "") -> None:
     try:
-        Fixer(root, renamed, report, backup, dry_run, now, idle_seconds).run()
+        Fixer(root, renamed, report, backup, dry_run, now, idle_seconds, member).run()
     except Exception as e:  # おまけが壊れても、核の同期は続ける
         report.warn(f"添付の置き場所の直しで止まりました({type(e).__name__}: {e})")
