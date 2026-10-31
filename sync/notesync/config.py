@@ -17,7 +17,6 @@ from . import ids
 
 MEMBER_CSV = Path("_仕組み/tools") / "同期プログラム" / "メンバー.csv"
 MY_SETTINGS = Path("_仕組み") / "個人設定.md"   # 名前と6桁の番号(Yu 2026-10-25)
-MY_YAML = Path("_仕組み/記録") / "私.yaml"       # v0.38 までの形。個人設定.md がなければ読む
 # 前回同期の記録(F-14)と同期中の札。個人 vault に置き、どの PC からも同じものを使う(複数の PC で使う)
 STATE_FILE = Path("_仕組み/記録") / "同期の記録.json"
 LOCK_FILE = Path("_仕組み/記録") / "同期中.lock"
@@ -39,7 +38,6 @@ class Config:
     idle_seconds: int = 10
     backup_dir: Path | None = None
     state_dir: Path | None = None  # 前回同期の記録(F-14)の置き場所。省略時は個人 vault の中
-    old_state_dir: Path | None = None  # v0.45 までの置き場所(%APPDATA%\知見同期)。新しい方がなければ読む
     code: str = ""
     config_path: Path | None = None  # 読んだ config.yaml。vault の場所が変わったときに書き直す(F-50)
     moved: list[str] = field(default_factory=list)       # load のときに直した場所(次の同期レポートに書く)
@@ -50,10 +48,6 @@ class Config:
         if self.state_dir:
             return self.state_dir / f"state_{self.member}.json"
         return self.personal / STATE_FILE
-
-    @property
-    def old_state_path(self) -> Path | None:
-        return self.old_state_dir / f"state_{self.member}.json" if self.old_state_dir else None
 
     @property
     def lock_path(self) -> Path:
@@ -84,7 +78,6 @@ def load(path: Path) -> Config:
         idle_seconds=int(data.get("idle_seconds", 10)),
         backup_dir=Path(data["backup_dir"]) if data.get("backup_dir") else path.parent / "backup",
         state_dir=Path(data["state_dir"]) if data.get("state_dir") else None,
-        old_state_dir=path.parent,
         config_path=path,
     )
     # F-50: vault の名前や場所が変わっていたら、新しい場所を見つけて設定を直す(人の記号を読む前に)
@@ -120,19 +113,15 @@ def _field(text: str, key: str) -> str:
 def read_my_code(personal: Path) -> tuple[str, str]:
     """個人 vault の自分の名前と人の記号。個人設定.md の number(6桁)を36進数にする。"""
     path = personal / MY_SETTINGS
-    if path.exists():
-        text = path.read_text(encoding="utf-8")
-        number = _field(text, "number")
-        try:
-            code = ids.code_from_number(number) if number else ""
-        except ValueError as e:
-            raise ConfigError(f"個人設定.md の number は6桁の数字にしてください(今は {number!r})") from e
-        return _field(text, "name"), code
-    path = personal / MY_YAML
     if not path.exists():
         return "", ""
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return str(data.get("name") or ""), str(data.get("code") or "").upper()
+    text = path.read_text(encoding="utf-8")
+    number = _field(text, "number")
+    try:
+        code = ids.code_from_number(number) if number else ""
+    except ValueError as e:
+        raise ConfigError(f"個人設定.md の number は6桁の数字にしてください(今は {number!r})") from e
+    return _field(text, "name"), code
 
 
 def member_code(cfg: Config) -> str:

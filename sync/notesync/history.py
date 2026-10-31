@@ -1,13 +1,9 @@
 """F-31 後半・F-32: ノートの外の履歴(共有の `_仕組み/記録/ノート履歴/<名前>.csv`)。
 
 タスクの due と status、イシューの status と resolution が変わったら、1行足す。
-ノートには書かない(仕様書「ノートの外へ」)。読むのは週報(F-29)。
+ノートには書かない(仕様書「ノートの外へ」)。読むのは週報(F-29)と工程表(F-53)。
 
-- 最初の due: その id の due の行のうち一番古いもの。due を変えても残る
-- 完了日: status が「完了」になった行の日
-- 期限を延ばした回数: 前の値がある due の行のうち、後の日の方が遅いものの数
-
-Box の競合を避けるため、ファイルは人ごとに分け、自分のノートの行だけを書く。
+共有クラウドフォルダでの競合を避けるため、ファイルは人ごとに分け、自分のノートの行だけを書く。
 前回の値は、このファイルの最後の行から読む(同期の記録が消えても作り直さなくてよい)。
 """
 
@@ -92,24 +88,3 @@ def record_history(personal: Path, shared: Path, member: str, report: Report,
             f.write(buf.getvalue())
     except Exception as e:  # おまけが壊れても、核の同期は続ける
         report.warn(f"ノート履歴の記録で止まりました({type(e).__name__}: {e})。id 付けと共有はそのまま行いました")
-
-
-# ---------- 週報(F-29)で使う読み方 ----------
-
-def first_due(rows: list[dict], note_id: str) -> str:
-    for r in rows:
-        if r["id"] == note_id and r["項目"] == "due" and r["後"]:
-            return r["後"]
-    return ""
-
-
-def done_date(rows: list[dict], note_id: str) -> str:
-    out = ""
-    for r in rows:
-        if r["id"] == note_id and r["項目"] == "status":
-            out = r["日時"][:10] if r["後"] == "完了" else ""
-    return out
-
-
-def extensions(rows: list[dict], note_id: str) -> int:
-    return sum(1 for r in rows if r["id"] == note_id and r["項目"] == "due" and r["前"] and r["後"] > r["前"])

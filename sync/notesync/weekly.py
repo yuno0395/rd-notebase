@@ -1,7 +1,7 @@
 """F-29: 管理者向けの週報(仕様書「管理者向けの週報」)。
 
 共有 vault のノートの属性と、ノート履歴(history.py)から、プロジェクトごとに作る。
-置き場所は個人設定の report(例: Box\\開発ノート_報告)の `<プロジェクト名>/<年-週>.html`。
+置き場所は個人設定の report(例: <共有クラウドフォルダ>\\チーム\\開発ノート_報告)の `<プロジェクト名>/<年-週>.html`。
 Markdown と Excel に分けず、ブラウザで開く HTML 1つにする(Yu 2026-10-25)。
 週報は、報告フォルダ(個人設定の report)を書いた PC なら誰のものでも作る。毎週月曜の最初の同期で作り、
 今週の分がもうあれば作らない。2台が同時に作らないよう、作る間は報告フォルダに札を置く。
@@ -24,11 +24,10 @@ from .autofill import LINK, Doc, Index, as_list, load_docs, milestones, plain, t
 from .history import HISTORY_DIR, read_rows
 from .report import Report
 
-BIG = {"方針", "絞込", "出荷", "大"}
+BIG = {"方針", "絞込", "出荷"}
 STAGES = ["未把握", "現象", "設計空間", "原理"]
 OPEN_TASK = {"未着手", "進行中", "待ち", "確認待ち"}
 DONE = {"完了", "中止"}
-OPEN_ISSUE = {"未対応", "対策中"}
 DROPPED = {"不採用", "中止", "変更"}   # 変更: イシューの対策で考え方を変え、新しい候補に置き換えた案(Yu 2026-10-29)
 SOLVED = {"低減済み", "解消"}
 TOPIC_SECTION = "今週のトピック"   # プロジェクトの本文の見出し。PL が選んだノートとダイジェストを書く(Yu 2026-10-29)
@@ -114,9 +113,6 @@ class ProjectReport:
         """成果物候補ごとの K-Plex 風の図(weekly_html.py が SVG にする)。"""
         self.blocks.append(("figs", items))
 
-    def tables(self) -> dict[str, list[list[str]]]:
-        return {b[1]: [b[2]] + b[3] for b in self.blocks if b[0] == "table"}
-
 
 class Builder:
     def __init__(self, shared: Path, today: date, history: list[dict]):
@@ -135,24 +131,24 @@ class Builder:
     # ---------- つながり ----------
 
     def parents(self, d: Doc) -> list[Doc]:
-        """上流。イシューは 脅かす(脅かす設計案か仮説。Yu 2026-10-28)も。v0.54 までの parent も読む。"""
+        """上流。parent と、イシューは 脅かす(脅かす設計案か仮説。Yu 2026-10-28)。"""
         ts = targets(d.fm.get("parent")) + targets(d.fm.get("脅かす"))
         return [p for p in (self.index.resolve(t) for t in ts) if p]
 
     def values(self, d: Doc) -> list[Doc]:
-        """設計案が実現する価値の仮説。属性 価値仮説(Yu 2026-10-28)と、v0.54 までの friend の仮説。"""
-        ts = targets(d.fm.get("価値仮説")) + targets(d.fm.get("friend"))
+        """設計案が実現する価値の仮説(属性 価値仮説。Yu 2026-10-28)。"""
+        ts = targets(d.fm.get("価値仮説"))
         return [h for h in (self.index.resolve(t) for t in ts) if h and h.type == "仮説"]
 
     def ups(self, d: Doc) -> list[Doc]:
-        """上流。parent と、設計案なら 価値仮説(古い friend の仮説も。その案が実現する仮説。Yu 2026-10-28)。"""
+        """上流。parent と、設計案なら 価値仮説(その案が実現する仮説。Yu 2026-10-28)。"""
         out = self.parents(d)
         if d.type == "設計案":
             out += self.values(d)
         return out
 
     def reach(self, d: Doc, want: str, seen: set[str] | None = None) -> list[Doc]:
-        """parent(設計案は friend の仮説も)をたどって着く、type が want のノート。"""
+        """parent(設計案は 価値仮説 も)をたどって着く、type が want のノート。"""
         seen = seen if seen is not None else set()
         if d.id in seen:
             return []
@@ -181,7 +177,7 @@ class Builder:
     def prospects(self, docs: list[Doc]) -> tuple[list[list[str]], int, int, tuple[int, int], list[dict]]:
         """開発の目処(Yu 2026-10-29): まだ不可能と決まっていない成果物候補(parent が目的の設計案で、
         不採用・中止でないもの)ごとに、開発の方向を大きく変えるリスク(impact 方針のイシュー)の
-        解決した数と、まだ閉じていない数。候補とその下の部分の案を 脅かす(古い parent も)イシューを数える。
+        解決した数と、まだ閉じていない数。候補とその下の部分の案を 脅かす(か parent の)イシューを数える。
 
         返すもの: 表の行、不可能ではない候補の数、外した候補の数、どの案にもつかない方針リスク(解決, 未解決)、
         候補ごとの図(K-Plex で候補を中心にした形: 上に目的、左に実現する仮説、右に脅かすイシュー、下に部分の案)。"""

@@ -40,6 +40,11 @@ include = [
   { from = "vault/共有/00_タスク一覧.base", to = "00_タスク一覧.base" },
   { from = "vault/共有/00_設計案一覧.base", to = "00_設計案一覧.base" },
   { from = "vault/共有/00_ノード一覧.base", to = "00_ノード一覧.base" },
+  # 共有と同じ中身のプラグイン設定は、共有の 配る設定 から写す
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/k-plex/data.json", to = ".obsidian/plugins/k-plex/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-excalidraw-plugin/data.json", to = ".obsidian/plugins/obsidian-excalidraw-plugin/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-custom-attachment-location/data.json", to = ".obsidian/plugins/obsidian-custom-attachment-location/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-front-matter-title-plugin/data.json", to = ".obsidian/plugins/obsidian-front-matter-title-plugin/data.json" },
 ]
 system = [
   "00_README.md",
@@ -65,6 +70,8 @@ include = [
   { from = "vault/共有/_仕組み/templates/_scripts", to = "_仕組み/templates/_scripts" },
   { from = "vault/共有/_仕組み/templates/_コマンド", to = "_仕組み/templates/_コマンド" },
   { from = "vault/共有/_仕組み/tools/同期プログラム/メンバー.csv", to = "_仕組み/tools/メンバー.csv" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-excalidraw-plugin/data.json", to = "_仕組み/設定/.obsidian/plugins/obsidian-excalidraw-plugin/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-custom-attachment-location/data.json", to = "_仕組み/設定/.obsidian/plugins/obsidian-custom-attachment-location/data.json" },
 ]
 system = [
   "_仕組み/templates/*",
@@ -79,7 +86,7 @@ seed = [
 # 準備の bat は、vault の 版.txt より新しく、当てる版より古いか同じ version のものを、古い順に全部当てる。
 # 版.txt のない vault(bat より前に作ったもの)には、当てる版までのものを全部当てる。
 # script は `python <script> <vault> --run --backup <控えのフォルダ>` で動くこと。控えはそのフォルダに作り
-# (Box の中に作らない)、何度走らせても同じ結果になること。version は、その移し替えを初めて配る版。
+# (共有クラウドフォルダの中に作らない)、何度走らせても同じ結果になること。version は、その移し替えを初めて配る版。
 
 [[migrate]]
 version = "0.2.0"

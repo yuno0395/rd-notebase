@@ -24,7 +24,7 @@ VAULT_ID = Path("_仕組み/記録") / "vault_id.txt"
 SYSTEM_DIR = "_仕組み"
 UP = 3          # 元の場所から上へたどる段数
 DOWN = 3        # 探すフォルダから下へ見る段数
-MAX_DIRS = 5000  # Box 全体を歩き回らないための上限
+MAX_DIRS = 5000  # 共有クラウドフォルダ全体を歩き回らないための上限
 
 
 def record_path(config_path: Path) -> Path:
@@ -222,7 +222,7 @@ def follow(cfg, dry: bool = False) -> tuple[list[str], list[str]]:
     for kind, path, idx in slots:
         if path.exists():
             # vault の印のない場所(書き間違い)には vault_id.txt を作らない(F-55。作ると vault に見えてしまう)
-            vid = ensure_id(path) if looks_like_vault(path, kind) else read_id(path)
+            vid = ensure_id(path) if looks_like_vault(path) else read_id(path)
             if vid:
                 rec[_key(path)] = vid
             continue

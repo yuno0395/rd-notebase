@@ -8,12 +8,10 @@
 // 新しいノートは開かない(書き続けられるように)。
 
 const NODE_TEMPLATE = "_仕組み/templates/ノード.md";
-const ID_PREFIX = /^[0-9A-Z]{6}[0-9A-Z]+_/i;
 const BAD_CHARS = /[\\/:*?"<>|#^\[\]\r\n]/;
 
-function nodeName(file) {
-  return file.basename.replace(ID_PREFIX, "");
-}
+// 共通の関数(nameOf・asList・placeLink)は make_note.js のものを使う。link_node を呼ぶときに入れる
+let M;
 
 // vault の中のノード(type: ノード)を、名前と別名で引ける形にする。配られた 90_共有 のものも含む。
 function nodeIndex(app) {
@@ -22,10 +20,7 @@ function nodeIndex(app) {
     if (file.path.startsWith("_仕組み/templates/")) continue;
     const fm = app.metadataCache.getFileCache(file)?.frontmatter;
     if (!fm || String(fm.type || "").trim() !== "ノード") continue;
-    let aliases = fm.aliases || [];
-    if (!Array.isArray(aliases)) aliases = [aliases];
-    aliases = aliases.map((a) => String(a).trim()).filter((a) => a);
-    out.push({ file, name: nodeName(file), aliases });
+    out.push({ file, name: M.nameOf(file), aliases: M.asList(fm.aliases) });
   }
   return out;
 }
@@ -82,7 +77,7 @@ function pick(tp, items, initial) {
 async function createNode(tp, name) {
   const app = tp.app;
   // 共有 vault で仮運用しているときは 共通/02_ノード、個人 vault では 02_ノード
-  const personal = (await app.vault.adapter.exists("_仕組み/個人設定.md")) || (await app.vault.adapter.exists("_仕組み/記録/私.yaml"));
+  const personal = await app.vault.adapter.exists("_仕組み/個人設定.md");
   const folder = !personal && app.vault.getAbstractFileByPath("共通/02_ノード") ? "共通/02_ノード" : "02_ノード";
   if (!app.vault.getAbstractFileByPath(folder)) await app.vault.createFolder(folder);
   const template = app.vault.getAbstractFileByPath(NODE_TEMPLATE);
@@ -91,32 +86,9 @@ async function createNode(tp, name) {
   return await tp.file.create_new(template, name, false, app.vault.getAbstractFileByPath(folder));
 }
 
-// ノートを作っている間に、Obsidian がリンクを書き換えることがある
-// (まだない [[名前]] が、作ったファイルの名前が id_名前 に変わったときに付け替えられる)。
-// 置き換える前に、行の中をもう一度見て、正しい場所を探す。
-function placeLink(app, ed, note, file, text, from, to, orig) {
-  const line = ed.getLine(from.line);
-  if (line.slice(from.ch, to.ch) !== orig) {
-    let best = null;
-    for (const m of line.matchAll(/\[\[([^\[\]\n]+?)\]\]/g)) {
-      const dest = app.metadataCache.getFirstLinkpathDest(m[1].split("|")[0].trim(), note.path);
-      if (dest?.path !== file.path) continue;
-      if (!best || Math.abs(m.index - from.ch) < Math.abs(best.index - from.ch)) best = m;
-    }
-    if (best) {
-      from = { line: from.line, ch: best.index };
-      to = { line: from.line, ch: best.index + best[0].length };
-    } else {
-      to = from; // 見つからなければ、元の場所に足す
-    }
-  }
-  ed.replaceRange(text, from, to);
-  ed.setCursor({ line: from.line, ch: from.ch + text.length });
-  ed.focus();
-}
-
 async function link_node(tp) {
   const app = tp.app;
+  M = tp.user.make_note;
   const { Notice } = tp.obsidian;
   const view = app.workspace.activeEditor;
   if (!view?.editor || !view.file) {
@@ -198,7 +170,7 @@ async function link_node(tp) {
   } else {
     file = node.file;
   }
-  placeLink(app, ed, note, file, `[[${file.basename}|${shown}]]`, from, to, orig);
+  M.placeLink(app, ed, note, file, `[[${file.basename}|${shown}]]`, from, to, orig);
 }
 
 module.exports = link_node;

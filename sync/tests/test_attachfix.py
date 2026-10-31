@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from notesync import ids
-from notesync.config import Config, member_code
+from notesync.config import Config
 from notesync.run import run_once
 
 from .test_heavy import write
@@ -13,10 +13,10 @@ NOW = datetime(2026, 10, 24, 9, 0, tzinfo=ids.JST).timestamp()
 
 def setup(tmp_path):
     personal = tmp_path / "個人"
-    write(personal / "_仕組み/記録/私.yaml", 'name: Yu\ncode: "001"\n')
+    personal.mkdir(parents=True)
     c = Config(member="Yu", personal=personal, shared=None, backup_dir=tmp_path / "b",
                state_dir=tmp_path / "s", idle_seconds=0)
-    c.code = member_code(c)
+    c.code = "001"
     return c, personal
 
 

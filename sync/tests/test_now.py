@@ -5,7 +5,7 @@ import time
 from notesync.now import run_now, take_signals, wait
 from notesync.run import run_once
 
-from .test_share import PJ, box, write  # noqa: F401
+from .test_share import PJ, cloud, write  # noqa: F401
 
 
 def put(folder, name, vault, age=0):
@@ -29,13 +29,13 @@ def test_takes_only_own_vault(tmp_path, cfg):
     assert not old_other.exists()  # 動いていない人あての古い合図は消す
 
 
-def test_sends_just_saved_note(tmp_path, box):
+def test_sends_just_saved_note(tmp_path, cloud):
     # 保存した直後のノートは、ふだんの同期では待つが、ボタンを押したら待たずに共有へ送る
-    yu = box["yu"]
+    yu = cloud["yu"]
     run_once(yu)
     task = yu.personal / "04_タスク/0RB003001_保圧を変える.md"
     write(task, task.read_text(encoding="utf-8") + "書き足し\n")
-    shared_task = box["shared"] / f"{PJ}/04_タスク/0RB003001_保圧を変える.md"
+    shared_task = cloud["shared"] / f"{PJ}/04_タスク/0RB003001_保圧を変える.md"
     yu.idle_seconds = 10
     run_once(yu)
     assert "書き足し" not in shared_task.read_text(encoding="utf-8")

@@ -12,12 +12,10 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 from . import ids
-from .autofill import Index, as_list, load_docs, plain
-from .history import HISTORY_DIR, read_rows
 from .report import Report
 from .safety import Backup
 from .vault import read, write

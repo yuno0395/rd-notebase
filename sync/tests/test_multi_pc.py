@@ -7,7 +7,7 @@ from notesync.config import Config, load
 from notesync.heavy import to_shared
 from notesync.lock import STALE_SECONDS, Busy, Lock
 from notesync.report import Report
-from notesync.boxcopies import tidy_layout_copies
+from notesync.copies import tidy_layout_copies
 from notesync.safety import Backup
 
 import pytest
@@ -37,18 +37,6 @@ def test_state_lives_in_personal_vault(tmp_path):
     p.write_text(f"member: Yu\npersonal: {personal}\n", encoding="utf-8")
     cfg = load(p)
     assert cfg.state_path == personal / "_仕組み/記録/同期の記録.json"
-    assert cfg.old_state_path == cfg_dir / "state_Yu.json"
-
-
-def test_old_state_is_read_once(tmp_path):
-    from notesync.state import State
-    old = tmp_path / "old.json"
-    old.write_text(json.dumps({"version": 1, "items": {"k": {"h": "1"}}}), encoding="utf-8")
-    new = tmp_path / "v" / "同期の記録.json"
-    s = State(new, old)
-    assert s.get("k") == {"h": "1"}
-    s.save()
-    assert new.exists()
 
 
 def test_link_from_other_pc_user_name():

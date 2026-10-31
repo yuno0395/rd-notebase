@@ -25,7 +25,7 @@ from .heavy import ATTACH, MDLINK, WIKI, free_name
 from .report import Report
 from .safety import Backup
 from .state import digest
-from .vault import box_copy_of, iter_md, read, write
+from .vault import sync_copy_of, iter_md, read, write
 
 SKIP_TOPS = {"90_共有"}  # 他の人のノートの写しは書き換えない
 DIARY_TOP = "00_日誌"
@@ -93,7 +93,7 @@ class Fixer:
             out.append((p, rel.as_posix(), folder))
         # 図は自分の入っているフォルダ(<id> や 日誌/<日付>)の添付を使う
         for p in sorted(self.base.rglob("*.excalidraw.md")) if self.base.exists() else []:
-            if p.parent == self.base or box_copy_of(p)[0]:
+            if p.parent == self.base or sync_copy_of(p)[0]:
                 continue
             out.append((p, p.relative_to(self.root).as_posix(), p.parent.relative_to(self.base).as_posix()))
         return out
@@ -152,7 +152,7 @@ class Fixer:
         owner = {rel: (p, note_id) for p, rel, note_id in notes}
         moved: dict[Path, Path] = {}
         for f, rels in sorted(users.items()):
-            if box_copy_of(f)[0]:
+            if sync_copy_of(f)[0]:
                 continue
             with_id = [r for r in rels if owner[r][1]]
             if len(rels) > 1:

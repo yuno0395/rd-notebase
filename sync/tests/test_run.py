@@ -21,8 +21,8 @@ def test_assigns_ids_and_fixes_links(cfg):
     run_once(cfg)
     nodes = cfg.personal / "02_ノード"
     water = find(nodes, "水")
-    assert re.fullmatch(r"[0-9A-Z]{6}001_水", water.stem)
-    assert text(water).startswith(f"---\nid: {water.stem[:9]}\nauthor: Yu\n---\n")
+    assert re.fullmatch(r"[0-9A-Z]{6}0001_水", water.stem)
+    assert text(water).startswith(f"---\nid: {water.stem[:10]}\nauthor: Yu\n---\n")
 
     # 属性欄のほかの行とコメントは残す
     ice = find(nodes, "氷")
@@ -104,7 +104,7 @@ def test_skips_note_being_written(cfg):
 
 
 def test_member_code_mismatch_stops(cfg):
-    (cfg.personal / "_仕組み/記録" / "私.yaml").write_text('name: Yu\ncode: "002"\n', encoding="utf-8")
+    (cfg.personal / "_仕組み/個人設定.md").write_text('---\nname: Yu\nnumber: "229999"\n---\n', encoding="utf-8")
     with pytest.raises(config.ConfigError, match="食い違って"):
         config.member_code(cfg)
 
@@ -116,7 +116,7 @@ def test_report_is_not_rewritten_on_second_run(cfg):
 
 
 def test_member_code_from_personal_settings(cfg):
-    # 個人設定.md の6桁の番号を36進数にする。私.yaml より先に読む。先頭の0も残す
+    # 個人設定.md の6桁の番号を36進数にする。先頭の0も残す
     (cfg.personal / "_仕組み/個人設定.md").write_text(
         '---\nname: "Yu"   # 名前\nnumber: "000001"   # 6桁\n---\n# 個人設定\n', encoding="utf-8")
     members = cfg.shared / config.MEMBER_CSV

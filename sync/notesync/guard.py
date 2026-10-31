@@ -1,28 +1,30 @@
 """設定の場所の確かめ(F-55)。
 
 config.yaml に書いた場所が、本当にその vault かを同期の前に確かめる。違っていれば何も書かずに止める。
-書き間違い(例: secret に Box の一番上を書く)で、関係ないフォルダの .md を改名したり、
+書き間違い(例: secret に共有クラウドフォルダの一番上を書く)で、関係ないフォルダの .md を改名したり、
 外部の人がいるフォルダへノートを集めたりしないため。
 """
 
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 SYSTEM_DIR = "_仕組み"
-FACT_DIR = "06_事実"
+
+# ホームの直下にできる、同期アプリの一番上のフォルダ(Box・OneDrive・Dropbox・Google ドライブ・iCloud Drive)。
+# OneDrive は「OneDrive - 会社名」の形にもなる。NAS やネットワークドライブの一番上は、ドライブの一番上として扱う
+CLOUD_TOP = re.compile(r"^(box|dropbox|onedrive( - .+)?|google ?drive|icloud ?drive)$", re.I)
 
 
 def _key(p: Path) -> str:
     return os.path.normcase(os.path.normpath(str(p)))
 
 
-def looks_like_vault(root: Path, kind: str) -> bool:
-    """vault の印があるか。どれも _仕組み/ を持つ。機密は古い形(06_事実/ だけ)も認める。"""
-    if (root / SYSTEM_DIR).is_dir():
-        return True
-    return kind == "機密" and (root / FACT_DIR).is_dir()
+def looks_like_vault(root: Path) -> bool:
+    """vault の印があるか。どれも _仕組み/ を持つ。"""
+    return (root / SYSTEM_DIR).is_dir()
 
 
 def _too_broad(root: Path) -> bool:
@@ -36,7 +38,7 @@ def _too_broad(root: Path) -> bool:
         return True
     if home is not None and k in {_key(home), _key(home.parent)}:
         return True
-    return root.name.lower() == "box" and home is not None and _key(root.parent) == _key(home)
+    return bool(CLOUD_TOP.match(root.name)) and home is not None and _key(root.parent) == _key(home)
 
 
 def _inside(a: Path, b: Path) -> bool:
@@ -55,10 +57,9 @@ def check_places(cfg) -> list[str]:
     for label, root in slots:
         if not root.exists():
             continue
-        kind = "機密" if label.startswith("機密") else ""
         if _too_broad(root):
-            problems.append(f"{label} が {root} になっています。ドライブやホーム、Box の一番上は vault にできません")
-        elif not looks_like_vault(root, kind):
+            problems.append(f"{label} が {root} になっています。ドライブやホーム、共有クラウドフォルダ(Box・OneDrive など)の一番上は vault にできません")
+        elif not looks_like_vault(root):
             problems.append(f"{label} の {root} に vault の印(_仕組み フォルダ)がありません。"
                             "場所を書き間違えていないか確かめてください")
     for i, (la, a) in enumerate(slots):

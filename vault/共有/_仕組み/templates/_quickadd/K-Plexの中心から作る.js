@@ -8,15 +8,12 @@
 
 const MAKE_NOTE = "_仕組み/templates/_scripts/make_note.js";
 const KPLEX_TYPES = ["k-plex-react-view", "k-plex-sidepanel-view"];
-const ID_PREFIX = /^[0-9A-Z]{6}[0-9A-Z]+_/i;
 
 // 中心の種類ごとに、上に出す種類
 const ORDER = {
   目的: ["設計案", "仮説", "イシュー", "タスク"],
   仮説: ["設計案", "仮説", "イシュー", "タスク"],
   設計案: ["イシュー", "設計案", "タスク", "仮説"],
-  設計記録: ["イシュー", "設計案", "タスク", "仮説"],
-  ソリューション: ["イシュー", "設計案", "タスク", "仮説"],
   イシュー: ["タスク", "イシュー", "設計案", "仮説"],
   タスク: ["イシュー", "タスク", "設計案", "仮説"],
   "実験・試作記録": ["イシュー", "タスク", "設計案", "仮説"],
@@ -61,7 +58,7 @@ module.exports = async function (params) {
     return;
   }
   const makeNote = await loadMakeNote(app);
-  const shown = center.basename.replace(ID_PREFIX, "");
+  const shown = makeNote.nameOf(center);
   const order = ORDER[makeNote.typeOf(app, center)] || ["イシュー", "タスク", "設計案", "仮説"];
   const kind = await quickAddApi.suggester(order.map((k) => `${LABEL[k]} ← ${shown}`), order);
   if (!kind) return;

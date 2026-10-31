@@ -71,7 +71,7 @@ def _my_number(personal: Path) -> str:
 
 
 def _config_dirs(root: Path, number: str) -> list[Path]:
-    """共有・機密の、自分の設定フォルダ(.obsidian-<番号>_<PC>、古い .obsidian-<名前>、.obsidian)。"""
+    """共有・機密の、自分の設定フォルダ(.obsidian-<番号>_<PC> と .obsidian)。"""
     out = []
     for d in sorted(root.glob(".obsidian*")):
         if not d.is_dir():

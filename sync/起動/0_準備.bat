@@ -23,7 +23,7 @@ if exist "%CONF%" (
 ) else (
   copy "%~dp0..\config.example.yaml" "%CONF%" > nul
   echo 設定のひな形を置きました: %CONF%
-  echo メモ帳で開きます。自分の名前と Box の場所に直して保存してください。dry_run は true のままにします。
+  echo メモ帳で開きます。自分の名前と、vault を置いた共有クラウドフォルダの場所に直して保存してください。dry_run は true のままにします。
 )
 notepad "%CONF%"
 pause

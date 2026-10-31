@@ -27,7 +27,7 @@ def write(path: Path, body, mode="w") -> Path:
 
 
 @pytest.fixture
-def box(tmp_path):
+def cloud(tmp_path):
     root = tmp_path / "Box"
     shared = root / "共有"
     data = root / "開発データ"
@@ -38,7 +38,7 @@ def box(tmp_path):
 
     def cfg(member, code, data_dir):
         personal = root / f"個人_{member}"
-        write(personal / "_仕組み/記録/私.yaml", f'name: {member}\ncode: "{code}"\n')
+        write(personal / "_仕組み/個人設定.md", f'---\nname: {member}\n---\n')
         c = Config(member=member, personal=personal, shared=shared, shared_data=data_dir,
                    backup_dir=tmp_path / f"backup_{member}", state_dir=tmp_path / f"state_{member}",
                    idle_seconds=0)
@@ -65,8 +65,8 @@ def report(c) -> str:
     return text(c.personal / "_仕組み/同期レポート.md")
 
 
-def test_moves_heavy_and_keeps_light(box):
-    yu, data = box["yu"], box["data"]
+def test_moves_heavy_and_keeps_light(cloud):
+    yu, data = cloud["yu"], cloud["data"]
     note = issue(yu, body="![[_仕組み/attachments/0RB001001/成形条件.xlsx]]\n"
                           "![[_仕組み/attachments/0RB001001/写真.png]]\n[資料](_仕組み/attachments/0RB001001/報告.pdf)\n")
     att = yu.personal / "_仕組み/attachments/0RB001001"
@@ -87,12 +87,12 @@ def test_moves_heavy_and_keeps_light(box):
     assert "![[_仕組み/attachments/0RB001001/写真.png]]" in t       # 画像はそのまま
     assert "重い添付を移した: _仕組み/attachments/0RB001001/成形条件.xlsx → 開発データ/_個人/Yu/0RB001001/成形条件.xlsx" in report(yu)
     # 重い添付は共有 vault にコピーしない
-    assert not (box["shared"] / "_仕組み/attachments/0RB001001/成形条件.xlsx").exists()
-    assert (box["shared"] / "_仕組み/attachments/0RB001001/写真.png").exists()
+    assert not (cloud["shared"] / "_仕組み/attachments/0RB001001/成形条件.xlsx").exists()
+    assert (cloud["shared"] / "_仕組み/attachments/0RB001001/写真.png").exists()
 
 
-def test_promote_to_project_and_shared_link_form(box):
-    yu, data, shared = box["yu"], box["data"], box["shared"]
+def test_promote_to_project_and_shared_link_form(cloud):
+    yu, data, shared = cloud["yu"], cloud["data"], cloud["shared"]
     note = issue(yu, body="![[_仕組み/attachments/0RB001001/成形条件.xlsx]]\n")
     write(yu.personal / "_仕組み/attachments/0RB001001/成形条件.xlsx", b"xlsx")
     run_once(yu, now=NOW)            # _個人 へ移し、ノートを共有へ集める
@@ -106,17 +106,17 @@ def test_promote_to_project_and_shared_link_form(box):
     assert f"[成形条件.xlsx](開発データ/{PJ}/0RB001001/成形条件.xlsx)" in s   # 共有では相対パス(F-19)
     assert "file:///" not in s
     # 佐藤に配るときは、佐藤の PC の file:/// に直す
-    run_once(box["sato"], now=NOW + 180)
-    got = text(box["sato"].personal / f"90_共有/{PJ}/03_イシュー/0RB001001_ヒケ.md")
-    assert f"[成形条件.xlsx]({file_url(box['sato'].shared_data / PJ / '0RB001001/成形条件.xlsx')})" in got
+    run_once(cloud["sato"], now=NOW + 180)
+    got = text(cloud["sato"].personal / f"90_共有/{PJ}/03_イシュー/0RB001001_ヒケ.md")
+    assert f"[成形条件.xlsx]({file_url(cloud['sato'].shared_data / PJ / '0RB001001/成形条件.xlsx')})" in got
     # 次の同期で、同じ内容とみなされて競合にならない
     run_once(yu, now=NOW + 240)
-    run_once(box["sato"], now=NOW + 300)
-    assert "競合" not in report(yu) and "競合" not in report(box["sato"])
+    run_once(cloud["sato"], now=NOW + 300)
+    assert "競合" not in report(yu) and "競合" not in report(cloud["sato"])
 
 
-def test_same_name_gets_suffix(box):
-    yu, data = box["yu"], box["data"]
+def test_same_name_gets_suffix(cloud):
+    yu, data = cloud["yu"], cloud["data"]
     issue(yu, body="![[_仕組み/attachments/0RB001001/a.xlsx]]\n")
     write(data / "_個人/Yu/0RB001001/a.xlsx", b"old")
     write(yu.personal / "_仕組み/attachments/0RB001001/a.xlsx", b"new")
@@ -125,8 +125,8 @@ def test_same_name_gets_suffix(box):
     assert (data / "_個人/Yu/0RB001001/a_2.xlsx").read_bytes() == b"new"
 
 
-def test_no_data_root_reports(box):
-    yu = box["yu"]
+def test_no_data_root_reports(cloud):
+    yu = cloud["yu"]
     yu.shared_data = None
     issue(yu)
     write(yu.personal / "_仕組み/attachments/0RB001001/a.xlsx", b"x")
@@ -135,8 +135,8 @@ def test_no_data_root_reports(box):
     assert (yu.personal / "_仕組み/attachments/0RB001001/a.xlsx").exists()
 
 
-def test_dry_run_moves_nothing(box):
-    yu = box["yu"]
+def test_dry_run_moves_nothing(cloud):
+    yu = cloud["yu"]
     note = issue(yu, body="![[_仕組み/attachments/0RB001001/a.xlsx]]\n")
     write(yu.personal / "_仕組み/attachments/0RB001001/a.xlsx", b"x")
     before = text(note)
@@ -159,10 +159,10 @@ def test_link_forms():
     assert relink(t, "0RB001001", "成形条件.xlsx", "U", False) == "![[成形条件.xlsx]] と [条件表](U)"
 
 
-def test_recover_shared(box, capsys):
+def test_recover_shared(cloud, capsys):
     from notesync.__main__ import main
     import yaml
-    shared, data, yu = box["shared"], box["data"], box["yu"]
+    shared, data, yu = cloud["shared"], cloud["data"], cloud["yu"]
     write(shared / f"{PJ}/03_イシュー/直接書いた.md", "---\ntype: イシュー\n---\n[[参考メモ]] を見る\n")
     write(shared / f"{PJ}/03_イシュー/0RB009002_古い.md",
           "---\nid: 0RB009002\nauthor: 佐藤\ntype: イシュー\n---\n![[_仕組み/attachments/0RB009002/測定.csv]]\n")
@@ -194,3 +194,14 @@ def test_recover_shared(box, capsys):
     assert (shared / "00_マニュアル/02_チームメンバー_普段の仕事.md").exists()
     run_once(yu, now=NOW + 60)
     assert "拾い直し" not in report(yu)
+
+
+def test_link_forms_on_nas():
+    """NAS などのネットワークの場所(\\\\nas\\共有\\...)も、行って戻って同じリンクになる。"""
+    from pathlib import PureWindowsPath
+    root = PureWindowsPath(r"\\nas\チーム\開発データ")
+    url = file_url(root / "PJ/a.xlsx")
+    assert url.startswith("file://nas/") and not url.startswith("file:///")
+    s = to_shared(f"[a]({url})", root)
+    assert s == "[a](開発データ/PJ/a.xlsx)"
+    assert to_personal(s, root) == f"[a]({url})"
