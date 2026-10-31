@@ -18,7 +18,7 @@ from .heavy import ATTACH, DATA_PREFIX, Mover, free_name, is_heavy, keep_rules, 
 from .report import Report
 from .safety import Backup
 from .state import digest
-from .vault import box_copy_of, is_hidden, iter_md, needs_id, notes, read, write
+from .vault import sync_copy_of, is_hidden, iter_md, needs_id, notes, read, write
 
 
 def pending(shared: Path, data_root: Path | None) -> tuple[list[str], list[str]]:
@@ -30,7 +30,7 @@ def pending(shared: Path, data_root: Path | None) -> tuple[list[str], list[str]]
         rules = keep_rules(shared)
         for f in sorted(base.rglob("*")):
             if f.is_file() and not any(is_hidden(x) for x in f.relative_to(base).parts) \
-                    and not box_copy_of(f)[0] and is_heavy(f, rules):
+                    and not sync_copy_of(f)[0] and is_heavy(f, rules):
                 heavy.append(f.relative_to(shared).as_posix())
     return no_id, heavy
 
@@ -79,7 +79,7 @@ def move_shared_heavy(shared: Path, data_root: Path, member: str, report: Report
         note_id = note_dir.name
         top = shared_folder_of(shared, note_id) or "共通"
         for f in sorted(note_dir.rglob("*")):
-            if not f.is_file() or box_copy_of(f)[0] or not is_heavy(f, m.rules):
+            if not f.is_file() or sync_copy_of(f)[0] or not is_heavy(f, m.rules):
                 continue
             rel_name = f.relative_to(note_dir).as_posix()
             target = data_root / top / note_id / rel_name

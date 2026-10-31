@@ -36,9 +36,9 @@ def is_hidden(part: str) -> bool:
     return part.startswith(".")
 
 
-# F-16: Box Drive が作った競合の複製(boxcopies.py)。ノートとしては扱わない
-BOX_MARK = re.compile(r"\((?=[^)]*(?:conflict|競合|コンフリクト))[^)]*\)", re.I)
-BOX_NUMBERED = re.compile(r"^(.*\S) \(\d{1,3}\)$")
+# F-16: 同期アプリが作った競合の複製(copies.py)。ノートとしては扱わない
+COPY_MARK = re.compile(r"\((?=[^)]*(?:conflict|競合|コンフリクト))[^)]*\)", re.I)
+COPY_NUMBERED = re.compile(r"^(.*\S) \(\d{1,3}\)$")
 
 
 def split_ext(name: str) -> tuple[str, str]:
@@ -48,15 +48,15 @@ def split_ext(name: str) -> tuple[str, str]:
     return (stem, "." + ext) if dot and stem else (name, "")
 
 
-def box_copy_of(path: Path) -> tuple[bool, Path | None]:
-    """(Box の複製か, 元のファイル(あれば))。番号つきは、元のファイルがあるときだけ複製とみなす。"""
+def sync_copy_of(path: Path) -> tuple[bool, Path | None]:
+    """(同期アプリの複製か, 元のファイル(あれば))。番号つきは、元のファイルがあるときだけ複製とみなす。"""
     stem, ext = split_ext(path.name)
     if "_競合_" in stem:  # 同期プログラムが置くもの(F-15)
         return False, None
-    if BOX_MARK.search(stem):
-        orig = path.with_name(BOX_MARK.sub("", stem).rstrip() + ext)
+    if COPY_MARK.search(stem):
+        orig = path.with_name(COPY_MARK.sub("", stem).rstrip() + ext)
         return True, orig if orig.exists() else None
-    m = BOX_NUMBERED.match(stem)
+    m = COPY_NUMBERED.match(stem)
     if m:
         orig = path.with_name(m.group(1) + ext)
         if orig.exists():
@@ -75,7 +75,7 @@ def iter_md(root: Path):
             continue
         if p.name.endswith(".excalidraw.md"):
             continue
-        if box_copy_of(p)[0]:
+        if sync_copy_of(p)[0]:
             continue
         yield p, rel
 

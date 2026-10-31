@@ -106,3 +106,13 @@ def test_extra_plugin_in_shared_is_todo_and_in_personal_is_warning(cfg):
     assert not any("others-plugin" in t for t in report.todos)  # 他の人の設定は見ない
     assert any("trying-this" in w for w in report.warnings)
     assert not any("trying-this" in t for t in report.todos)
+
+
+def test_cloud_top_folder_is_too_broad(cfg, monkeypatch, tmp_path):
+    """Box だけでなく OneDrive・Dropbox などの一番上も vault にできない。"""
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    for name in ("Box", "OneDrive - 会社", "Dropbox", "Google Drive"):
+        top = tmp_path / name
+        write(top / "_仕組み/版.txt", "0.2.0\n")
+        cfg.secret = [top]
+        assert any("一番上" in p for p in check_places(cfg)), name

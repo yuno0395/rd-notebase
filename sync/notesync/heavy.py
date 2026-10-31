@@ -21,7 +21,7 @@ from . import ids
 from .report import Report
 from .safety import Backup
 from .state import digest
-from .vault import DIST, SYSTEM_DIR, box_copy_of, is_hidden, iter_md, read, write
+from .vault import DIST, SYSTEM_DIR, sync_copy_of, is_hidden, iter_md, read, write
 
 ATTACH = f"{SYSTEM_DIR}/attachments"
 DATA_PREFIX = "開発データ/"
@@ -68,7 +68,10 @@ def is_heavy(path: Path, rules: dict) -> bool:
 # ---------- リンクの形(F-18・F-19) ----------
 
 def file_url(path: Path) -> str:
-    return "file:///" + quote(path.as_posix().lstrip("/"), safe="/:")
+    p = path.as_posix()
+    if p.startswith("//"):  # NAS などのネットワークの場所(\\nas\共有\...)は file://nas/共有/...
+        return "file:" + quote(p, safe="/:")
+    return "file:///" + quote(p.lstrip("/"), safe="/:")
 
 
 def url_prefix(data_root: Path) -> str:
@@ -81,8 +84,8 @@ USERS_URL = re.compile(r"^file:///([A-Za-z]):/Users/[^/]+/", re.I)
 def prefix_pattern(data_root: Path) -> re.Pattern:
     """自分の開発データの `file:///` の頭。`C:/Users/<名前>/...` なら <名前> は誰でもよいとする。
 
-    1人が2台の PC を使い、Windows のユーザー名が PC ごとに違うと、Box Drive の場所
-    (C:/Users/<名前>/Box)も違う。どちらの PC で書かれたリンクも同じ開発データとして読むため。"""
+    1人が2台の PC を使い、Windows のユーザー名が PC ごとに違うと、共有クラウドフォルダの場所
+    (C:/Users/<名前>/Box や C:/Users/<名前>/OneDrive)も違う。どちらの PC で書かれたリンクも同じ開発データとして読むため。"""
     pre = url_prefix(data_root)
     m = USERS_URL.match(pre)
     if not m:
@@ -252,7 +255,7 @@ class Mover:
             for f in sorted(note_dir.rglob("*")):
                 if not f.is_file() or any(is_hidden(x) for x in f.relative_to(note_dir).parts):
                     continue
-                if box_copy_of(f)[0] or not is_heavy(f, self.rules):
+                if sync_copy_of(f)[0] or not is_heavy(f, self.rules):
                     continue
                 if self.busy(f):
                     self.report.record(f"{ATTACH}/{note_id}/{f.name} はコピー中かもしれないので、次の同期で移します")
@@ -301,7 +304,7 @@ def move_heavy(personal: Path, shared: Path | None, data_root: Path | None, memb
                         "個人設定に shared_data を書いてください")
         return
     if not data_root.exists():
-        report.warn(f"開発データのフォルダが見つかりません: {data_root}(Box Drive が止まっていないか確かめてください)。"
+        report.warn(f"開発データのフォルダが見つかりません: {data_root}(同期アプリ(Box Drive・OneDrive など)が止まっていないか確かめてください)。"
                     "重い添付は移していません")
         return
     Mover(personal, shared, data_root, member, report, backup, dry_run, now, idle_seconds).run()

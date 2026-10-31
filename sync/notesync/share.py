@@ -29,7 +29,7 @@ from .report import Report
 from .safety import Backup
 from .heavy import DEFAULT_KEEP, is_heavy, to_personal, to_shared
 from .state import State, digest, digest_text
-from .vault import DIST, OWN_DIRS, SKIP_DIRS, box_copy_of, is_hidden, read, write
+from .vault import DIST, OWN_DIRS, SKIP_DIRS, sync_copy_of, is_hidden, read, write
 
 ARCHIVE = "99_archive"
 COMMON = "共通"
@@ -101,7 +101,7 @@ def scan(root: Path, tops: tuple[str, ...] | None = None, skip_tops: set[str] = 
         if parts[0] in skip_tops:
             continue
         stem = note_stem(p.name)
-        if CONFLICT_MARK in stem or box_copy_of(p)[0]:
+        if CONFLICT_MARK in stem or sync_copy_of(p)[0]:
             continue
         file_id, name = ids.split_filename(stem)
         if not file_id:
@@ -432,9 +432,9 @@ def sync_attachments(ctx: Context, note_id: str, mode: str) -> None:
     for d in (pdir, sdir):
         if d.exists():
             rels |= {f.relative_to(d).as_posix() for f in d.rglob("*")
-                     if f.is_file() and not box_copy_of(f)[0] and not is_heavy(f, ctx.keep)}
+                     if f.is_file() and not sync_copy_of(f)[0] and not is_heavy(f, ctx.keep)}
     # 前回同期した添付が片方からなくなった(名前を変えた・消した)。もう片方がそのままなら消して、二重にしない
-    # フォルダごとないとき(Box がまだ落としていない、などもありうる)は消さない
+    # フォルダごとないとき(同期アプリがまだ落としていない、などもありうる)は消さない
     prefix = f"att:{note_id}/"
     recs = ctx.state.starting(prefix) if pdir.is_dir() and sdir.is_dir() else {}
     for key, rec in sorted(recs.items()):
