@@ -247,6 +247,24 @@ def test_rename_vault_then_press_again(team):
     assert personal not in {Path(v["path"]) for v in vaults.values()}
 
 
+def test_tells_when_obsidian_uses_other_config_dir(team):
+    """「設定フォルダを上書き」に違う名前を打つと、Obsidian はその空のフォルダを読み、プラグインが入っていないように見える。"""
+    shared, aenv = team["shared"], team["admin_env"]
+    assert "設定フォルダを上書き" in "\n".join(team["ui"].out)
+    other = shared / ".obsidian-001_admpc"   # Obsidian が作った空の設定フォルダ
+    other.mkdir()
+    (other / "app.json").write_text("{}", encoding="utf-8")
+    code, s, ui = run("管理者", aenv, ["3", ""])
+    out = "\n".join(ui.out)
+    assert code == 0, out
+    assert "Obsidian が 共有 vault を .obsidian-001_admpc で開いています" in out, out
+    assert s.clip_text == ".obsidian-001_adm"
+    # bat が作ったフォルダ(知見同期の版.txt あり)は知らせない
+    assert st.stray_config_dirs(shared, "001", ".obsidian-001_adm") == [".obsidian-001_admpc"]
+    (other / st.SEEN_VERSION).write_text("9.9.20\n", encoding="utf-8")
+    assert st.stray_config_dirs(shared, "001", ".obsidian-001_adm") == []
+
+
 def test_dry_run_changes_nothing(team):
     shared, cloud = team["shared"], team["cloud"]
     env = env_of(team["tmp"], "member")
