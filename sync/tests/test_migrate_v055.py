@@ -21,6 +21,7 @@ def run(*args):
 
 def test_migrate(tmp_path):
     v = tmp_path / "個人"
+    (v / "_仕組み").mkdir(parents=True)
     a = write(v / "03_イシュー/0RA001001_ヒケ.md",
               '---\nid: 0RA001001\ntype: イシュー\nparent:\n  - "[[0RA009001_A案]]"\n---\nparent: 本文はそのまま\n')
     b = write(v / "04_タスク/0RA002001_試作.md", '---\ntype: タスク\nparent: ["[[0RA001001_ヒケ]]"]\n---\n')
@@ -47,7 +48,18 @@ def test_migrate(tmp_path):
 
 def test_backup_folder(tmp_path):
     v = tmp_path / "box" / "個人"
+    (v / "_仕組み").mkdir(parents=True)
     write(v / "03_イシュー/0RA001001_ヒケ.md", '---\ntype: イシュー\nparent: ["[[A案]]"]\n---\n')
     run(v, "--run", "--backup", tmp_path / "控え")             # 準備の bat の呼び方
     assert list((tmp_path / "控え").glob("移行前の控え_個人_*.zip"))
     assert not list((tmp_path / "box").glob("*.zip"))          # Box の中には作らない
+
+
+def test_refuses_folder_that_is_not_a_vault(tmp_path):
+    """書き間違えた場所(vault の印がない)のノートは書き換えない。"""
+    v = tmp_path / "Box"
+    a = write(v / "どこか/メモ.md", '---\ntype: イシュー\nparent: ["[[X]]"]\n---\n')
+    r = subprocess.run([sys.executable, str(SCRIPT), str(v), "--run"], capture_output=True, text=True, encoding="utf-8",
+                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+    assert r.returncode == 1 and "vault ではない" in r.stdout
+    assert "parent:" in a.read_text(encoding="utf-8")

@@ -38,7 +38,7 @@ CANDIDATE_CSV = "候補の数.csv"
 # 値: true(載せる)/ false(外す)/ 自動(同じノード: ほかのプロジェクトがあるときだけ)
 # 開発の初めは出荷準備ではなく開発の目処が大事なので、出荷準備度は既定で外す。
 # 同じノードは、当面1つのプロジェクトで使うので既定で外す(Yu 2026-10-29)
-SECTIONS = ["今週のトピック", "開発の目処", "候補の数", "マイルストーン", "中途半端な仕事", "担当者", "出荷準備度", "同じノード"]
+SECTIONS = ["今週のトピック", "開発の目処", "候補の数", "マイルストーン", "工程表", "中途半端な仕事", "担当者", "出荷準備度", "同じノード"]
 DEFAULT_SECTIONS = {k: True for k in SECTIONS} | {"出荷準備度": False, "同じノード": False}
 
 
@@ -105,6 +105,10 @@ class ProjectReport:
 
     def table(self, name: str, header: list[str], body: list[list[str]], empty: str = "なし") -> None:
         self.blocks.append(("table", name, header, [[str(c) for c in r] for r in body], empty))
+
+    def gantt(self, plan, today) -> None:
+        """工程表(F-53。weekly_html.py が SVG のガントにする)。"""
+        self.blocks.append(("gantt", plan, today))
 
     def figs(self, items: list[dict]) -> None:
         """成果物候補ごとの K-Plex 風の図(weekly_html.py が SVG にする)。"""
@@ -418,6 +422,15 @@ class Builder:
         if "マイルストーン" in show:
             r.section("マイルストーン")
             r.table("マイルストーン", ["名前", "計画日", "見込み日", "ずれ"], self.milestones(proj))
+        if "工程表" in show:
+            from .schedule import build_plan
+            plan = build_plan(proj, [d for d in docs if d.rel.startswith(pj + "/")], self.index, self.history, self.today)
+            r.section("工程表", "上に節目(◇ 計画日、◆ 見込み日。遅れは赤)、下にタスクを減らすイシューごとに。"
+                      "タスクの棒は 進行中 になった日から 完了 になった日まで。まだ終わっていないものは今日まで")
+            if plan.bars or plan.stones:
+                r.gantt(plan, self.today)
+            else:
+                r.note("まだ節目も着手したタスクもありません")
         if "中途半端な仕事" in show:
             r.section("中途半端になっている仕事",
                       "優先順位は低い(priority 3・4)のに、一部だけ進めたまま残っているイシュー。続けるか、中止にするかを決める")

@@ -144,3 +144,14 @@ def test_moved_to_sibling_folder(tmp_path):
     (box / "個人_親/開発ノート_Yu").rename(box / "チーム/開発ノート_Yu")   # 親の隣のフォルダへ動かした
     cfg = load(conf)
     assert cfg.personal == box / "チーム/開発ノート_Yu"
+
+
+def test_backup_copy_is_not_taken_for_the_real_vault(tmp_path):
+    """元の場所が見えないとき、同じ印を持つ控え(丸ごとの写し)を本物として選ばない(F-55)。"""
+    box, conf = setup(tmp_path)
+    load(conf)
+    shutil.copytree(box / "共有", box / "共有の控え")
+    shutil.rmtree(box / "共有")
+    cfg = load(conf)
+    assert cfg.shared == box / "共有"                                       # 控えへは切り替えない
+    assert "共有の控え" not in conf.read_text(encoding="utf-8")

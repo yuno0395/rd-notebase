@@ -10,6 +10,7 @@ from .autofill import run_autofill
 from .boxcopies import report_box_copies, tidy_layout_copies
 from .heavy import keep_rules, move_heavy
 from .history import record_history
+from .schedule import update_schedules
 from .weekly import maybe_weekly
 from .daily import update_daily
 from .recover import report_pending
@@ -17,6 +18,8 @@ from .assign import Vault, assign_ids, collect_used, fix_links, name_index, repo
 from . import ids
 from .config import Config
 from .relocate import follow
+from .guard import check_places
+from .outward import check_outward
 from .lock import Busy, Lock
 from .report import Report
 from .safety import Backup
@@ -90,6 +93,18 @@ def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None)
             report.record(r)
         report.write(cfg.personal)
         return report
+    problems = check_places(cfg)
+    if problems:
+        # 書き間違えた場所のファイルを改名したり、そこへノートを集めたりしないように、何も書かずに止める(F-55)
+        report = Report(dry_run=dry)
+        report.stopped = "設定の場所がおかしいので、同期を止めました: " + " / ".join(problems)
+        report.todo(f"設定の場所がおかしいので、同期を止めました。設定ファイル {cfg.config_path or 'config.yaml'} を"
+                    "直してください(下の警告)")
+        for w in problems + move_warnings:
+            report.warn(w)
+        if "個人" not in " ".join(problems):
+            report.write(cfg.personal)
+        return report
     lock = Lock(cfg.lock_path)
     try:
         lock.acquire()
@@ -154,7 +169,7 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
     tidy_layout_copies(cfg.personal, report, backup, dry)  # 2台で使うとできる画面配置の複製
 
     # おまけの自動入力(F-26・F-27・F-31)。集める前に書いて、同じ同期で共有に届ける
-    run_autofill(cfg.personal, cfg.shared, report, backup, dry, now, cfg.idle_seconds, fresh)
+    started = run_autofill(cfg.personal, cfg.shared, report, backup, dry, now, cfg.idle_seconds, fresh)
 
     # 集約と再配布(F-05〜11、F-14、F-15)
     if cfg.shared and cfg.shared.exists():
@@ -166,7 +181,8 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
                       state=state, dry_run=dry, now=now, idle_seconds=cfg.idle_seconds,
                       data_root=cfg.shared_data, keep=keep_rules(cfg.shared), fresh=fresh)
         run_share(ctx)
-        record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now)  # F-31・F-32
+        record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now, started)  # F-31・F-32・F-54
+        update_schedules(cfg.personal, cfg.shared, cfg.member, report, backup, dry, now, cfg.idle_seconds)  # F-53
         maybe_weekly(cfg.shared, cfg.report_dir, now, report, dry)  # F-29(誰の PC でも作る)
         report_pending(cfg.shared, cfg.shared_data, report)  # F-35
         if not dry:
@@ -174,6 +190,10 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
     elif cfg.shared:
         report.warn(f"共有 vault が見つかりません: {cfg.shared}(Box Drive が止まっていないか確かめてください)")
 
+    try:
+        check_outward(cfg, report)  # F-56: 外へ送る機能がオンになっていないか
+    except Exception as e:  # おまけが壊れても、核の同期は続ける
+        report.warn(f"外へ送る機能の確かめで止まりました({type(e).__name__}: {e})")
     update_daily(cfg.personal, cfg.shared, cfg.member, report, backup, dry, now, cfg.idle_seconds)  # F-33
     notice_new_version(cfg.personal, cfg.shared, report)
     report.write(cfg.personal)

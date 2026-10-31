@@ -4,6 +4,7 @@
 - F-26: タスク・実験・試作記録の「リスクはどう変わったか」(古いノートは「残ったリスク」)にあるイシューの
   previous が空なら、そのノートを入れる。
 - F-27: イシューの generation を previous をたどって計算し、空なら入れ、食い違えば知らせる。
+- F-54: 着手の印(本文の書き足し・デイリーのタイムライン・下の記録・- [x])があるタスクを 進行中 にする。
 - F-52: 設計案の「価値の仮説を実現できるか」にある価値の仮説を、属性 価値仮説 に足す。
 
 書き換えるのは自分のノート(個人 vault の 01〜05)だけ。他の人のノートは読むだけにする。
@@ -514,10 +515,134 @@ def fill_references(docs: list[Doc], index: Index, w: Writer) -> None:
             w.set_text(d, new, f"類似・参考ナレッジを {len(lines)} 件足した")
 
 
+# ---------- F-54: 着手の印で status を 進行中 にする(Yu 2026-10-29) ----------
+
+NOT_STARTED = {"", "未着手"}
+DAILY_DIR = "00_日誌/デイリー"
+TIMELINE = "タイムライン"
+REFS_SECTIONS = ("類似・参考ナレッジ", "先に読むもの")   # 同期プログラムが足す欄なので、書き足しに数えない
+# 前の版のテンプレートの説明の行(古いタスクを書き足しと見間違えないように)
+OLD_TEMPLATE_LINES = {
+    "QuickAdd が作るときに入れる",
+    "似たことをした過去のナレッジ・イシュー(同じノードを使うもの)。同期プログラムがあとで足す。自分で見つけたら [[ ]] で書く",
+}
+CHECKED = re.compile(r"^\s*[-*]\s+\[[xX]\]")
+
+
+def _mtime_day(d: Doc) -> date:
+    return datetime.fromtimestamp(d.path.stat().st_mtime, tz=ids.JST).date()
+
+
+def _created_day(d: Doc) -> date | None:
+    try:
+        return ids.decode_time(d.id).date()
+    except ValueError:
+        return None
+
+
+def template_lines(personal: Path, shared: Path | None) -> set[str] | None:
+    """タスクのテンプレートの本文の行。見つからなければ None(書き足しの印は見ない)。"""
+    for root in (personal, shared):
+        if root is None:
+            continue
+        p = root / "_仕組み" / "templates" / "タスク.md"
+        if p.exists():
+            _, body = frontmatter.split(read(p))
+            return {ln.strip() for ln in body.splitlines()}
+    return None
+
+
+def added_text(task: Doc, template: set[str]) -> tuple[bool, bool]:
+    """(テンプレートにない文を書き足したか, - [x] があるか)"""
+    _, body = frontmatter.split(task.text)
+    added = checked = False
+    skip = False
+    for ln in body.splitlines():
+        m = re.match(r"^(#{1,6})\s+(.*?)\s*$", ln)
+        if m:
+            skip = m.group(2) in REFS_SECTIONS
+            continue
+        if CHECKED.match(ln):
+            checked = True
+        t = ln.strip()
+        if skip or not t or t in template or t in OLD_TEMPLATE_LINES:
+            continue
+        if re.fullmatch(r"[-*]\s*(\[ \])?\s*", t):
+            continue      # 空の箇条書き
+        added = True
+    return added, checked
+
+
+def daily_links(personal: Path, index: Index, today: date) -> dict[str, date]:
+    """デイリーのタイムラインにリンクがあるノートの id と、いちばん早い日。"""
+    out: dict[str, date] = {}
+    folder = personal / DAILY_DIR
+    if not folder.exists():
+        return out
+    for p in sorted(folder.rglob("*.md")):
+        try:
+            day = date.fromisoformat(p.stem[:10])
+        except ValueError:
+            continue
+        if day > today:
+            continue
+        for t in section_links(read(p), TIMELINE):
+            d = index.resolve(t)
+            if d and (d.id not in out or day < out[d.id]):
+                out[d.id] = day
+    return out
+
+
+def start_marks(task: Doc, docs: list[Doc], index: Index, template: set[str] | None,
+                daily: dict[str, date]) -> list[tuple[date, str]]:
+    marks = []
+    if template is not None:
+        added, checked = added_text(task, template)
+        if added:
+            marks.append((_mtime_day(task), "本文の書き足し"))
+        if checked:
+            marks.append((_mtime_day(task), "チェックした - [x]"))
+    if task.id in daily:
+        marks.append((daily[task.id], "デイリーのタイムライン"))
+    for c in docs:
+        if c.type not in ("実験・試作記録", "ナレッジ") or c.id == task.id:
+            continue
+        if any((r := index.resolve(t)) and r.id == task.id for t in targets(c.fm.get("parent"))):
+            day = _created_day(c) or _mtime_day(c)
+            marks.append((day, f"{c.type}「{c.name}」"))
+    return marks
+
+
+def fill_started(docs: list[Doc], index: Index, w: Writer, personal: Path, shared: Path | None,
+                 today: date) -> dict[str, date]:
+    """自分のタスクで status が 未着手 なのに着手の印があれば 進行中 にする。返すのは id と着手の日。"""
+    template = template_lines(personal, shared)
+    daily = daily_links(personal, index, today)
+    started: dict[str, date] = {}
+    for d in docs:
+        if not d.own or d.type != "タスク" or d.rel.startswith("99_archive/"):
+            continue
+        if str(d.fm.get("status") or "").strip() not in NOT_STARTED:
+            continue
+        marks = start_marks(d, docs, index, template, daily)
+        if not marks:
+            continue
+        day, why = min(marks)
+        created = _created_day(d)
+        if created and day < created:
+            day = created
+        day = min(day, today)
+        if w.set(d, {"status": "進行中"}, f"着手の印({why}、{day.isoformat()})があるので status を 進行中 にした"):
+            started[d.id] = day
+    return started
+
+
 # ---------- まとめて ----------
 
 def run_autofill(personal: Path, shared: Path | None, report: Report, backup: Backup,
-                 dry_run: bool, now: float, idle_seconds: int, fresh: set[str] = frozenset()) -> None:
+                 dry_run: bool, now: float, idle_seconds: int, fresh: set[str] = frozenset()) -> dict[str, date]:
+    """返すのは F-54 で 進行中 にしたタスクの id と着手の日(ノート履歴の日付に使う)。"""
+    started: dict[str, date] = {}
     try:
         docs = load_docs(personal, own=True, tops=OWN_DIRS + ("99_archive",))
         docs += load_docs(personal / DIST, own=False)
@@ -531,6 +656,8 @@ def run_autofill(personal: Path, shared: Path | None, report: Report, backup: Ba
         fill_priority(docs, index, w, today)
         fill_references(docs, index, w)
         fill_value_hypotheses(docs, index, w)
+        started = fill_started(docs, index, w, personal, shared, today)
     except Exception as e:  # おまけが壊れても、核の同期は続ける
         report.warn(f"priority・previous・generation の自動入力で止まりました({type(e).__name__}: {e})。"
                     "id 付けと共有はそのまま行いました")
+    return started

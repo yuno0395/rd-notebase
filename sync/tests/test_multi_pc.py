@@ -52,9 +52,9 @@ def test_old_state_is_read_once(tmp_path):
 
 
 def test_link_from_other_pc_user_name():
-    root = Path("C:/Users/yunos/Box/開発データ")
+    root = Path("C:/Users/tanaka/Box/開発データ")
     work = "[a.xlsx](file:///C:/Users/satoh/Box/%E9%96%8B%E7%99%BA%E3%83%87%E3%83%BC%E3%82%BF/PJ/0R/a.xlsx)"
-    mine = work.replace("satoh", "yunos")
+    mine = work.replace("satoh", "tanaka")
     assert to_shared(work, root) == "[a.xlsx](開発データ/PJ/0R/a.xlsx)"
     assert to_shared(mine, root) == "[a.xlsx](開発データ/PJ/0R/a.xlsx)"
     other = "[b](file:///D:/data/b.xlsx)"

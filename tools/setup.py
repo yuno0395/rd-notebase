@@ -1410,6 +1410,13 @@ class Setup:
         if not self.ui.yes(f"GitHub にタグ v{self.version} を打ちますか(GitHub にサインインした PC だけ)", True):
             self.hand.append(f"あとで GitHub にタグ v{self.version} を打つ(git tag v{self.version} → git push origin v{self.version})")
             return
+        # タグを送ると、まだ GitHub にない手元のコミットも一緒に送られる(正本は public)。あれば送らない
+        code, ahead = self.git("rev-list", "--count", "@{u}..HEAD")
+        if code != 0 or ahead.strip() != "0":
+            self.hand.append(f"手元に GitHub へまだ送っていないコミットがあるか、確かめられませんでした。タグ v{self.version} は"
+                             "送っていません。git log @{u}..HEAD で中身を確かめ、作り物の見本と仕組みだけなら"
+                             f" git push してから git tag v{self.version} → git push origin v{self.version}")
+            return
         code, out = self.git("tag", f"v{self.version}")
         if code == 0:
             code, out = self.git("push", "origin", f"v{self.version}")

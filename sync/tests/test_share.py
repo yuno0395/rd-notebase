@@ -38,6 +38,7 @@ def box(tmp_path):
           '---\nid: 0RB003001\ntype: タスク\nparent: ["[[0RB002001_ヒケ|ヒケ]]"]\n---\n')
     write(yu / "_仕組み/attachments/0RB003001/図.excalidraw.md", "図のデータ\n")
     write(yu / "02_ノード/0RB004001_秘密のメモ.md", "---\nid: 0RB004001\ntype: ノード\nvisibility: 個人\n---\n")
+    write(yu / "00_日誌/メモ/2026-10-29 思いつき.md", MEMO)
     write(yu / "05_ナレッジ/0RB005001_保圧のナレッジ.md",
           '---\nid: 0RB005001\ntype: ナレッジ\nparent: ["[[0RB003001_保圧を変える|保圧を変える]]"]\n'
           'risk_reduction:\n  - "[[0RB002001_ヒケ]] 出荷→小"\nusefulness: B\n---\n')
@@ -60,6 +61,9 @@ def box(tmp_path):
         return c
 
     return {"root": root, "shared": shared, "yu": cfg("Yu"), "sato": cfg("佐藤")}
+
+
+MEMO = "---\ntype: メモ\nvisibility: 個人\n---\n[[0RB001001_水|水]] を温めたら?\n"
 
 
 def files(root: Path) -> set[str]:
@@ -87,6 +91,8 @@ def test_does_not_collect_when_conditions_fail(box):
     r = report(box["yu"])
     todo = r.split("## 警告")[0]
     assert "秘密のメモ" not in s and "秘密のメモ" not in todo     # visibility 個人は知らせもしない
+    assert "思いつき" not in s and "思いつき" not in r                 # 共有しないメモ(00_日誌/メモ/)
+    assert text(box["yu"].personal / "00_日誌/メモ/2026-10-29 思いつき.md") == MEMO  # id もつけない
     assert "保圧のナレッジ" not in s
     assert "保圧のナレッジ|保圧のナレッジ]] の reviewed_by が空です" in r
     assert "迷子" not in s and "プロジェクト「無いPJ」の台帳が共有 vault にありません" in r

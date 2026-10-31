@@ -78,6 +78,14 @@ def plan(vault: Path) -> tuple[list[tuple[Path, Path]], list[Path]]:
     return moves, fixes
 
 
+
+VAULT_MARKS = ("_仕組み", "_templates", "_記録", "06_事実")
+
+
+def is_vault(v: Path) -> bool:
+    """vault の印(仕組みのフォルダ)があるか。書き間違えた場所のノートを書き換えないため。"""
+    return any((v / m).is_dir() for m in VAULT_MARKS)
+
 def main(argv: list[str]) -> int:
     run = "--run" in argv
     backup: Path | None = None
@@ -94,6 +102,9 @@ def main(argv: list[str]) -> int:
     for v in vaults:
         if not v.is_dir():
             print(f"見つかりません: {v}")
+            return 1
+        if not is_vault(v):
+            print(f"vault ではないようです(_仕組み フォルダがありません): {v}")
             return 1
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     for v in vaults:

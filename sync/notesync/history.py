@@ -54,7 +54,9 @@ def last_values(rows: list[dict]) -> dict[tuple[str, str], str]:
 
 
 def record_history(personal: Path, shared: Path, member: str, report: Report,
-                   dry_run: bool, now: float) -> None:
+                   dry_run: bool, now: float, started: dict | None = None) -> None:
+    """started: F-54 で 進行中 にしたタスクの id と着手の日。その status の行は着手の日で書く。"""
+    started = started or {}
     try:
         path = history_path(shared, member)
         rows = read_rows(path)
@@ -69,7 +71,10 @@ def record_history(personal: Path, shared: Path, member: str, report: Report,
                     continue  # まだ書いていない値は記録しない
                 if before == now_v:
                     continue
-                new.append({"日時": stamp, "id": d.id, "名前": d.name, "種類": d.type,
+                when = stamp
+                if key == "status" and now_v == "進行中" and d.id in started:
+                    when = f"{started[d.id].isoformat()} 00:00"
+                new.append({"日時": when, "id": d.id, "名前": d.name, "種類": d.type,
                             "項目": key, "前": before or "", "後": now_v})
         if not new:
             return
