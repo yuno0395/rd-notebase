@@ -423,6 +423,16 @@ class VaultPlan:
                     or self.old_version != self.version)
 
 
+def stray_config_dirs(vault: Path, number: str, expected: str) -> list[str]:
+    """自分の番号の設定フォルダのうち、準備の bat が作っていないもの(Obsidian が「設定フォルダを上書き」の名前で作った)。
+    名前が1文字でも違うと、Obsidian はそちらを読み、bat が入れたプラグインは読まれない。"""
+    out = []
+    for d in sorted(vault.glob(f".obsidian-{number}_*")):
+        if d.is_dir() and d.name != expected and not (d / SEEN_VERSION).is_file():
+            out.append(d.name)
+    return out
+
+
 def plan_vault(dist: Path, kind: str, target: Path) -> VaultPlan:
     """dist(<版>/)の kind の配布物を target に当てると何が起きるかを数える。"""
     manifest = load_manifest(dist)
@@ -758,6 +768,7 @@ class Setup:
         self.shared: Path | None = None
         self.secrets: list[Path] = []
         self.new_config_dirs: list[str] = []
+        self.stray_configs: list[tuple[str, str]] = []  # (vault, Obsidian が別の名前で作った設定フォルダ)
         self.first_config = False
         self.clip_text = ""
         self.tag_pending = False
@@ -1007,6 +1018,8 @@ class Setup:
             d = v / name
             if not d.is_dir():
                 self.new_config_dirs.append(label)
+            for other in stray_config_dirs(v, self.number, name):
+                self.stray_configs.append((label, other))
             self.plan_plugins(label, v, name)
         self.plan_plugins("個人 vault", self.personal, ".obsidian")
 
@@ -1433,7 +1446,13 @@ class Setup:
         if new_dirs:
             name = self.config_name()
             self.hand.append(f"Obsidian で {'・'.join(new_dirs)} を開き、設定 → ファイルとリンク →「設定フォルダを上書き」に "
-                             f"{name} と打って Obsidian を開き直す(この名前はクリップボードに入れてあります)")
+                             f"{name} を貼って Obsidian を開き直す(この名前はクリップボードに入れてあります。手で打つと1文字違いでプラグインが読まれません)")
+            self.clip_text = name
+        for label, other in self.stray_configs:
+            name = self.config_name()
+            self.hand.append(f"Obsidian が {label} を {other} で開いています(プラグインと設定は {name} に入れました)。"
+                             f"設定 → ファイルとリンク →「設定フォルダを上書き」を {name} に直して Obsidian を開き直す"
+                             f"(この名前はクリップボードに入れてあります。Ctrl+V で貼ってください)。{other} は消してかまいません")
             self.clip_text = name
         if self.memo.get("first_done") is None:
             self.hand += ["Obsidian で vault を開いて「このフォルダの作者を信頼し、プラグインを有効にする」を押す(vault ごとに1回)",
