@@ -97,3 +97,8 @@ vaults = ["個人", "共有"]
 version = "0.2.0"
 script = "tools/migrate_v055.py"   # 仕様書 v0.55: イシューの parent → 脅かす、設計案の friend の仮説 → 価値仮説
 vaults = ["個人", "共有"]
+
+[[migrate]]
+version = "0.2.1"
+script = "tools/migrate_v067.py"   # 仕様書 v0.67: 個人 vault の 90_共有/ をなくし、配られたノートを共有と同じ場所へ
+vaults = ["個人"]

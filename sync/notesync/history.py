@@ -15,7 +15,8 @@ from datetime import date, datetime
 from pathlib import Path
 
 from . import ids
-from .autofill import OWN_DIRS, load_docs
+from .autofill import load_docs
+from .vault import NOT_NOTE_TOPS
 from .report import Report
 
 HISTORY_DIR = "_仕組み/記録/ノート履歴"
@@ -59,7 +60,7 @@ def record_history(personal: Path, shared: Path, member: str, report: Report,
         last = last_values(rows)
         stamp = datetime.fromtimestamp(now, tz=ids.JST).strftime("%Y-%m-%d %H:%M")
         new = []
-        for d in load_docs(personal, own=True, tops=OWN_DIRS + ("99_archive",)):
+        for d in [d for d in load_docs(personal, own=True, skip=NOT_NOTE_TOPS, member=member) if d.own]:
             for key in WATCH.get(d.type, ()):
                 now_v = value_of(d.fm.get(key))
                 before = last.get((d.id, key))

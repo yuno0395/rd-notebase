@@ -20,8 +20,8 @@ from datetime import datetime, timedelta
 from . import frontmatter, ids
 from .assign import LINK
 from .report import REPORT_NAME
-from .share import ARCHIVE, DIST, Context, Item, as_list, note_stem, recent
-from .vault import iter_md, read, write
+from .share import ARCHIVE, Context, Item, as_list, note_stem, recent
+from .vault import iter_md, read, theirs_file, write
 
 CHOICE_LINE = re.compile(r"^-\s*\[[xX]\]\s*(同じもの|別もの):\s*(.*)$")
 SAME, OTHER = "同じもの", "別もの"
@@ -117,7 +117,7 @@ def merge_into(ctx: Context, item: Item, other: Item) -> bool:
         section += ["", body]
     new = new.rstrip("\r\n") + nl + nl + nl.join(section).replace("\n", nl) + nl
 
-    # 自分の vault で item を指していたリンク(90_共有 と 99_archive は除く)
+    # 自分の vault で item を指していたリンク(他の人のノートと 99_archive は除く)
     def repl(m: re.Match) -> str:
         target = m.group(1).strip()
         if ids.split_filename(target.split("/")[-1])[0] != item.id:
@@ -127,7 +127,7 @@ def merge_into(ctx: Context, item: Item, other: Item) -> bool:
 
     relinked = []
     for path, rel in iter_md(ctx.personal):
-        if rel.parts[0] in (DIST, ARCHIVE) or path == item.path:
+        if rel.parts[0] == ARCHIVE or path == item.path or theirs_file(path, ctx.member):
             continue
         text = read(path)
         changed = LINK.sub(repl, text)

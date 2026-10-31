@@ -13,17 +13,17 @@ def test_renamed_note_moves_in_shared_and_links_follow(cloud):
     run_once(cloud["yu"])
     run_once(cloud["sato"])
     yu = cloud["yu"].personal
-    (yu / "02_ノード/0RB001001_水.md").rename(yu / "02_ノード/0RB001001_お水.md")  # Obsidian の外で変えた
+    (yu / "共通/02_ノード/0RB001001_水.md").rename(yu / "共通/02_ノード/0RB001001_お水.md")  # Obsidian の外で変えた
     run_once(cloud["yu"])
     s = files(cloud["shared"])
     assert "共通/02_ノード/0RB001001_お水.md" in s
     assert "共通/02_ノード/0RB001001_水.md" not in s
-    assert "[[0RB001001_お水|水]]" in text(yu / "03_イシュー/0RB002001_ヒケ.md")   # 古いリンクを直す
+    assert "[[0RB001001_お水|水]]" in text(yu / f"{PJ}/03_イシュー/0RB002001_ヒケ.md")   # 古いリンクを直す
     assert "[[0RB001001_お水|水]]" in text(cloud["shared"] / f"{PJ}/03_イシュー/0RB002001_ヒケ.md")
     run_once(cloud["sato"])
     p = files(cloud["sato"].personal)
-    assert "90_共有/共通/02_ノード/0RB001001_お水.md" in p
-    assert "90_共有/共通/02_ノード/0RB001001_水.md" not in p
+    assert "共通/02_ノード/0RB001001_お水.md" in p
+    assert "共通/02_ノード/0RB001001_水.md" not in p
 
 
 def test_renamed_attachment_is_not_doubled(cloud):

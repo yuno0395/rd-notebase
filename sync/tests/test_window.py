@@ -4,7 +4,7 @@ from .test_share import PJ, cloud, files, report, write  # noqa: F401
 
 
 def window(c, name="案件A", body=""):
-    return write(c.personal / f"02_ノード/0RB900001_{name}.md",
+    return write(c.personal / f"共通/02_ノード/0RB900001_{name}.md",
                  f"---\nid: 0RB900001\ntype: 窓口\nreaders: [Yu, 佐藤]\nowner: [Yu]\n---\n{body}")
 
 
@@ -23,7 +23,7 @@ def test_window_goes_to_common_and_refs_are_fine(cloud):
     assert f"{PJ}/03_イシュー/0RB901001_荷重.md" in s
     assert "機密の窓口へのリンクではありません" not in report(yu)
     # 佐藤にも配られる
-    assert "90_共有/共通/機密の窓口/0RB900001_案件A.md" in files(cloud["sato"].personal)
+    assert "共通/機密の窓口/0RB900001_案件A.md" in files(cloud["sato"].personal)
 
 
 def test_window_with_secret_folder_name_is_not_shared(cloud):

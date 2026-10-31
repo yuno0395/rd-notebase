@@ -22,7 +22,7 @@ from . import frontmatter, ids
 from .frontmatter import LINK, as_list, link_targets as targets
 from .report import Report
 from .safety import Backup
-from .vault import DIST, OWN_DIRS, SKIP_DIRS, sync_copy_of, is_hidden, read, write
+from .vault import NOT_NOTE_TOPS, SKIP_DIRS, is_hidden, is_theirs, read, sync_copy_of, write
 
 
 # 仕様書「priority の決め方」
@@ -68,7 +68,8 @@ def plain(value: str) -> str:
 
 
 def load_docs(root: Path, own: bool, tops: tuple[str, ...] | None = None,
-              skip: set[str] = frozenset()) -> list[Doc]:
+              skip: set[str] = frozenset(), member: str = "") -> list[Doc]:
+    """member を渡すと、author に member のいないノート(配られた他の人のノート)は own=False にする。"""
     out = []
     if not root.exists():
         return out
@@ -85,7 +86,9 @@ def load_docs(root: Path, own: bool, tops: tuple[str, ...] | None = None,
         if not file_id:
             continue
         text = read(p)
-        out.append(Doc(p, rel.as_posix(), file_id.upper(), name, frontmatter.load(text), text, own))
+        fm = frontmatter.load(text)
+        out.append(Doc(p, rel.as_posix(), file_id.upper(), name, fm, text,
+                       own and not (member and is_theirs(fm, member))))
     return out
 
 
@@ -600,12 +603,12 @@ def fill_started(docs: list[Doc], index: Index, w: Writer, personal: Path, share
 # ---------- まとめて ----------
 
 def run_autofill(personal: Path, shared: Path | None, report: Report, backup: Backup,
-                 dry_run: bool, now: float, idle_seconds: int, fresh: set[str] = frozenset()) -> dict[str, date]:
+                 dry_run: bool, now: float, idle_seconds: int, fresh: set[str] = frozenset(),
+                 member: str = "") -> dict[str, date]:
     """返すのは F-54 で 進行中 にしたタスクの id と着手の日(ノート履歴の日付に使う)。"""
     started: dict[str, date] = {}
     try:
-        docs = load_docs(personal, own=True, tops=OWN_DIRS + ("99_archive",))
-        docs += load_docs(personal / DIST, own=False)
+        docs = load_docs(personal, own=True, skip=NOT_NOTE_TOPS, member=member)
         if shared and shared.exists():
             docs += load_docs(shared, own=False, skip={"00_inbox", "00_週報"})
         index = Index(docs)

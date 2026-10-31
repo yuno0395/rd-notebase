@@ -35,9 +35,6 @@
     },
     {
       "folder": "99_archive"
-    },
-    {
-      "folder": "90_共有"
     }
   ],
   "auto_jump_to_cursor": true,
@@ -108,6 +105,14 @@
       "template": "_仕組み/templates/_コマンド/今の仕事を確かめる.md",
       "insert_enabled": true,
       "create_enabled": false
+    },
+    {
+      "template": "_仕組み/templates/_コマンド/自分も作成者に入れて書く.md",
+      "insert_enabled": true,
+      "create_enabled": false
     }
+  ],
+  "startup_templates": [
+    "_仕組み/templates/_コマンド/起動時(他の人のノートは読む画面).md"
   ]
 }

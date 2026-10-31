@@ -31,24 +31,24 @@ def cloud(tmp_path):
 
     yu = root / "個人_Yu"
     write(yu / "_仕組み/個人設定.md", '---\nname: Yu\n---\n')
-    write(yu / "02_ノード/0RB001001_水.md", "---\nid: 0RB001001\ntype: ノード\n---\n水の話\n")
-    write(yu / "03_イシュー/0RB002001_ヒケ.md",
+    write(yu / "共通/02_ノード/0RB001001_水.md", "---\nid: 0RB001001\ntype: ノード\n---\n水の話\n")
+    write(yu / f"{PJ}/03_イシュー/0RB002001_ヒケ.md",
           f"---\nid: 0RB002001\ntype: イシュー\nimpact: 出荷\nproject: [{PJ}]\n---\n[[0RB001001_水|水]] が原因\n")
-    write(yu / "04_タスク/0RB003001_保圧を変える.md",
+    write(yu / f"{PJ}/04_タスク/0RB003001_保圧を変える.md",
           '---\nid: 0RB003001\ntype: タスク\nparent: ["[[0RB002001_ヒケ|ヒケ]]"]\n---\n')
     write(yu / "_仕組み/attachments/0RB003001/図.excalidraw.md", "図のデータ\n")
-    write(yu / "02_ノード/0RB004001_秘密のメモ.md", "---\nid: 0RB004001\ntype: ノード\nvisibility: 個人\n---\n")
+    write(yu / "共通/02_ノード/0RB004001_秘密のメモ.md", "---\nid: 0RB004001\ntype: ノード\nvisibility: 個人\n---\n")
     write(yu / "00_日誌/メモ/2026-10-29 思いつき.md", MEMO)
-    write(yu / "05_ナレッジ/0RB005001_保圧のナレッジ.md",
+    write(yu / f"{PJ}/05_ナレッジ/0RB005001_保圧のナレッジ.md",
           '---\nid: 0RB005001\ntype: ナレッジ\nparent: ["[[0RB003001_保圧を変える|保圧を変える]]"]\n'
           'risk_reduction:\n  - "[[0RB002001_ヒケ]] 出荷→小"\nusefulness: B\n---\n')
     write(yu / "03_イシュー/0RB006001_迷子.md", "---\nid: 0RB006001\ntype: イシュー\nproject: [無いPJ]\n---\n")
-    write(yu / "02_ノード/0RB007001_顧客の寸法.md",
+    write(yu / "共通/02_ノード/0RB007001_顧客の寸法.md",
           "---\nid: 0RB007001\ntype: ノード\n---\n[[0RC001001_顧客図面]] を見た\n")
 
     sato = root / "個人_佐藤"
     write(sato / "_仕組み/個人設定.md", '---\nname: 佐藤\n---\n')
-    write(sato / "02_ノード/0RB101002_鉄.md", "---\nid: 0RB101002\ntype: ノード\n---\n")
+    write(sato / "共通/02_ノード/0RB101002_鉄.md", "---\nid: 0RB101002\ntype: ノード\n---\n")
 
     secret = root / "機密_顧客A"
     (secret / "_仕組み").mkdir(parents=True)
@@ -101,7 +101,7 @@ def test_does_not_collect_when_conditions_fail(cloud):
 
 
 def test_knowledge_of_big_issue_needs_another_reviewer(cloud):
-    k = cloud["yu"].personal / "05_ナレッジ/0RB005001_保圧のナレッジ.md"
+    k = cloud["yu"].personal / f"{PJ}/05_ナレッジ/0RB005001_保圧のナレッジ.md"
     write(k, text(k).replace("usefulness: B", "usefulness: B\nreviewed_by: [Yu]"))
     run_once(cloud["yu"])
     assert "確認待ち" in report(cloud["yu"])
@@ -113,7 +113,7 @@ def test_knowledge_of_big_issue_needs_another_reviewer(cloud):
 def test_redistributes_to_members_only(cloud):
     run_once(cloud["yu"])
     run_once(cloud["sato"])
-    got = files(cloud["sato"].personal / "90_共有")
+    got = files(cloud["sato"].personal)                            # 共有と同じ場所に配る
     assert "共通/02_ノード/0RB001001_水.md" in got
     assert f"{PJ}/04_タスク/0RB003001_保圧を変える.md" in got
     assert f"{PJ}/0RA00A001_{PJ}.md" in got
@@ -121,8 +121,9 @@ def test_redistributes_to_members_only(cloud):
     assert (cloud["sato"].personal / "_仕組み/attachments/0RB003001/図.excalidraw.md").exists()
     # 自分が書いたノートは配らない(F-10)
     run_once(cloud["yu"])
-    assert not any("0RB001001" in x for x in files(cloud["yu"].personal / "90_共有"))
-    assert "鉄" in " ".join(files(cloud["yu"].personal / "90_共有"))
+    assert [x for x in files(cloud["yu"].personal) if "0RB001001" in x] == ["共通/02_ノード/0RB001001_水.md"]
+    assert "共通/02_ノード/0RB101002_鉄.md" in files(cloud["yu"].personal)
+    assert not (cloud["yu"].personal / "90_共有").exists()
 
 
 def test_second_run_changes_nothing(cloud):
@@ -139,34 +140,33 @@ def test_second_run_changes_nothing(cloud):
 def test_update_flows_through(cloud):
     run_once(cloud["yu"])
     run_once(cloud["sato"])
-    water = cloud["yu"].personal / "02_ノード/0RB001001_水.md"
+    water = cloud["yu"].personal / "共通/02_ノード/0RB001001_水.md"
     write(water, text(water) + "0℃で凍る\n")
     run_once(cloud["yu"])
     run_once(cloud["sato"])
-    copy = cloud["sato"].personal / "90_共有/共通/02_ノード/0RB001001_水.md"
+    copy = cloud["sato"].personal / "共通/02_ノード/0RB001001_水.md"
     assert "0℃で凍る" in text(copy)
 
 
 def test_adopted_note_comes_back_to_author(cloud):
-    """佐藤が 90_共有/ から自分のフォルダへ移して書き足すと、共有を経て Yu のノートに入る。"""
+    """佐藤が配られたノートの author に自分を足して書き足すと、共有を経て Yu のノートに入る。"""
     run_once(cloud["yu"])
     run_once(cloud["sato"])
-    src = cloud["sato"].personal / "90_共有/共通/02_ノード/0RB001001_水.md"
-    dest = cloud["sato"].personal / "02_ノード/0RB001001_水.md"
-    src.rename(dest)
-    write(dest, text(dest) + "佐藤の書き足し\n")
+    dest = cloud["sato"].personal / "共通/02_ノード/0RB001001_水.md"
+    write(dest, text(dest).replace("author: Yu", 'author: ["Yu", "佐藤"]') + "佐藤の書き足し\n")
     run_once(cloud["sato"])
     assert "佐藤の書き足し" in text(cloud["shared"] / "共通/02_ノード/0RB001001_水.md")
     run_once(cloud["yu"])
-    assert "佐藤の書き足し" in text(cloud["yu"].personal / "02_ノード/0RB001001_水.md")
+    assert "佐藤の書き足し" in text(cloud["yu"].personal / "共通/02_ノード/0RB001001_水.md")
     assert "取り込み" in report(cloud["yu"])
+    assert 'author: ["Yu", "佐藤"]' in text(cloud["yu"].personal / "共通/02_ノード/0RB001001_水.md")
 
 
 def test_conflict_keeps_both_and_resolves(cloud):
     run_once(cloud["yu"])
     shared_water = cloud["shared"] / "共通/02_ノード/0RB001001_水.md"
     write(shared_water, text(shared_water) + "共有で直接の書き足し\n")
-    water = cloud["yu"].personal / "02_ノード/0RB001001_水.md"
+    water = cloud["yu"].personal / "共通/02_ノード/0RB001001_水.md"
     write(water, text(water) + "Yu の書き足し\n")
     run_once(cloud["yu"])
     conflicts = [p for p in shared_water.parent.iterdir() if "_競合_Yu_" in p.name]
@@ -188,26 +188,28 @@ def test_conflict_file_is_not_redistributed(cloud):
     run_once(cloud["yu"])
     shared_water = cloud["shared"] / "共通/02_ノード/0RB001001_水.md"
     write(shared_water, text(shared_water) + "a\n")
-    water = cloud["yu"].personal / "02_ノード/0RB001001_水.md"
+    water = cloud["yu"].personal / "共通/02_ノード/0RB001001_水.md"
     write(water, text(water) + "b\n")
     run_once(cloud["yu"])
     run_once(cloud["sato"])
     assert not any("_競合_" in x for x in files(cloud["sato"].personal))
 
 
-def test_editing_distributed_copy_is_reported(cloud):
+def test_editing_others_note_is_put_back(cloud):
     run_once(cloud["yu"])
     run_once(cloud["sato"])
-    copy = cloud["sato"].personal / "90_共有/共通/02_ノード/0RB001001_水.md"
+    copy = cloud["sato"].personal / "共通/02_ノード/0RB001001_水.md"
     write(copy, text(copy) + "ここに書いてしまった\n")
     run_once(cloud["sato"])
-    assert "90_共有 の編集" in report(cloud["sato"])
+    assert "他の人のノート: 共通/02_ノード/0RB001001_水.md が手元で変わっていた" in report(cloud["sato"])
     assert "ここに書いてしまった" not in text(cloud["shared"] / "共通/02_ノード/0RB001001_水.md")
+    assert "ここに書いてしまった" not in text(copy)                 # 共有の中身に戻す
+    assert list((cloud["sato"].personal.parent.parent / "backup_佐藤").rglob("0RB001001_水.md"))
 
 
 def test_archive_move_is_reflected(cloud):
     run_once(cloud["yu"])
-    src = cloud["yu"].personal / "04_タスク/0RB003001_保圧を変える.md"
+    src = cloud["yu"].personal / f"{PJ}/04_タスク/0RB003001_保圧を変える.md"
     dest = cloud["yu"].personal / "99_archive/0RB003001_保圧を変える.md"
     dest.parent.mkdir(parents=True, exist_ok=True)
     src.rename(dest)
@@ -231,7 +233,7 @@ def test_dry_run_writes_only_report(cloud):
     after = files(cloud["root"])
     assert after - before == {"個人_Yu/_仕組み/同期レポート.md"}
     r = report(cloud["yu"])
-    assert "予定: 集約: 02_ノード/0RB001001_水.md → 共有/共通/02_ノード/0RB001001_水.md" in r
+    assert "予定: 集約: 共通/02_ノード/0RB001001_水.md → 共有/共通/02_ノード/0RB001001_水.md" in r
     assert not cloud["yu"].state_path.exists()
 
 
@@ -254,15 +256,15 @@ def test_lost_state_is_rebuilt_without_overwriting(cloud):
 def add_h2o(cloud):
     """佐藤の「蒸留水」(別名 H2O)が共有にあり、Yu が別に「H2O」を作った。"""
     sato = cloud["sato"].personal
-    write(sato / "02_ノード/0RB102002_蒸留水.md",
+    write(sato / "共通/02_ノード/0RB102002_蒸留水.md",
           "---\nid: 0RB102002\ntype: ノード\naliases:\n  - 蒸留水\n  - H2O\n---\n## これは何か\n佐藤のメモ\n")
     run_once(cloud["sato"])
     yu = cloud["yu"].personal
-    write(yu / "02_ノード/0RB008001_H2O.md",
+    write(yu / "共通/02_ノード/0RB008001_H2O.md",
           "---\nid: 0RB008001\ntype: ノード\naliases: [H2O, 純水]\n---\n## これは何か\n"
           "Yuのメモ ![[写真.png]]\n## 何に影響するか\n")
     write(yu / "_仕組み/attachments/0RB008001/写真.png", "png")
-    write(yu / "03_イシュー/0RB009001_濁り.md",
+    write(yu / f"{PJ}/03_イシュー/0RB009001_濁り.md",
           f"---\nid: 0RB009001\ntype: イシュー\nproject: [{PJ}]\n---\n[[0RB008001_H2O|H2O]] と [[0RB008001_H2O]]\n")
 
 
@@ -300,16 +302,16 @@ def test_same_merges_into_shared_node(cloud):
     assert "### これは何か\nYuのメモ" in water and "何に影響するか" not in water
     assert (shared / "_仕組み/attachments/0RB102002/写真.png").exists()
     # 自分のノードは archive へ、リンクは付け替え
-    assert not (yu / "02_ノード/0RB008001_H2O.md").exists()
+    assert not (yu / "共通/02_ノード/0RB008001_H2O.md").exists()
     assert 'merged_into: "[[0RB102002_蒸留水|蒸留水]]"' in text(yu / "99_archive/0RB008001_H2O.md")
-    issue = text(yu / "03_イシュー/0RB009001_濁り.md")
+    issue = text(yu / f"{PJ}/03_イシュー/0RB009001_濁り.md")
     assert "[[0RB102002_蒸留水|H2O]] と [[0RB102002_蒸留水|H2O]]" in issue
     assert "同じもの:" not in report(cloud["yu"])
     # Yu も author に入ったが、最初に書いたのは佐藤なので Yu にも配られる。佐藤の手元にも入る
     run_once(cloud["yu"])
-    assert "## まとめたメモ" in text(yu / "90_共有/共通/02_ノード/0RB102002_蒸留水.md")
+    assert "## まとめたメモ" in text(yu / "共通/02_ノード/0RB102002_蒸留水.md")
     run_once(cloud["sato"])
-    assert "## まとめたメモ" in text(cloud["sato"].personal / "02_ノード/0RB102002_蒸留水.md")
+    assert "## まとめたメモ" in text(cloud["sato"].personal / "共通/02_ノード/0RB102002_蒸留水.md")
     assert "同じ名前:" not in report(cloud["yu"])
 
 
@@ -353,3 +355,40 @@ def test_design_options_go_to_their_own_folder(cloud):
     assert f"{PJ}/01_目的/0RB201001_予兆検知.md" in s
     assert f"{PJ}/01_設計案/0RB202001_A案.md" in s
     assert f"{PJ}/01_設計案/0RB203001_B案.md" in s
+
+
+# ---------- v0.67: 個人 vault も共有と同じ並び(90_共有 はなし) ----------
+
+def test_own_note_is_moved_to_its_place(cloud):
+    """F-57: 振り分け先と違うフォルダにある自分のノートは、共有と同じ場所へ移す。"""
+    yu = cloud["yu"].personal
+    write(yu / "03_イシュー/0RB010001_そり.md",
+          f"---\nid: 0RB010001\ntype: イシュー\nproject: [{PJ}]\n---\n")
+    write(yu / "00_inbox/0RB011001_親なし.md", "---\nid: 0RB011001\ntype: タスク\n---\n")  # inbox は触らない
+    write(yu / "04_タスク/0RB012001_測る.md", f"---\nid: 0RB012001\ntype: タスク\nproject: [{PJ}]\n---\n")
+    run_once(cloud["yu"])
+    assert (yu / f"{PJ}/03_イシュー/0RB010001_そり.md").exists()
+    assert not (yu / "03_イシュー/0RB010001_そり.md").exists()
+    assert (yu / f"{PJ}/04_タスク/0RB012001_測る.md").exists()    # 親がなくても project で決まる
+    assert not (yu / "04_タスク").exists()                         # 空になった一番上のフォルダは片付ける
+    assert (yu / "00_inbox/0RB011001_親なし.md").exists()
+    assert (yu / "03_イシュー/0RB006001_迷子.md").exists()        # 台帳のないプロジェクトは動かさない
+    assert "置き場所を直した: 03_イシュー/0RB010001_そり.md" in report(cloud["yu"])
+    assert f"{PJ}/03_イシュー/0RB010001_そり.md" in files(cloud["shared"])
+
+
+def test_note_without_author_from_shared_is_not_taken(cloud):
+    """共有 vault で直接作った author のないノート(台帳など)は、配られても自分のものにしない。"""
+    for _ in range(2):
+        run_once(cloud["yu"])
+    ledger = cloud["yu"].personal / f"{PJ}/0RA00A001_{PJ}.md"
+    assert "author" not in text(ledger)
+    assert "author" not in text(cloud["shared"] / f"{PJ}/0RA00A001_{PJ}.md")
+    assert "競合" not in report(cloud["yu"]).split("## 記録")[0].replace("(なし)", "")
+
+
+def test_old_shared_folder_stops_sync(cloud):
+    (cloud["yu"].personal / "90_共有").mkdir()
+    run_once(cloud["yu"])
+    assert "90_共有/ が残っているので、同期を止めています" in report(cloud["yu"])
+    assert not (cloud["shared"] / "共通/02_ノード/0RB001001_水.md").exists()

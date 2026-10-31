@@ -33,7 +33,7 @@ def test_sends_just_saved_note(tmp_path, cloud):
     # 保存した直後のノートは、ふだんの同期では待つが、ボタンを押したら待たずに共有へ送る
     yu = cloud["yu"]
     run_once(yu)
-    task = yu.personal / "04_タスク/0RB003001_保圧を変える.md"
+    task = yu.personal / f"{PJ}/04_タスク/0RB003001_保圧を変える.md"
     write(task, task.read_text(encoding="utf-8") + "書き足し\n")
     shared_task = cloud["shared"] / f"{PJ}/04_タスク/0RB003001_保圧を変える.md"
     yu.idle_seconds = 10

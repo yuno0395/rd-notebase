@@ -307,27 +307,117 @@ function initialValues(app, kind, note) {
   return out;
 }
 
-async function placeFor(app, kind, note) {
-  const folder = KINDS[kind].folder;
-  const fs = app.vault.adapter;
-  if (await fs.exists("_仕組み/個人設定.md")) return folder; // 個人 vault
-  // 共有 vault で仮運用しているとき: 今のノートのプロジェクト、なければ 共通
-  const project = (kind === "イシュー" ? projectFor(app, note) : asList(app.metadataCache.getFileCache(note)?.frontmatter?.project))[0];
-  const top = note.path.split("/")[0];
-  for (const p of [project, top, "共通"]) {
-    if (p && app.vault.getAbstractFileByPath(`${p}/${folder}`)) return `${p}/${folder}`;
+// ---------- 置き場所(個人 vault も共有 vault と同じ並び。仕様書「フォルダ構成」v0.67) ----------
+// <プロジェクト>/01_目的/ などに置く。ノードは 共通/02_ノード/。決め方は同期プログラムと同じ
+// (要件書 F-06): project が書いてあればそれ(2つ以上か 共通 なら 共通)、なければ parent をたどる。
+
+const COMMON = "共通";
+const TYPE_FOLDERS = ["01_目的", "01_設計案", "02_ノード", "03_イシュー", "04_タスク", "05_ナレッジ"];
+const RECENT_KEY = "notebase-recent-projects";
+
+// [[0RB001001_試しPJ|試しPJ]] や 試しPJ を、名前 試しPJ にする
+function plainName(v) {
+  const t = (String(v).match(/\[\[([^\]|]+)/) || [null, String(v)])[1].trim();
+  return t.replace(ID_PREFIX, "");
+}
+
+function projectOfList(list) {
+  const ps = asList(list).map(plainName).filter((x) => x);
+  if (ps.length > 1 || ps.includes(COMMON)) return COMMON;
+  return ps[0] || null;
+}
+
+// ノートの振り分け先のプロジェクト。決まらなければ null
+function projectOf(app, file, seen = new Set()) {
+  if (!file || seen.has(file.path)) return null;
+  seen.add(file.path);
+  const fm = app.metadataCache.getFileCache(file)?.frontmatter || {};
+  const t = String(fm.type || "").trim();
+  if (t === "ノード" || t === "窓口") return COMMON;
+  if (t === "プロジェクト") return nameOf(file);
+  const own = projectOfList(fm.project);
+  if (own) return own;
+  if (t === "イシュー" || t === "目的") return null;
+  for (const p of asList(fm.parent)) {
+    const target = (p.match(/\[\[([^\]]+)\]\]/) || [])[1];
+    const found = target && projectOf(app, resolve(app, target, file.path), seen);
+    if (found) return found;
   }
-  return folder;
+  return null;
+}
+
+// 作るノートのプロジェクト。属性に入れる値(values)から決める
+function projectOfNew(app, kind, note, values) {
+  if (kind === "イシュー") return projectOfList(projectFor(app, note));
+  if (kind === "目的") return projectOfList(app.metadataCache.getFileCache(note)?.frontmatter?.project);
+  for (const m of String(values.parent || "").matchAll(/\[\[([^\]|]+)/g)) {
+    const found = projectOf(app, resolve(app, m[1], note.path));
+    if (found) return found;
+  }
+  return null;
+}
+
+// vault にあるプロジェクトの台帳の名前(最近選んだものを先に)
+function projectNames(app) {
+  const names = app.vault.getMarkdownFiles()
+    .filter((f) => !f.path.startsWith("99_archive/") && typeOf(app, f) === "プロジェクト")
+    .map((f) => nameOf(f));
+  let recent = [];
+  try { recent = JSON.parse(window.localStorage.getItem(RECENT_KEY) || "[]"); } catch (e) { recent = []; }
+  const rank = (n) => { const i = recent.indexOf(n); return i < 0 ? 999 : i; };
+  return [...new Set(names)].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, "ja"));
+}
+
+// プロジェクトを選ぶ窓。Esc で閉じたら null
+function chooseProject(app, obsidian, placeholder) {
+  const names = projectNames(app);
+  return new Promise((done) => {
+    let picked = null;
+    class Picker extends obsidian.FuzzySuggestModal {
+      getItems() { return [...names, COMMON]; }
+      getItemText(x) { return x === COMMON ? "共通(プロジェクトをまたぐもの)" : x; }
+      onChooseItem(x) { picked = x; }
+      onClose() { setTimeout(() => done(picked), 0); } // 選んだときは onChooseItem が閉じたあとに呼ばれる
+    }
+    const m = new Picker(app);
+    m.setPlaceholder(placeholder);
+    m.open();
+  }).then((picked) => {
+    if (picked && picked !== COMMON) {
+      try {
+        const recent = JSON.parse(window.localStorage.getItem(RECENT_KEY) || "[]").filter((x) => x !== picked);
+        window.localStorage.setItem(RECENT_KEY, JSON.stringify([picked, ...recent].slice(0, 20)));
+      } catch (e) { /* 覚えられなくても選んだものは使う */ }
+    }
+    return picked;
+  });
+}
+
+// 置くフォルダ。親から決まらなければ選んでもらい、選んだプロジェクトを values.project に入れる。
+// 選ばなかったら 00_inbox(行き先のわからないもの)
+async function placeFor(app, obsidian, kind, note, values) {
+  const folder = KINDS[kind].folder;
+  let project = projectOfNew(app, kind, note, values);
+  if (!project) {
+    project = await chooseProject(app, obsidian, `${kind}をどのプロジェクトに置きますか(Esc で 00_inbox へ)`);
+    if (!project) return "00_inbox";
+    values.project = flow([project]);
+  }
+  return `${project}/${folder}`;
+}
+
+async function ensureFolder(app, path) {
+  if (!app.vault.getAbstractFileByPath(path)) await app.vault.createFolder(path);
 }
 
 async function createNote(tp, kind, name, note) {
   const app = tp.app;
   const k = KINDS[kind];
-  const folderPath = await placeFor(app, kind, note);
-  if (!app.vault.getAbstractFileByPath(folderPath)) await app.vault.createFolder(folderPath);
+  const values = initialValues(app, kind, note);
+  const folderPath = await placeFor(app, tp.obsidian, kind, note, values);
+  await ensureFolder(app, folderPath);
   const template = app.vault.getAbstractFileByPath(k.template);
   if (!template) throw new Error(`${k.template} がありません`);
-  const values = initialValues(app, kind, note);
   // テンプレートの中で id がつき、ファイル名が id_名前 に変わる
   const file = await tp.file.create_new(template, name, false, app.vault.getAbstractFileByPath(folderPath));
   if (!file) return null;
@@ -477,5 +567,6 @@ async function fromNote(tp, kind, note, rawName) {
 }
 
 // ほかのスクリプト(link_node.js・link_relation.js・K-Plex の QuickAdd)も、tp.user.make_note から使う
-Object.assign(make_note, { fromNote, typeOf, nameOf, linkOf, asList, resolve, flow, placeLink });
+Object.assign(make_note, { fromNote, typeOf, nameOf, linkOf, asList, resolve, flow, placeLink,
+  chooseProject, ensureFolder, TYPE_FOLDERS, COMMON });
 module.exports = make_note;

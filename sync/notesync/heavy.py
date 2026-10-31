@@ -21,7 +21,7 @@ from . import ids
 from .report import Report
 from .safety import Backup
 from .state import digest
-from .vault import DIST, SYSTEM_DIR, sync_copy_of, is_hidden, iter_md, read, write
+from .vault import SYSTEM_DIR, sync_copy_of, is_hidden, iter_md, read, theirs_file, write
 
 ATTACH = f"{SYSTEM_DIR}/attachments"
 DATA_PREFIX = "開発データ/"
@@ -205,7 +205,8 @@ class Mover:
 
     def notes(self) -> list[tuple[Path, str]]:
         if self._notes is None:
-            self._notes = [(p, rel.as_posix()) for p, rel in iter_md(self.personal) if rel.parts[0] != DIST]
+            self._notes = [(p, rel.as_posix()) for p, rel in iter_md(self.personal)
+                           if not theirs_file(p, self.member)]  # 他の人のノートは書き換えない
         return self._notes
 
     def rewrite_links(self, note_id: str, rel_name: str, new_url: str, old_url: str | None = None) -> bool:

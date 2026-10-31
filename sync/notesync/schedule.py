@@ -6,7 +6,7 @@
 
 出すところは2つ(Yu 2026-10-29「週報の HTML と共有 vault の両方」):
 - 共有 vault の `<プロジェクト>/00_工程表_<プロジェクト>.md`。Mermaid のガント(Obsidian でも GitHub でも
-  図になる、ただの文字)と、同じ中身の表。各自の 90_共有/ にも同じものを置く(台帳の埋め込みが切れないように)
+  図になる、ただの文字)と、同じ中身の表。各自の個人 vault の同じ場所にも置く(台帳の埋め込みが切れないように)
 - 週報の HTML の「工程表」の節(weekly_html.py が SVG にする)
 
 台帳の「期間・主な節目」の表の下に `![[00_工程表_<プロジェクト>]]` が1つもなければ、1回だけ足す。
@@ -234,8 +234,8 @@ def update_schedules(personal: Path, shared: Path, member: str, report: Report, 
             folder = Path(proj.rel).parent.as_posix()
             _put(shared / folder / file_name(name), text, report, dry_run, "工程表を作り直した")
             members = {plain(m) for m in as_list(proj.fm.get("members"))}
-            if member in members and (personal / "90_共有").exists():
-                _put(personal / "90_共有" / folder / file_name(name), text, report, dry_run, "工程表を配った")
+            if member in members and personal.exists():  # 共有と同じ場所に置く(配られた台帳の埋め込みが切れない)
+                _put(personal / folder / file_name(name), text, report, dry_run, "工程表を配った")
             add_embed(proj, report, backup, dry_run, now, idle_seconds, shared)
     except Exception as e:  # おまけが壊れても、核の同期は続ける
         report.warn(f"工程表を作るところで止まりました({type(e).__name__}: {e})。同期はそのまま行いました")

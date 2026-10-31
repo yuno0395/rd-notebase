@@ -152,7 +152,7 @@
           "folder": {
             "enabled": true,
             "folders": [
-              "02_ノード"
+              "共通/02_ノード"
             ],
             "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,
@@ -185,7 +185,7 @@
           "folder": {
             "enabled": true,
             "folders": [
-              "02_ノード"
+              "共通/機密の窓口"
             ],
             "chooseWhenCreatingNote": false,
             "createInSameFolderAsActiveFile": false,

@@ -41,8 +41,8 @@ def test_shared_pointing_at_wrong_folder_stops_without_copying(cfg, tmp_path):
 
 
 def test_overlapping_places_stop(cfg):
-    cfg.secret = [cfg.personal / "02_ノード"]
-    (cfg.personal / "02_ノード" / "_仕組み").mkdir()
+    cfg.secret = [cfg.personal / "共通/02_ノード"]
+    (cfg.personal / "共通/02_ノード" / "_仕組み").mkdir()
     problems = check_places(cfg)
     assert any("重なっています" in p for p in problems)
 

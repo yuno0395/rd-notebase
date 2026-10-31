@@ -197,7 +197,8 @@ def test_new_version_and_backups(team, monkeypatch):
     keys["mine:x"] = [{"modifiers": ["Alt"], "key": "X"}]                     # 自分で足したキー
     keys["mine:y"] = [{"modifiers": ["Mod"], "key": "N"}]                     # 配る Ctrl+N とぶつかる
     hk.write_text(json.dumps(keys), encoding="utf-8")
-    note = personal / "02_ノード" / "0RDGPG001_水.md"
+    note = personal / "共通" / "02_ノード" / "0RDGPG001_水.md"
+    note.parent.mkdir(parents=True, exist_ok=True)
     note.write_text("---\nid: 0RDGPG001\n---\n", encoding="utf-8")
     code, s, ui = run("管理者", aenv, ["1", "9.9.21", "", "n"])  # 新しい版(1回目は上書きがなく控えはない)
     out = "\n".join(ui.out)
@@ -384,14 +385,24 @@ def test_migrations_for_old_vaults(tmp_path):
     (dist / "個人" / "_仕組み" / "記録" / "版.txt").write_text("0.2.0\n", encoding="utf-8")
     shutil.copy2(ROOT / "manifest.toml", dist / "manifest.toml")
     names = [Path(m["script"]).name for m in st.load_manifest(dist)["migrate"]]
-    assert names == ["migrate_v054.py", "migrate_v055.py"]
+    assert names == ["migrate_v054.py", "migrate_v055.py", "migrate_v067.py"]
     old = tmp_path / "古い個人"
     (old / "_仕組み").mkdir(parents=True)
-    assert [p.name for _, p in st.plan_vault(dist, "個人", old).migrations] == names
+    # 0.2.0 を出すときは、0.2.0 までの移し替えだけ(0.2.1 の migrate_v067 は次の版から)
+    assert [p.name for _, p in st.plan_vault(dist, "個人", old).migrations] == names[:2]
     (old / "_仕組み" / "記録").mkdir()
     (old / "_仕組み" / "記録" / "版.txt").write_text("0.2.0\n", encoding="utf-8")
     assert st.plan_vault(dist, "個人", old).migrations == []
     assert st.plan_vault(dist, "個人", tmp_path / "新しい個人").migrations == []   # これから作る vault
+    # 0.2.1 を当てると、0.2.0 の個人 vault には migrate_v067(90_共有 をなくす)だけ。共有 vault には当てない
+    (dist / "個人" / "_仕組み" / "記録" / "版.txt").write_text("0.2.1\n", encoding="utf-8")
+    assert [p.name for _, p in st.plan_vault(dist, "個人", old).migrations] == ["migrate_v067.py"]
+    (dist / "共有" / "_仕組み" / "記録").mkdir(parents=True)
+    (dist / "共有" / "_仕組み" / "記録" / "版.txt").write_text("0.2.1\n", encoding="utf-8")
+    shared_old = tmp_path / "古い共有"
+    (shared_old / "_仕組み" / "記録").mkdir(parents=True)
+    (shared_old / "_仕組み" / "記録" / "版.txt").write_text("0.2.0\n", encoding="utf-8")
+    assert st.plan_vault(dist, "共有", shared_old).migrations == []
 
 
 @pytest.mark.parametrize("ahead, pushed", [("0\n", True), ("2\n", False)])

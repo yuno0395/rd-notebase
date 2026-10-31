@@ -13,7 +13,7 @@ const BAD_CHARS = /[\\/:*?"<>|#^\[\]\r\n]/;
 // 共通の関数(nameOf・asList・placeLink)は make_note.js のものを使う。link_node を呼ぶときに入れる
 let M;
 
-// vault の中のノード(type: ノード)を、名前と別名で引ける形にする。配られた 90_共有 のものも含む。
+// vault の中のノード(type: ノード)を、名前と別名で引ける形にする。配られた他の人のノードも含む(同じ 共通/02_ノード/ にある)。
 function nodeIndex(app) {
   const out = [];
   for (const file of app.vault.getMarkdownFiles()) {
