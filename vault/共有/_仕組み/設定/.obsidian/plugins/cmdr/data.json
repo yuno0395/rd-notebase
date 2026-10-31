@@ -71,6 +71,12 @@
       "icon": "network",
       "name": "K-Plex で見る(Ctrl+G)",
       "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/今の仕事を確かめる.md",
+      "icon": "compass",
+      "name": "今の仕事を確かめる(Ctrl+J)",
+      "mode": "any"
     }
   ]
 }
