@@ -86,6 +86,13 @@ def main() -> int:
             continue
         (out / "移し替え").mkdir(exist_ok=True)
         shutil.copy2(src, out / "移し替え" / src.name)
+    # bat は CRLF に(LF だと Windows が日本語の行の区切りを読み違え、文の途中をコマンドとして動かす)
+    for f in out.rglob("*.bat"):
+        data = f.read_bytes()
+        crlf = data.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        if crlf != data:
+            f.write_bytes(crlf)
+            print(f"bat の改行を CRLF に直した: {f.relative_to(out).as_posix()}")
     for e in errors:
         print("エラー:", e)
     return 1 if errors else 0

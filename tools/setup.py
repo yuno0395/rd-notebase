@@ -359,6 +359,23 @@ def kind_of(rel: str, rules: dict) -> str | None:
     return None
 
 
+def bats_with_lf(root: Path) -> list[Path]:
+    """改行が LF だけの bat。Windows は日本語の行の区切りを読み違え、文の途中をコマンドとして動かす。"""
+    if not root.is_dir():
+        return []
+    return [f for f in sorted(root.rglob("*.bat"))
+            if f.is_file() and re.search(rb"(?<!\r)\n", f.read_bytes())]
+
+
+def fix_bat_eol(root: Path) -> list[Path]:
+    """root の下の bat の改行を CRLF にそろえる(GitHub の画面や API から持ってくると LF になる)。直したものを返す。"""
+    fixed = bats_with_lf(root)
+    for f in fixed:
+        data = f.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        f.write_bytes(data)
+    return fixed
+
+
 def same(a: Path, b: Path) -> bool:
     try:
         return a.stat().st_size == b.stat().st_size and a.read_bytes() == b.read_bytes()
@@ -495,6 +512,8 @@ def apply_vault(vp: VaultPlan, backups: Backups, label: str, ext: Ext | None = N
         dst = vp.target / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(vp.src / rel, dst)
+    for f in fix_bat_eol(vp.target / SYSTEM / "tools"):
+        done.append(f"{f.name} の改行を直した(CRLF)")
     # 空のフォルダ(01_目的 など)も作る
     for d in vp.src.rglob("*"):
         if d.is_dir():
@@ -1085,11 +1104,14 @@ class Setup:
                 if (src / "config.example.yaml").is_file():
                     shutil.copy2(src / "config.example.yaml", dst / "config.example.yaml")
                 (dst / "版.txt").write_text(ver + "\n", encoding="utf-8")
+                fix_bat_eol(dst / "起動")
                 if self.ext.shortcut("知見同期を続ける", dst / "起動" / "3_同期を続ける.bat"):
                     self.log("デスクトップに「知見同期を続ける」を置いた")
             self.add(f"同期プログラムを {have or 'なし'} → {ver} にする({dst})", go)
             if have:
                 self.hand_once("watch_restart", "「知見同期を続ける」の画面が開いていたら、閉じてからデスクトップの「知見同期を続ける」で開き直す")
+        elif bats_with_lf(dst / "起動"):
+            self.add(f"同期プログラムの bat の改行を直す(CRLF に。{dst / '起動'})", lambda: fix_bat_eol(dst / "起動"))
 
         conf = self.env.config
         values = {"member": self.me, "personal": str(self.personal), "shared": str(self.shared),

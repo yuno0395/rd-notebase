@@ -247,6 +247,42 @@ def test_rename_vault_then_press_again(team):
     assert personal not in {Path(v["path"]) for v in vaults.values()}
 
 
+def test_bats_are_crlf_and_lf_ones_get_fixed(team):
+    """LF の bat は Windows が日本語の行を途中で切り、「'じるか' is not recognized」などと出る。置く bat は CRLF にそろえる。"""
+    shared, aenv = team["shared"], team["admin_env"]
+    for root in (shared / st.DIST_DIR / "9.9.20", shared / st.SYSTEM / "tools", aenv.program):
+        assert list(root.rglob("*.bat")), root
+        assert st.bats_with_lf(root) == [], root
+    # GitHub の画面などから持ってきて LF になった bat も、bat をもう一度押せば直る(版は同じまま)
+    watch = aenv.program / "起動" / "3_同期を続ける.bat"
+    prep = shared / st.PREP_DIR / "プロジェクトリーダー.bat"
+    for f in (watch, prep):
+        f.write_bytes(f.read_bytes().replace(b"\r\n", b"\n"))
+    code, s, ui = run("管理者", aenv, ["3", ""])  # 自分の環境だけ
+    assert code == 0, "\n".join(ui.out)
+    assert b"\r\n" in watch.read_bytes() and st.bats_with_lf(aenv.program) == []
+    code, s, ui = run("管理者", aenv, ["1", ""])  # 共有 vault も
+    out = "\n".join(ui.out)
+    assert code == 0, out
+    assert st.bats_with_lf(shared / st.SYSTEM / "tools") == [], out
+
+
+def test_repo_bats_are_crlf():
+    """正本の bat は .gitattributes で CRLF(Git で持ってきたとき)。"""
+    for d in ("sync", "tools", "vault"):
+        assert st.bats_with_lf(ROOT / d) == []
+
+
+def test_fix_bat_eol(tmp_path):
+    (tmp_path / "a.bat").write_bytes(b"@echo off\nchcp 65001 > nul\r\necho \xe9\x96\x89\xe3\x81\x98\xe3\x82\x8b\n")
+    (tmp_path / "b.bat").write_bytes(b"@echo off\r\n")
+    (tmp_path / "c.md").write_bytes(b"x\n")
+    assert [f.name for f in st.fix_bat_eol(tmp_path)] == ["a.bat"]
+    assert (tmp_path / "a.bat").read_bytes() == b"@echo off\r\nchcp 65001 > nul\r\necho \xe9\x96\x89\xe3\x81\x98\xe3\x82\x8b\r\n"
+    assert (tmp_path / "c.md").read_bytes() == b"x\n"
+    assert st.fix_bat_eol(tmp_path) == []
+
+
 def test_tells_when_obsidian_uses_other_config_dir(team):
     """「設定フォルダを上書き」に違う名前を打つと、Obsidian はその空のフォルダを読み、プラグインが入っていないように見える。"""
     shared, aenv = team["shared"], team["admin_env"]
