@@ -158,7 +158,8 @@ def test_pl_first_time_with_project_and_secret(team):
     text = ledgers[0].read_text(encoding="utf-8")
     code36 = st.notesync().ids.code_of("123456")
     assert ledgers[0].name[6:10] == code36
-    assert "members: [佐藤, Yu]" in text and "<%" not in text and 'aliases: ["樹脂カバー量産"]' in text
+    # members は「番号_名前」。Yu は古い3文字の記号(001)なので名前だけ
+    assert "members: [123456_佐藤, Yu]" in text and "<%" not in text and 'aliases: ["樹脂カバー量産"]' in text
     assert "| DR1 | 2026-12-08 | 2026-12-08 |" in text
     assert (shared / "樹脂カバー量産" / "03_イシュー").is_dir()
     # 機密フォルダと窓口

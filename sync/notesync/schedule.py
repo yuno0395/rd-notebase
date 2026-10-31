@@ -21,9 +21,9 @@ from datetime import date, datetime
 from pathlib import Path
 
 from . import frontmatter, ids
-from .autofill import MILESTONE_SECTION, Doc, Index, as_list, load_docs, milestones, plain, targets
+from .autofill import MILESTONE_SECTION, Doc, Index, as_list, load_docs, milestones, targets
 from .report import Report
-from .vault import read, write
+from .vault import has_person, read, write
 
 PREFIX = "00_工程表_"
 STARTED = {"進行中", "待ち", "確認待ち", "完了", "中止"}
@@ -217,7 +217,8 @@ def add_embed(project: Doc, report: Report, backup, dry_run: bool, now: float, i
 
 def update_schedules(personal: Path, shared: Path, member: str, report: Report, backup,
                      dry_run: bool, now: float, idle_seconds: int, history: list[dict] | None = None) -> None:
-    """全プロジェクトの工程表を作り直す(中身が変わったときだけ書く)。おまけなので、壊れても同期は止めない。"""
+    """全プロジェクトの工程表を作り直す(中身が変わったときだけ書く)。おまけなので、壊れても同期は止めない。
+    member は自分(番号_名前 か 名前)。members に入っているプロジェクトの工程表を個人 vault にも置く。"""
     try:
         from .weekly import all_history
         today = datetime.fromtimestamp(now, tz=ids.JST).date()
@@ -233,8 +234,7 @@ def update_schedules(personal: Path, shared: Path, member: str, report: Report, 
             text = markdown(plan, proj, today)
             folder = Path(proj.rel).parent.as_posix()
             _put(shared / folder / file_name(name), text, report, dry_run, "工程表を作り直した")
-            members = {plain(m) for m in as_list(proj.fm.get("members"))}
-            if member in members and personal.exists():  # 共有と同じ場所に置く(配られた台帳の埋め込みが切れない)
+            if has_person(as_list(proj.fm.get("members")), member) and personal.exists():  # 共有と同じ場所に置く(配られた台帳の埋め込みが切れない)
                 _put(personal / folder / file_name(name), text, report, dry_run, "工程表を配った")
             add_embed(proj, report, backup, dry_run, now, idle_seconds, shared)
     except Exception as e:  # おまけが壊れても、核の同期は続ける

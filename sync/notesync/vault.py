@@ -43,16 +43,71 @@ def plain_name(value: str) -> str:
     return ids.split_filename(t)[1] if ids.split_filename(t)[0] else t
 
 
+# 人の書き方(author・reviewed_by・members・review_request・attendees)。v0.68 から「番号_名前」(例 229999_Yu)。
+# 同姓同名がいても番号で見分けるため(Yu 2026-10-31)。名前だけの書き方(Yu)もそのまま読む。
+# 番号は個人設定.md の6桁の number。古い3文字の記号しかない人は名前だけで書く。
+PERSON = re.compile(r"^(\d{6})_(.+)$")
+
+
+def person(value: str) -> tuple[str, str]:
+    """(6桁の番号, 名前)。"229999_Yu" → ("229999", "Yu")、"Yu" → ("", "Yu")。[[ ]] のリンクでもよい。"""
+    t = frontmatter.link_targets(value)
+    t = (t[0] if t else str(value)).strip()
+    m = PERSON.match(t)
+    if m:
+        return m.group(1), m.group(2).strip()
+    return "", plain_name(t).strip()
+
+
+def person_name(value: str) -> str:
+    """名前だけ(画面や週報に出すとき)。"""
+    return person(value)[1]
+
+
+def same_person(a: str, b: str) -> bool:
+    """同じ人か。両方に番号があれば番号で、どちらかが名前だけなら名前で比べる。"""
+    na_, a_ = person(a)
+    nb_, b_ = person(b)
+    if na_ and nb_:
+        return na_ == nb_
+    return bool(a_) and a_ == b_
+
+
+def person_labels(values) -> dict[str, str]:
+    """書いてある値 → 週報などに出す名前。同じ名前で番号の違う人がいるときだけ「名前(番号)」にする。
+    名前だけの古い書き方は、その名前の人が1人ならその人にまとめる。"""
+    numbers: dict[str, set[str]] = {}
+    for v in values:
+        n, name = person(v)
+        numbers.setdefault(name, set())
+        if n:
+            numbers[name].add(n)
+    out = {}
+    for v in values:
+        n, name = person(v)
+        out[v] = f"{name}({n})" if n and len(numbers[name]) > 1 else name
+    return out
+
+
+def has_person(values, who: str) -> bool:
+    return any(same_person(v, who) for v in values)
+
+
+def me_value(name: str, number: str) -> str:
+    """自分を書くときの形。番号がわからなければ名前だけ。"""
+    return f"{number}_{name}" if number else name
+
+
 def authors_of(fm: dict) -> list[str]:
-    """書いた人。まとめたノードは [佐藤, Yu] のように並ぶ(先頭が最初に書いた人)。"""
+    """書いた人(書いてあるまま。"229999_Yu" か "Yu")。まとめたノードは [佐藤, Yu] のように並ぶ(先頭が最初に書いた人)。"""
     return [plain_name(a).strip() for a in frontmatter.as_list(fm.get("author")) if a.strip()]
 
 
 def is_theirs(fm: dict, member: str) -> bool:
     """他の人のノートか。author に自分が入っていなければ他の人のもの(配られたもの)。
-    author が空のノートは自分のもの(同期プログラムがあとで author を書く)。"""
+    member は自分("229999_Yu" か "Yu")。author が空のノートは自分のもの(同期プログラムがあとで author を書く)。"""
     a = authors_of(fm)
-    return bool(a) and member not in a
+    return bool(a) and not has_person(a, member)
 
 
 def theirs_file(path: Path, member: str) -> bool:

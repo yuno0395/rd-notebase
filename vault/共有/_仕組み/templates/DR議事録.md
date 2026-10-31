@@ -4,7 +4,7 @@ type: 議事録
 kind: DR              # DR の議事録の印(ふつうの議事録と分ける)
 aliases: [<%* const nm = tp.file.title.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, ""); if (nm && !nm.startsWith("無題")) tR += JSON.stringify(nm); %>]
 date: <% tp.date.now("YYYY-MM-DD") %>
-attendees: []         # 判定した人
+attendees: []         # 判定した人(番号_名前。例 229999_Yu)
 parent: []            # 目的
 project: [<%* tR += await tp.user.place_note(tp) %>] # 親がないときだけ。Ctrl+N で選んだプロジェクトが入る(親があれば空のまま)
 ---
