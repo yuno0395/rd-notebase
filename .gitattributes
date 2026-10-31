@@ -1,2 +1,3 @@
 sync/tests/sample_vault/** -text
 *.bat text eol=crlf
+*.cmd text eol=crlf
