@@ -7,7 +7,7 @@ import time
 from .attachfix import fix_attachments
 from .fresh import fresh_ids
 from .autofill import run_autofill
-from .boxcopies import report_box_copies, tidy_layout_copies
+from .copies import report_sync_copies, tidy_layout_copies
 from .heavy import keep_rules, move_heavy
 from .history import record_history
 from .schedule import update_schedules
@@ -165,7 +165,7 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
     report_same_names(vaults, report)
     # 重い添付を 開発データ/ へ移し、リンクを書き換える(F-17〜20)。個人 vault だけ
     move_heavy(cfg.personal, cfg.shared, cfg.shared_data, cfg.member, report, backup, dry, now, cfg.idle_seconds)
-    report_box_copies([(v.label, v.root) for v in vaults], report)  # F-16
+    report_sync_copies([(v.label, v.root) for v in vaults], report)  # F-16
     tidy_layout_copies(cfg.personal, report, backup, dry)  # 2台で使うとできる画面配置の複製
 
     # おまけの自動入力(F-26・F-27・F-31)。集める前に書いて、同じ同期で共有に届ける
@@ -188,7 +188,7 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
         if not dry:
             state.save()
     elif cfg.shared:
-        report.warn(f"共有 vault が見つかりません: {cfg.shared}(Box Drive が止まっていないか確かめてください)")
+        report.warn(f"共有 vault が見つかりません: {cfg.shared}(同期アプリ(Box Drive・OneDrive など)が止まっていないか確かめてください)")
 
     try:
         check_outward(cfg, report)  # F-56: 外へ送る機能がオンになっていないか

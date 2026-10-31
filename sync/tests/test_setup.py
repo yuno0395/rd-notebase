@@ -67,11 +67,11 @@ def run(role, env, answers, dry=False, dist=None, hint=None):
 @pytest.fixture
 def team(tmp_path):
     """管理者が最初の版 9.9.20 を出してチームの土台を作ったところ。"""
-    box = tmp_path / "Box"
-    box.mkdir()
+    cloud = tmp_path / "Box"
+    cloud.mkdir()
     env = env_of(tmp_path, "admin")
     answers = [
-        str(box),       # Box のフォルダ
+        str(cloud),       # 共有クラウドフォルダ
         "",             # 共有 vault の場所(Box/チーム/開発ノート_共有)
         "", "",         # 開発データ・報告
         "9.9.20",       # 出す版
@@ -83,7 +83,7 @@ def team(tmp_path):
     ]
     code, s, ui = run("管理者", env, answers)
     assert code == 0, "\n".join(ui.out)
-    yield {"box": box, "shared": box / "チーム" / "開発ノート_共有", "admin_env": env, "tmp": tmp_path, "ui": ui}
+    yield {"cloud": cloud, "shared": cloud / "チーム" / "開発ノート_共有", "admin_env": env, "tmp": tmp_path, "ui": ui}
     shutil.rmtree(ROOT / "dist" / "9.9.20", ignore_errors=True)
     shutil.rmtree(ROOT / "dist" / "9.9.21", ignore_errors=True)
 
@@ -102,8 +102,8 @@ def test_admin_first_time(team):
     assert (shared / st.DIST_DIR / "9.9.20" / "準備" / "setup.py").is_file()
     assert (shared / st.DIST_DIR / "9.9.20" / "同期プログラム" / "notesync" / "run.py").is_file()
     assert (shared / st.DIST_DIR / "9.9.20" / st.CHANGES).is_file()
-    assert (team["box"] / "チーム" / "開発データ").is_dir()
-    personal = team["box"] / "個人" / "開発ノート_Yu"
+    assert (team["cloud"] / "チーム" / "開発データ").is_dir()
+    personal = team["cloud"] / "個人" / "開発ノート_Yu"
     assert st.my_settings(personal) == ("Yu", "")   # 3文字の古い記号は個人設定.md に書かない(メンバー.csv で読む)
     assert (shared / ".obsidian-001_adm" / "hotkeys.json").is_file()
     # 手で入れていた設定も bat で入る(貼ったファイルの置き場所・図・コアプラグイン)
@@ -121,11 +121,11 @@ def test_admin_first_time(team):
     assert conf["member"] == "Yu" and conf["dry_run"] is True and Path(conf["shared"]) == shared
     assert (team["admin_env"].program / "notesync" / "run.py").is_file()
     out = "\n".join(team["ui"].out)
-    assert "Box の画面で、共有 vault" in out and "設定フォルダを上書き" in out
+    assert "共有クラウドの画面(Box・OneDrive など)で、共有 vault" in out and "設定フォルダを上書き" in out
 
 
 def test_pl_first_time_with_project_and_secret(team):
-    shared, box = team["shared"], team["box"]
+    shared, cloud = team["shared"], team["cloud"]
     # 管理者が佐藤を足す
     aenv = team["admin_env"]
     code, s, ui = run("管理者", aenv, ["2", "佐藤", "123456", ""])  # メンバーを足す(1回目は上書きがなく控えはない)
@@ -137,18 +137,18 @@ def test_pl_first_time_with_project_and_secret(team):
     answers = [
         "2",             # 佐藤(123456)
         "pc1",           # PC の記号
-        str(box),        # Box のフォルダ
+        str(cloud),        # 共有クラウドフォルダ
         "",              # 個人 vault の場所
         "",              # 開発データ
         "", "",          # 週報を作る・報告フォルダ
         "y", "樹脂カバー量産", "1",  # プロジェクト(メンバーに Yu も)
-        "y", str(box / "機密" / "顧客A"), "案件A",  # 機密フォルダ
+        "y", str(cloud / "機密" / "顧客A"), "案件A",  # 機密フォルダ
         "",              # Enter で進む
     ]
     code, s, ui = run("PL", env, answers, dist=dist, hint=shared)
     out = "\n".join(ui.out)
     assert code == 0, out
-    personal = box / "個人" / "開発ノート_佐藤"
+    personal = cloud / "個人" / "開発ノート_佐藤"
     assert st.my_settings(personal) == ("佐藤", "123456")
     assert st.read_version(personal) == "9.9.20"
     assert (shared / ".obsidian-123456_pc1" / "app.json").is_file()
@@ -162,7 +162,7 @@ def test_pl_first_time_with_project_and_secret(team):
     assert "| DR1 | 2026-12-08 | 2026-12-08 |" in text
     assert (shared / "樹脂カバー量産" / "03_イシュー").is_dir()
     # 機密フォルダと窓口
-    secret = box / "機密" / "顧客A"
+    secret = cloud / "機密" / "顧客A"
     assert (secret / "06_事実").is_dir() and st.read_version(secret) == "9.9.20"
     assert "「案件A」" in (secret / "00_README.md").read_text(encoding="utf-8")
     assert ("佐藤", "123456") in st.read_members_csv(secret / st.SECRET_CSV)
@@ -187,9 +187,9 @@ def test_pl_first_time_with_project_and_secret(team):
 
 
 def test_new_version_and_backups(team, monkeypatch):
-    shared, box = team["shared"], team["box"]
+    shared, cloud = team["shared"], team["cloud"]
     aenv = team["admin_env"]
-    personal = box / "個人" / "開発ノート_Yu"
+    personal = cloud / "個人" / "開発ノート_Yu"
     readme = personal / "00_README.md"
     readme.write_text("自分で書き換えた README\n", encoding="utf-8", newline="\n")  # 仕組みのファイルは版で上書きされる
     hk = personal / ".obsidian" / "hotkeys.json"
@@ -233,10 +233,10 @@ def test_backups_default(tmp_path):
 
 
 def test_rename_vault_then_press_again(team):
-    box, shared = team["box"], team["shared"]
+    cloud, shared = team["cloud"], team["shared"]
     aenv = team["admin_env"]
-    personal = box / "個人" / "開発ノート_Yu"
-    renamed = box / "個人" / "Yu のノート"
+    personal = cloud / "個人" / "開発ノート_Yu"
+    renamed = cloud / "個人" / "Yu のノート"
     personal.rename(renamed)
     code, s, ui = run("管理者", aenv, ["3", ""])  # 自分の環境だけ
     out = "\n".join(ui.out)
@@ -248,13 +248,13 @@ def test_rename_vault_then_press_again(team):
 
 
 def test_dry_run_changes_nothing(team):
-    shared, box = team["shared"], team["box"]
+    shared, cloud = team["shared"], team["cloud"]
     env = env_of(team["tmp"], "member")
     dist = shared / st.DIST_DIR / "9.9.20"
-    code, s, ui = run("メンバー", env, ["1", "m1", str(box), str(box / "個人" / "試し"), "", "n"], dry=True, dist=dist, hint=shared)
+    code, s, ui = run("メンバー", env, ["1", "m1", str(cloud), str(cloud / "個人" / "試し"), "", "n"], dry=True, dist=dist, hint=shared)
     out = "\n".join(ui.out)
     assert code == 0 and "試しなので、ここでやめます" in out, out
-    assert not (box / "個人" / "試し").exists()
+    assert not (cloud / "個人" / "試し").exists()
     assert not env.config.exists() and not env.app.exists()
     assert not (shared / ".obsidian-001_m1").exists()
 
@@ -320,7 +320,7 @@ def test_input_ended_stops(monkeypatch):
     monkeypatch.setattr("builtins.input", eof)
     ui = st.UI()
     with pytest.raises(st.Stop):
-        ui.ask("Box Drive のフォルダ", "C:/nowhere")
+        ui.ask("共有クラウドフォルダ", "C:/nowhere")
 
 
 def test_migrations_for_old_vaults(tmp_path):
@@ -353,3 +353,24 @@ def test_tag_is_not_pushed_with_unpushed_commits(ahead, pushed):
     s.tag()
     assert (("push", "origin", "v9.9.21") in calls) is pushed
     assert bool(s.hand) is not pushed
+
+
+def test_cloud_root_reads_old_box_memo(tmp_path):
+    """v0.65 までの 準備.json の box も、共有クラウドフォルダとして読む(F-46)。"""
+    env = env_of(tmp_path, "pc1")
+    old = tmp_path / "Box"
+    old.mkdir()
+    env.memo.parent.mkdir(parents=True)
+    env.memo.write_text(json.dumps({"box": str(old)}), encoding="utf-8")
+    s = st.Setup("メンバー", True, ui=st.UI([]), env=env, ext=FakeExt(env), today=TODAY)
+    assert s.cloud_root() == old
+    assert s.memo == {"cloud": str(old)}
+
+
+def test_cloud_root_guesses_onedrive(tmp_path):
+    env = env_of(tmp_path, "pc1")
+    od = env.home / "OneDrive - 会社"
+    od.mkdir(parents=True)
+    ui = st.UI([""])
+    s = st.Setup("メンバー", True, ui=ui, env=env, ext=FakeExt(env), today=TODAY)
+    assert s.cloud_root() == od

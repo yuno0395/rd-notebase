@@ -91,7 +91,7 @@ class Env:
 
     @property
     def memo(self) -> Path:
-        return self.app / "準備.json"   # この PC で覚えておくこと(PC の記号など)。Box には置かない
+        return self.app / "準備.json"   # この PC で覚えておくこと(PC の記号など)。共有クラウドフォルダには置かない
 
     @property
     def log(self) -> Path:
@@ -221,6 +221,12 @@ class Stop(Exception):
 
 
 # ---------- 版 ----------
+
+def cloud_candidates(home: Path) -> list[Path]:
+    """共有クラウドフォルダのありそうな場所。Box Drive・OneDrive(会社のものは「OneDrive - 会社名」)・Dropbox・Google ドライブ。"""
+    names = ["Box"] + sorted(p.name for p in home.glob("OneDrive*")) + ["Dropbox", "Google Drive", "マイドライブ"]
+    return [home / n for n in names]
+
 
 def vkey(v: str) -> tuple[int, ...]:
     try:
@@ -848,17 +854,22 @@ class Setup:
             self.conf.update({"personal": str(c.personal), "shared": str(c.shared) if c.shared else None,
                               "secret": [str(p) for p in c.secret]})
 
-    # --- Box の場所 ---
-    def box_root(self) -> Path:
-        if self.memo.get("box") and Path(self.memo["box"]).is_dir():
-            return Path(self.memo["box"])
-        guess = self.env.home / "Box"
-        if not guess.is_dir() and self.shared_hint:
-            guess = self.shared_hint.parent
+    # --- 共有クラウドフォルダの場所 ---
+    def cloud_root(self) -> Path:
+        """PC 上で同期されるフォルダ(Box Drive・OneDrive・Google ドライブ・NAS など)の一番上。
+        準備.json の cloud に覚える。v0.65 までの box も読む(F-46)。"""
+        if "box" in self.memo:
+            self.memo.setdefault("cloud", self.memo.pop("box"))
+        if self.memo.get("cloud") and Path(self.memo["cloud"]).is_dir():
+            return Path(self.memo["cloud"])
+        guess = next((p for p in cloud_candidates(self.env.home) if p.is_dir()), None)
+        if guess is None:
+            guess = self.shared_hint.parent if self.shared_hint else self.env.home / "Box"
         while True:
-            a = Path(self.ui.ask("Box Drive のフォルダ(エクスプローラーのアドレス欄から写せます)", str(guess)))
+            a = Path(self.ui.ask("共有クラウドフォルダ(Box・OneDrive・NAS など、PC 上で同期されるフォルダ。"
+                                 "エクスプローラーのアドレス欄から写せます)", str(guess)))
             if a.is_dir():
-                self.memo["box"] = str(a)
+                self.memo["cloud"] = str(a)
                 return a
             self.ui.say(f"フォルダが見つかりません: {a}")
 
@@ -938,8 +949,8 @@ class Setup:
         if self.conf.get("personal"):
             personal = Path(self.conf["personal"])
         else:
-            box = self.box_root()
-            personal = Path(self.ui.ask("個人 vault の場所(なければ作ります)", str(box / "個人" / f"開発ノート_{self.me}")))
+            cloud = self.cloud_root()
+            personal = Path(self.ui.ask("個人 vault の場所(なければ作ります)", str(cloud / "個人" / f"開発ノート_{self.me}")))
         self.personal = personal
         if personal.exists() and not (personal / SYSTEM).is_dir() and any(personal.iterdir()):
             raise Stop(f"{personal} は vault ではないファイルが入っています。空のフォルダか個人 vault を指してください")
@@ -960,7 +971,6 @@ class Setup:
         report = self.conf.get("report")
         data = self.conf.get("shared_data")
         if not self.conf.get("member"):
-            box = self.box_root()
             if not data:
                 d = Path(self.ui.ask("開発データ(重い添付)のフォルダ", str(shared.parent / "開発データ")))
                 data = str(d)
@@ -1140,7 +1150,7 @@ class Setup:
 
     def ask_secret(self) -> None:
         while True:
-            p = Path(self.ui.ask("機密フォルダの場所(Box に作ったフォルダ。なければ作ります)"))
+            p = Path(self.ui.ask("機密フォルダの場所(共有クラウドフォルダに作ったフォルダ。なければ作ります)"))
             if not str(p) or str(p) == ".":
                 return
             bad = [x for x in [self.shared, self.personal] if p.resolve().is_relative_to(x.resolve()) or x.resolve().is_relative_to(p.resolve())]
@@ -1197,7 +1207,7 @@ class Setup:
         conf = self.env.config
         self.add(f"config.yaml の secret に {vp_label}を足す",
                  lambda: add_secret(conf, p) if conf.is_file() else None)
-        self.hand.append(f"Box の画面で{vp_label}の共同作業者を、案件の担当者だけにする(見てよい人を窓口「{alias}」の readers にも書く)")
+        self.hand.append(f"共有クラウドの画面(Box・OneDrive など)で{vp_label}を見られる人を、案件の担当者だけにする(見てよい人を窓口「{alias}」の readers にも書く)")
 
     # --- 管理者 ---
     def ask_admin(self) -> None:
@@ -1211,7 +1221,7 @@ class Setup:
                 raise Stop(f"この正本は Git で持ってきたものではありません。{DEFAULT_REPO_DIR}\\tools\\システム管理者.bat を押してください")
             if self.dry:
                 raise Stop(f"正本を Git で {DEFAULT_REPO_DIR} に持ってくる必要があります(試しなのでやめます)")
-            self.ui.say(f"正本を Git で {DEFAULT_REPO_DIR} に持ってきます(Box の外)。")
+            self.ui.say(f"正本を Git で {DEFAULT_REPO_DIR} に持ってきます(共有クラウドフォルダの外)。")
             code, out = self.ext.run(["git", "clone", REPO_URL, str(DEFAULT_REPO_DIR)])
             if code != 0:
                 raise Stop("正本を持ってこられませんでした:\n" + out[-600:])
@@ -1220,8 +1230,8 @@ class Setup:
         first = not shared or not (shared / SYSTEM).is_dir()
         if first:
             self.ui.say("共有 vault がまだありません。チームの土台を作ります。")
-            box = self.box_root()
-            shared = Path(self.ui.ask("共有 vault の場所", str(box / "チーム" / "開発ノート_共有")))
+            cloud = self.cloud_root()
+            shared = Path(self.ui.ask("共有 vault の場所", str(cloud / "チーム" / "開発ノート_共有")))
             if (shared / SYSTEM).is_dir():
                 first = False
             else:
@@ -1232,7 +1242,7 @@ class Setup:
                 for d in (shared, data, report):
                     if not d.is_dir():
                         self.add(f"フォルダを作る: {d}", lambda d=d: d.mkdir(parents=True, exist_ok=True))
-                self.hand += ["Box の画面で、共有 vault・開発データ・報告フォルダにメンバーを共同作業者(編集)として招待する",
+                self.hand += ["共有クラウドの画面(Box・OneDrive など)で、共有 vault・開発データ・報告フォルダにメンバーを編集できる人として招待する",
                               "報告フォルダに、週報を読む上司を閲覧で招待する"]
         self.shared = shared
         if not first:
@@ -1288,7 +1298,7 @@ class Setup:
                     self.backups.save("機密フォルダ", s, [SECRET_CSV.as_posix()])
                     shutil.copy2(shared / MEMBER_CSV, s / SECRET_CSV)
         self.add(f"メンバー.csv に {name}({number})を足す(権限のある機密フォルダの写しにも)", go)
-        self.hand.append(f"Box の画面で {name} を共有 vault・開発データ・報告フォルダに招待し、共有 vault の "
+        self.hand.append(f"共有クラウドの画面(Box・OneDrive など)で {name} を共有 vault・開発データ・報告フォルダに招待し、共有 vault の "
                          f"{PREP_DIR.as_posix()}/チームメンバー.bat を押してもらう")
 
     def ask_release(self, shared: Path, first: bool) -> None:
@@ -1316,9 +1326,9 @@ class Setup:
         self.version = ver
         plugin_from = Path(self.conf["personal"]) / ".obsidian" if self.conf.get("personal") else None
         out_dir = REPO / "dist" / ver
-        # 正本の中で組み立てる(Box はまだ変えない)。何を当てるかは、組み立てたものを見て決める
+        # 正本の中で組み立てる(共有 vault はまだ変えない)。何を当てるかは、組み立てたものを見て決める
         self.ui.say("")
-        self.ui.say(f"まず正本の中で版 {ver} を組み立てます。Box はまだ何も変えません。")
+        self.ui.say(f"まず正本の中で版 {ver} を組み立てます。共有 vault はまだ何も変えません。")
         if not dirty and not self.dry:
             self.ui.say("- 正本を GitHub の最新にする(git pull)")
             self.git_pull()

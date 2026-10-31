@@ -22,7 +22,7 @@ from . import frontmatter, ids
 from .frontmatter import LINK, as_list, link_targets as targets
 from .report import Report
 from .safety import Backup
-from .vault import DIST, OWN_DIRS, SKIP_DIRS, box_copy_of, is_hidden, read, write
+from .vault import DIST, OWN_DIRS, SKIP_DIRS, sync_copy_of, is_hidden, read, write
 
 
 # 仕様書「priority の決め方」
@@ -79,7 +79,7 @@ def load_docs(root: Path, own: bool, tops: tuple[str, ...] | None = None,
             continue
         if tops is not None and parts[0] not in tops:
             continue
-        if p.name.endswith(".excalidraw.md") or box_copy_of(p)[0]:
+        if p.name.endswith(".excalidraw.md") or sync_copy_of(p)[0]:
             continue
         file_id, name = ids.split_filename(p.stem)
         if not file_id:

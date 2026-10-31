@@ -7,7 +7,7 @@ from notesync.config import Config, load
 from notesync.heavy import to_shared
 from notesync.lock import STALE_SECONDS, Busy, Lock
 from notesync.report import Report
-from notesync.boxcopies import tidy_layout_copies
+from notesync.copies import tidy_layout_copies
 from notesync.safety import Backup
 
 import pytest

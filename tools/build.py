@@ -4,7 +4,7 @@
 できるもの: dist/0.1.0/{共有,個人,機密}/ と dist/0.1.0/manifest.toml、plugins.py・プラグインを入れる.bat、
           準備/setup.py(準備の bat の中身)、同期プログラム/(notesync と起動用の bat)、移し替え/(manifest の migrate)
 続けて python tools/plugins.py pack 0.1.0 --from <プラグインが入った設定フォルダ> で dist/0.1.0/プラグイン/ をそろえる。
-これを Box の共有 _仕組み/tools/配布/0.1.0/ に置く。
+これを共有 vault の _仕組み/tools/配布/0.1.0/ に置く。
 
 Python 3.11 以上。標準ライブラリだけを使う。
 """

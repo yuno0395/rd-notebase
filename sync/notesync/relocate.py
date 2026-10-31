@@ -24,7 +24,7 @@ VAULT_ID = Path("_仕組み/記録") / "vault_id.txt"
 SYSTEM_DIR = "_仕組み"
 UP = 3          # 元の場所から上へたどる段数
 DOWN = 3        # 探すフォルダから下へ見る段数
-MAX_DIRS = 5000  # Box 全体を歩き回らないための上限
+MAX_DIRS = 5000  # 共有クラウドフォルダ全体を歩き回らないための上限
 
 
 def record_path(config_path: Path) -> Path:
