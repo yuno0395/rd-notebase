@@ -51,7 +51,7 @@ def last_values(rows: list[dict]) -> dict[tuple[str, str], str]:
 
 
 def record_history(personal: Path, shared: Path, member: str, report: Report,
-                   dry_run: bool, now: float, started: dict | None = None) -> None:
+                   dry_run: bool, now: float, started: dict | None = None, me: str = "") -> None:
     """started: F-54 で 進行中 にしたタスクの id と着手の日。その status の行は着手の日で書く。"""
     started = started or {}
     try:
@@ -60,7 +60,7 @@ def record_history(personal: Path, shared: Path, member: str, report: Report,
         last = last_values(rows)
         stamp = datetime.fromtimestamp(now, tz=ids.JST).strftime("%Y-%m-%d %H:%M")
         new = []
-        for d in [d for d in load_docs(personal, own=True, skip=NOT_NOTE_TOPS, member=member) if d.own]:
+        for d in [d for d in load_docs(personal, own=True, skip=NOT_NOTE_TOPS, member=me or member) if d.own]:
             for key in WATCH.get(d.type, ()):
                 now_v = value_of(d.fm.get(key))
                 before = last.get((d.id, key))

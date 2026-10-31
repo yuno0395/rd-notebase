@@ -22,13 +22,6 @@ function asList(v) {
   return (Array.isArray(v) ? v : [v]).map((x) => String(x));
 }
 
-function plain(v) {
-  // "[[0RAYFN001_Yu|Yu]]" や "Yu" を "Yu" にする
-  const m = String(v).match(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/);
-  const s = m ? (m[2] || m[1]) : String(v);
-  return s.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, "").trim();
-}
-
 function linkTargets(v) {
   const out = [];
   for (const x of asList(v)) {
@@ -38,15 +31,8 @@ function linkTargets(v) {
   return out;
 }
 
-async function myName(app) {
-  const fs = app.vault.adapter;
-  if (await fs.exists("_仕組み/記録/私.yaml")) {
-    const m = (await fs.read("_仕組み/記録/私.yaml")).match(/^name:\s*["']?([^"'\r\n#]+)/m);
-    if (m) return m[1].trim();
-  }
-  const dir = app.vault.configDir; // 共有・機密 vault: .obsidian-<名前>
-  return dir.startsWith(".obsidian-") ? dir.slice(".obsidian-".length) : "";
-}
+// 人の書き方(番号_名前)と自分は others_note.js にまとめてある(仕様書 v0.68)
+let P = null;
 
 function fmOf(app, file) {
   return app.metadataCache.getFileCache(file)?.frontmatter || {};
@@ -58,7 +44,8 @@ function priorityOf(fm) {
 }
 
 function people(fm, key) {
-  return asList(fm[key]).map(plain).filter(Boolean);
+  // 書いてあるまま(229999_Yu か Yu)。比べるのは P.samePerson、出すのは P.personName
+  return asList(fm[key]).map((v) => v.trim()).filter(Boolean);
 }
 
 function ownerOf(fm) {
@@ -111,7 +98,7 @@ function judge(app, task, issues, me, myBest) {
   const quick = ifms.some((fm) => String(fm.speed || "").trim() === "すぐ");
   const challenging = ifms.some((fm) => CHALLENGING.includes(String(fm.resolution || "").trim()));
   const q1 = issues.length > 0 && best <= myBest;
-  const q2 = owners.includes(me) && quick && !BLOCKED.includes(status);
+  const q2 = P.hasPerson(owners, me) && quick && !BLOCKED.includes(status);
   return { best, q1, q2, q3: challenging, owners, quick, status, ifms };
 }
 
@@ -132,9 +119,10 @@ async function now_check(tp) {
     setTimeout(() => ed.setSelection(anchor, head), 0);
   }
 
-  const me = await myName(app);
+  P = tp.user.others_note;
+  const me = await P.myName(app);
   if (!me) {
-    new Notice("自分の名前が見つかりません。_仕組み/記録/私.yaml に name を書いてください", 8000);
+    new Notice("自分が見つかりません。個人 vault なら _仕組み/個人設定.md に name と number を書いてください", 8000);
     return;
   }
 
@@ -163,12 +151,12 @@ async function now_check(tp) {
   const reachable = new Set();
   for (const f of files) {
     const fm = fmOf(app, f);
-    if (fm.type === "タスク" && !CLOSED_TASK.includes(String(fm.status || "").trim()) && ownerOf(fm).includes(me)) {
+    if (fm.type === "タスク" && !CLOSED_TASK.includes(String(fm.status || "").trim()) && P.hasPerson(ownerOf(fm), me)) {
       const issues = issuesOf(app, f).filter((i) => !CLOSED_ISSUE.includes(String(fmOf(app, i).status || "").trim()));
       myTasks.push({ f, issues });
       issues.forEach((i) => reachable.add(i.path));
     }
-    if (fm.type === "イシュー" && !CLOSED_ISSUE.includes(String(fm.status || "").trim()) && ownerOf(fm).includes(me)) {
+    if (fm.type === "イシュー" && !CLOSED_ISSUE.includes(String(fm.status || "").trim()) && P.hasPerson(ownerOf(fm), me)) {
       reachable.add(f.path);
     }
   }
@@ -188,7 +176,7 @@ async function now_check(tp) {
     lines.push(`- ${mark(r.q1)} 目的への貢献が一番大きいか: ${issues.map((i) => linkTo(app, i, task.path)).join("、")} は ${pri}${top}`);
   }
   const why2 = [];
-  if (!r.owners.includes(me)) why2.push(`担当は ${r.owners.join("・") || "空"}`);
+  if (!P.hasPerson(r.owners, me)) why2.push(`担当は ${r.owners.map(P.personName).join("・") || "空"}`);
   if (!r.quick) why2.push("イシューの speed が「すぐ」でない");
   if (BLOCKED.includes(r.status)) why2.push(`status が「${r.status}」`);
   lines.push(`- ${mark(r.q2)} 自分で実行できるか${why2.length ? ": " + why2.join("、") : ""}`);

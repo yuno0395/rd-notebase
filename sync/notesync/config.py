@@ -39,6 +39,7 @@ class Config:
     backup_dir: Path | None = None
     state_dir: Path | None = None  # 前回同期の記録(F-14)の置き場所。省略時は個人 vault の中
     code: str = ""
+    number: str = ""  # 個人設定.md の6桁の番号(author に「番号_名前」と書くため。v0.68)
     config_path: Path | None = None  # 読んだ config.yaml。vault の場所が変わったときに書き直す(F-50)
     moved: list[str] = field(default_factory=list)       # load のときに直した場所(次の同期レポートに書く)
     move_warnings: list[str] = field(default_factory=list)
@@ -48,6 +49,12 @@ class Config:
         if self.state_dir:
             return self.state_dir / f"state_{self.member}.json"
         return self.personal / STATE_FILE
+
+    @property
+    def me(self) -> str:
+        """ノートに自分を書くときの形(author・reviewed_by など)。例 229999_Yu。番号がなければ名前だけ。"""
+        from .vault import me_value
+        return me_value(self.member, self.number)
 
     @property
     def lock_path(self) -> Path:
@@ -84,23 +91,29 @@ def load(path: Path) -> Config:
     from .relocate import follow
     cfg.moved, cfg.move_warnings = follow(cfg, dry=cfg.dry_run)
     cfg.code = member_code(cfg)
+    cfg.number = member_number(cfg)
     return cfg
 
 
-def read_members(shared: Path) -> dict[str, str]:
-    """メンバー.csv の 名前 → 人の記号。2列目が6桁の番号なら36進数の4文字に、古い3文字の記号はそのまま。"""
+def read_member_numbers(shared: Path) -> dict[str, str]:
+    """メンバー.csv の 名前 → 2列目そのまま(6桁の番号か、古い3文字の記号)。"""
     path = shared / MEMBER_CSV
     if not path.exists():
         return {}
     with path.open(encoding="utf-8-sig", newline="") as f:
         rows = list(csv.reader(f))
+    return {row[0].strip(): row[1].strip() for row in rows[1:]
+            if len(row) >= 2 and row[0].strip() and row[1].strip()}
+
+
+def read_members(shared: Path) -> dict[str, str]:
+    """メンバー.csv の 名前 → 人の記号。2列目が6桁の番号なら36進数の4文字に、古い3文字の記号はそのまま。"""
     out = {}
-    for row in rows[1:]:
-        if len(row) >= 2 and row[0].strip() and row[1].strip():
-            try:
-                out[row[0].strip()] = ids.code_of(row[1])
-            except ValueError as e:
-                raise ConfigError(f"メンバー.csv の {row[0].strip()} の番号: {e}") from e
+    for name, raw in read_member_numbers(shared).items():
+        try:
+            out[name] = ids.code_of(raw)
+        except ValueError as e:
+            raise ConfigError(f"メンバー.csv の {name} の番号: {e}") from e
     return out
 
 
@@ -108,6 +121,20 @@ def _field(text: str, key: str) -> str:
     """属性欄の1行を文字のまま読む(YAML に読ませると 012345 が数になり先頭の0が消えるため)。"""
     m = re.search(rf"^{key}:[ \t]*[\"']?([^\"'#\r\n]*?)[\"']?[ \t]*(?:#.*)?$", text, re.M)
     return m.group(1).strip() if m else ""
+
+
+def read_my_number(personal: Path) -> str:
+    path = personal / MY_SETTINGS
+    return _field(path.read_text(encoding="utf-8"), "number") if path.exists() else ""
+
+
+def member_number(cfg: Config) -> str:
+    """author に書く6桁の番号。個人設定.md の number、なければ メンバー.csv の6桁の番号。
+    古い3文字の記号しかない人は空(author は名前だけで書く)。"""
+    n = read_my_number(cfg.personal)
+    if not n and cfg.shared:
+        n = read_member_numbers(cfg.shared).get(cfg.member, "")
+    return n if re.fullmatch(r"\d{6}", n or "") else ""
 
 
 def read_my_code(personal: Path) -> tuple[str, str]:

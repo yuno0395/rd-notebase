@@ -686,6 +686,11 @@ def yaml_list(items: list[str]) -> str:
     return "[" + ", ".join(items) + "]"
 
 
+def person_value(name: str, number: str) -> str:
+    """author や members に書く形。6桁の番号があれば「番号_名前」(例 229999_Yu)、なければ名前だけ。"""
+    return f"{number}_{name}" if re.fullmatch(r"\d{6}", number or "") else name
+
+
 def render(template: str, note_id: str, alias: str, today: datetime, lists: dict[str, list[str]]) -> str:
     """Templater のテンプレートを、Obsidian を通さずに埋める(台帳と機密の窓口だけ)。"""
     out = []
@@ -1170,6 +1175,10 @@ class Setup:
         for x in re.split(r"[,、\s]+", a):
             if x.isdigit() and 1 <= int(x) <= len(members) and members[int(x) - 1][0] not in chosen:
                 chosen.append(members[int(x) - 1][0])
+        # 台帳の members は「番号_名前」(同姓同名を番号で見分ける。仕様書 v0.68)
+        numbers = {n: num for n, num in members}
+        numbers.setdefault(self.me, self.number)
+        written = [person_value(n, numbers.get(n, "")) for n in chosen]
         tmpl = self.shared / SYSTEM / "templates" / "プロジェクト.md"
 
         def go():
@@ -1177,7 +1186,7 @@ class Setup:
             for sub in ("01_目的", "01_設計案", "03_イシュー", "04_タスク", "05_ナレッジ"):
                 (root / sub).mkdir(parents=True, exist_ok=True)
             nid = make_note_id(self.shared, self.number)
-            text = render(tmpl.read_text(encoding="utf-8"), nid, name, self.today, {"members": chosen})
+            text = render(tmpl.read_text(encoding="utf-8"), nid, name, self.today, {"members": written})
             (root / f"{nid}_{name}.md").write_text(text, encoding="utf-8")
             self.log(f"プロジェクト {name} を作った")
         self.add(f"共有 vault にプロジェクト「{name}」(メンバー {'、'.join(chosen)})のフォルダと台帳を作る", go)

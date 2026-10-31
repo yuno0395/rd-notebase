@@ -187,11 +187,12 @@ def shared_folder_of(shared: Path | None, note_id: str) -> str | None:
 
 class Mover:
     def __init__(self, personal: Path, shared: Path | None, data_root: Path, member: str,
-                 report: Report, backup: Backup, dry_run: bool, now: float, idle_seconds: int):
+                 report: Report, backup: Backup, dry_run: bool, now: float, idle_seconds: int, me: str = ""):
         self.personal = personal
         self.shared = shared
         self.data_root = data_root
-        self.member = member
+        self.member = member  # 開発データ/個人/<名前>/ の名前
+        self.me = me or member  # 自分のノートか見分ける(番号_名前)
         self.report = report
         self.backup = backup
         self.dry_run = dry_run
@@ -206,7 +207,7 @@ class Mover:
     def notes(self) -> list[tuple[Path, str]]:
         if self._notes is None:
             self._notes = [(p, rel.as_posix()) for p, rel in iter_md(self.personal)
-                           if not theirs_file(p, self.member)]  # 他の人のノートは書き換えない
+                           if not theirs_file(p, self.me)]  # 他の人のノートは書き換えない
         return self._notes
 
     def rewrite_links(self, note_id: str, rel_name: str, new_url: str, old_url: str | None = None) -> bool:
@@ -295,7 +296,8 @@ class Mover:
 
 
 def move_heavy(personal: Path, shared: Path | None, data_root: Path | None, member: str,
-               report: Report, backup: Backup, dry_run: bool, now: float, idle_seconds: int) -> None:
+               report: Report, backup: Backup, dry_run: bool, now: float, idle_seconds: int,
+               me: str = "") -> None:
     if not data_root:
         rules = keep_rules(shared)
         base = personal / ATTACH
@@ -308,4 +310,4 @@ def move_heavy(personal: Path, shared: Path | None, data_root: Path | None, memb
         report.warn(f"開発データのフォルダが見つかりません: {data_root}(同期アプリ(Box Drive・OneDrive など)が止まっていないか確かめてください)。"
                     "重い添付は移していません")
         return
-    Mover(personal, shared, data_root, member, report, backup, dry_run, now, idle_seconds).run()
+    Mover(personal, shared, data_root, member, report, backup, dry_run, now, idle_seconds, me).run()

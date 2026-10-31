@@ -23,6 +23,7 @@ from . import frontmatter, ids
 from .autofill import LINK, Doc, Index, as_list, load_docs, milestones, plain, targets, to_date
 from .history import HISTORY_DIR, read_rows
 from .report import Report
+from .vault import person_labels, person_name
 
 BIG = {"方針", "絞込", "出荷"}
 STAGES = ["未把握", "現象", "設計空間", "原理"]
@@ -64,9 +65,15 @@ def prio(doc: Doc) -> int | None:
     return int(v) if v in ("1", "2", "3", "4") else None
 
 
-def owner(doc: Doc) -> str:
+def owner_value(doc: Doc) -> str:
+    """担当(owner、なければ author の先頭)を書いてあるまま(229999_Yu か Yu)。"""
     o = as_list(doc.fm.get("owner")) or as_list(doc.fm.get("author"))
     return plain(o[0]) if o else "(不明)"
+
+
+def owner(doc: Doc) -> str:
+    """担当の名前(週報に出す形)。"""
+    return person_name(owner_value(doc)) or "(不明)"
 
 
 @dataclass
@@ -302,11 +309,12 @@ class Builder:
 
     def people(self, docs: list[Doc]) -> list[list[str]]:
         # 確認を頼まれた: 確認待ちのタスクの review_request に名前があるもの(仕様書「確認待ち」)
+        # 人は「番号_名前」でも名前だけでも書ける。同じ人を1行にまとめ、同姓同名だけ番号を添える(v0.68)
         counts: dict[str, list[int]] = {}
         for t in docs:
             if t.type != "タスク" or status(t) not in OPEN_TASK:
                 continue
-            c = counts.setdefault(owner(t), [0, 0, 0, 0, 0])
+            c = counts.setdefault(owner_value(t), [0, 0, 0, 0, 0])
             s = status(t)
             if s == "進行中":
                 c[0] += 1
@@ -319,7 +327,13 @@ class Builder:
             due = to_date(t.fm.get("due"))
             if due and due < self.today:
                 c[2] += 1
-        return [[k, *map(str, v)] for k, v in sorted(counts.items())]
+        labels = person_labels(list(counts))
+        merged: dict[str, list[int]] = {}
+        for k, v in counts.items():
+            m = merged.setdefault(labels[k], [0, 0, 0, 0, 0])
+            for i, x in enumerate(v):
+                m[i] += x
+        return [[k, *map(str, v)] for k, v in sorted(merged.items())]
 
     def topics(self, proj: Doc) -> list[list[str]]:
         """今週のトピック(Yu 2026-10-29)。プロジェクトの本文「## 今週のトピック」の箇条書き

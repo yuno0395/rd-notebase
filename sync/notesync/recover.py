@@ -53,11 +53,12 @@ def report_pending(shared: Path | None, data_root: Path | None, report: Report) 
 
 
 def recover(member: str, code: str, personal: Path, shared: Path, data_root: Path | None,
-            report: Report, backup: Backup, dry_run: bool, now: float) -> None:
+            report: Report, backup: Backup, dry_run: bool, now: float, me: str = "") -> None:
+    """me: author に書く自分(番号_名前)。member は 開発データ/個人/<名前>/ の名前。"""
     sv = Vault("共有", shared, assign=True)
     pv = Vault("個人", personal, assign=False)
     used = collect_used([pv, sv])
-    renamed = assign_ids(sv, member, code, used, report, backup, dry_run, now, 0)
+    renamed = assign_ids(sv, me or member, code, used, report, backup, dry_run, now, 0)
     index, stems = name_index([pv, sv])
     if dry_run:
         for old, new in renamed.items():

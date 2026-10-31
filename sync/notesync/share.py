@@ -33,8 +33,8 @@ from .report import Report
 from .safety import Backup
 from .heavy import DEFAULT_KEEP, is_heavy, to_personal, to_shared
 from .state import State, digest, digest_text
-from .vault import (COMMON, NOT_NOTE_TOPS, SKIP_DIRS, TYPE_FOLDERS, authors_of, is_hidden, is_theirs,
-                    plain_name, read, sync_copy_of, write)
+from .vault import (COMMON, NOT_NOTE_TOPS, SKIP_DIRS, TYPE_FOLDERS, authors_of, has_person, is_hidden,
+                    is_theirs, plain_name, read, same_person, sync_copy_of, write)
 
 ARCHIVE = "99_archive"
 BIG_IMPACT = {"方針", "絞込", "出荷"}
@@ -138,6 +138,10 @@ class Context:
     counts: dict[str, int] = field(default_factory=dict)
     asked: set[frozenset] = field(default_factory=set)        # F-47 で聞いている組
     fresh: set[str] = field(default_factory=set)              # F-28: 作ったばかりでテンプレートのままのノート
+    me: str = ""  # ノートに書く自分(番号_名前。v0.68)。member は名前(ファイル名や場所に使う)
+
+    def __post_init__(self):
+        self.me = self.me or self.member
 
     def count(self, what: str) -> None:
         self.counts[what] = self.counts.get(what, 0) + 1
@@ -301,7 +305,7 @@ def check_conditions(ctx: Context, item: Item) -> str | None:
         return f"未入力: {link} の author が空です(共有していません)"
     if item.type in ("ナレッジ", "ナレッジ図", "結果") and ctx.reaches_big_issue(item):
         others = [r for r in (plain_name(x) for x in as_list(item.fm.get("reviewed_by")))
-                  if r and r not in item.authors]
+                  if r and not has_person(item.authors, r)]
         if not others:
             return f"確認待ち: {link} は impact 大のイシューにつながるため、作成者以外の確認者が必要です(共有していません)"
     hits = ctx.secret_links(item)
@@ -472,14 +476,13 @@ def sync_attachments(ctx: Context, note_id: str, mode: str) -> None:
 
 
 def different(a: Item, b: Item) -> bool:
-    return a.name != b.name or bool(a.author and b.author and a.author != b.author)
+    return a.name != b.name or bool(a.author and b.author and not same_person(a.author, b.author))
 
 
 def my_projects(ctx: Context) -> set[str]:
     out = set()
     for name, item in ctx.projects.items():
-        members = {plain_name(m) for m in as_list(item.fm.get("members"))}
-        if ctx.member in members:
+        if has_person(as_list(item.fm.get("members")), ctx.me):
             out.add(name)
     return out
 
@@ -497,7 +500,7 @@ def their_note(ctx: Context, item: Item, in_shared: bool) -> bool:
     """個人 vault のノートが、配られた他の人のノートか。author に自分がいなければ他の人のもの。
     author が空でも、共有に同じファイル名のノートがあれば他の人のもの(自分のノートは共有へ出す前に author を
     書くので、author のないまま共有にあるのは、共有 vault で直接作られたもの)。"""
-    if is_theirs(item.fm, ctx.member):
+    if is_theirs(item.fm, ctx.me):
         return True
     rec = ctx.state.get(f"note:{item.id}")
     return not item.authors and (in_shared or bool(rec and rec.get("m") == "down"))
@@ -545,7 +548,7 @@ def run_share(ctx: Context) -> None:
     for items in mine.values():
         for it in items:
             # author は id 付けの手順で書く(試し運転ではまだ書いていない)
-            it.fm.setdefault("author", ctx.member) if not it.author else None
+            it.fm.setdefault("author", ctx.me) if not it.author else None
     build_index(ctx, mine, shared)
     for items in shared.values():
         for it in items:
@@ -617,7 +620,8 @@ def run_share(ctx: Context) -> None:
             # F-08: 同じ id で別のノート(作成者か名前が違う)があれば集めない
             # 前に同期した id なら、共有で名前が変わっていても同じノート(id は変えない)。作成者が違うときだけ止める
             clash = [o for o in in_shared
-                     if (bool(o.author and item.author and o.author != item.author) if rec else different(o, item))]
+                     if (bool(o.author and item.author and not same_person(o.author, item.author))
+                         if rec else different(o, item))]
             if clash:
                 o = clash[0]
                 ctx.report.warn(
@@ -654,7 +658,7 @@ def run_share(ctx: Context) -> None:
         item = items[0]
         key = f"note:{note_id}"
         rec = ctx.state.get(key)
-        if item.author == ctx.member:
+        if item.author and same_person(item.author, ctx.me):
             continue  # F-10: 自分が書いたノートは配らない
         if item.top == ARCHIVE:
             if not rec:

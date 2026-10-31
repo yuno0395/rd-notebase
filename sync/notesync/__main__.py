@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         r = Report(dry_run=not args.run)
         recover(cfg.member, cfg.code, cfg.personal, cfg.shared, cfg.shared_data, r,
-                Backup(cfg.backup_dir), not args.run, _t.time())
+                Backup(cfg.backup_dir), not args.run, _t.time(), me=cfg.me)
         path = r.write(cfg.personal)
         print(f"{'拾い直しました' if args.run else '試し運転しました'}: 記録 {len(r.records)} 件。{path} を見てください")
         return 0

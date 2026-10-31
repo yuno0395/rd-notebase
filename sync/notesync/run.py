@@ -148,7 +148,7 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
         if v.assign:
             personal = v.label == "個人"
             renamed[v.label + str(v.root)] = assign_ids(
-                v, cfg.member, cfg.code, used, report, backup, dry, now, cfg.idle_seconds,
+                v, cfg.me, cfg.code, used, report, backup, dry, now, cfg.idle_seconds,
                 fresh if personal else frozenset(), shared_stems if personal else frozenset())
 
     # リンクを直すのは、個人と機密の中だけ。機密のノートは機密の中のノートにだけつなぐ(F-40)
@@ -163,36 +163,37 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
         return index, stems
 
     open_vaults = [v for v in vaults if v.label != "機密"]
-    fix_links(vaults[0], *planned(open_vaults), report, backup, dry, cfg.member)
+    fix_links(vaults[0], *planned(open_vaults), report, backup, dry, cfg.me)
     for v in vaults:
         if v.label == "機密":
             fix_links(v, *planned([v]), report, backup, dry)
 
     # id を振ったノートの添付を _仕組み/attachments/<id>/ へ移し、リンクの形をそろえる(F-17b)
     fix_attachments(cfg.personal, renamed.get(vaults[0].label + str(vaults[0].root), {}),
-                    report, backup, dry, now, cfg.idle_seconds, cfg.member)
+                    report, backup, dry, now, cfg.idle_seconds, cfg.me)
     report_same_names(vaults, report)
     # 重い添付を 開発データ/ へ移し、リンクを書き換える(F-17〜20)。個人 vault だけ
-    move_heavy(cfg.personal, cfg.shared, cfg.shared_data, cfg.member, report, backup, dry, now, cfg.idle_seconds)
+    move_heavy(cfg.personal, cfg.shared, cfg.shared_data, cfg.member, report, backup, dry, now, cfg.idle_seconds,
+               me=cfg.me)
     report_sync_copies([(v.label, v.root) for v in vaults], report)  # F-16
     tidy_layout_copies(cfg.personal, report, backup, dry)  # 2台で使うとできる画面配置の複製
 
     # おまけの自動入力(F-26・F-27・F-31)。集める前に書いて、同じ同期で共有に届ける
     started = run_autofill(cfg.personal, cfg.shared, report, backup, dry, now, cfg.idle_seconds, fresh,
-                           cfg.member)
+                           cfg.me)
 
     # 集約と再配布(F-05〜11、F-14、F-15)
     if cfg.shared and cfg.shared.exists():
         state = State(cfg.state_path)
         if state.broken:
             report.warn("前回同期の記録が壊れていたので、見比べて作り直しました(F-34)")
-        ctx = Context(member=cfg.member, personal=cfg.personal, shared=cfg.shared,
+        ctx = Context(member=cfg.member, me=cfg.me, personal=cfg.personal, shared=cfg.shared,
                       secret=[p for p in cfg.secret if p.exists()], report=report, backup=backup,
                       state=state, dry_run=dry, now=now, idle_seconds=cfg.idle_seconds,
                       data_root=cfg.shared_data, keep=keep_rules(cfg.shared), fresh=fresh)
         run_share(ctx)
-        record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now, started)  # F-31・F-32・F-54
-        update_schedules(cfg.personal, cfg.shared, cfg.member, report, backup, dry, now, cfg.idle_seconds)  # F-53
+        record_history(cfg.personal, cfg.shared, cfg.member, report, dry, now, started, me=cfg.me)  # F-31・F-32・F-54
+        update_schedules(cfg.personal, cfg.shared, cfg.me, report, backup, dry, now, cfg.idle_seconds)  # F-53
         maybe_weekly(cfg.shared, cfg.report_dir, now, report, dry)  # F-29(誰の PC でも作る)
         report_pending(cfg.shared, cfg.shared_data, report)  # F-35
         if not dry:

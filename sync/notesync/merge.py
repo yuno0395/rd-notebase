@@ -21,7 +21,7 @@ from . import frontmatter, ids
 from .assign import LINK
 from .report import REPORT_NAME
 from .share import ARCHIVE, Context, Item, as_list, note_stem, recent
-from .vault import iter_md, read, theirs_file, write
+from .vault import has_person, iter_md, person_name, read, theirs_file, write
 
 CHOICE_LINE = re.compile(r"^-\s*\[[xX]\]\s*(同じもの|別もの):\s*(.*)$")
 SAME, OTHER = "同じもの", "別もの"
@@ -62,7 +62,7 @@ def link_of(item: Item) -> str:
 
 
 def lines_for(item: Item, other: Item) -> tuple[str, str]:
-    theirs = f"{link_of(other)}({other.author or '作成者不明'})"
+    theirs = f"{link_of(other)}({person_name(other.author) or '作成者不明'})"
     return (f"{SAME}: {link_of(item)} を {theirs} にまとめる(チェックすると、次の同期でまとめます)",
             f"{OTHER}: {link_of(item)} と {theirs} は別のノートとして共有する")
 
@@ -92,7 +92,8 @@ def merge_into(ctx: Context, item: Item, other: Item) -> bool:
     stamp = datetime.fromtimestamp(ctx.now, tz=ids.JST)
     day = stamp.strftime("%Y-%m-%d")
     due = (stamp + timedelta(days=REWRITE_DAYS)).strftime("%Y-%m-%d")
-    who = item.author or ctx.member
+    who = item.author or ctx.me
+    shown_who = person_name(who)
     o_stem = note_stem(other.filename)
 
     # 共有のノード: aliases と author を足し、本文を末尾の章に入れる
@@ -105,14 +106,14 @@ def merge_into(ctx: Context, item: Item, other: Item) -> bool:
         if n.strip() and n.strip().lower() not in {a.lower() for a in aliases}:
             aliases.append(n.strip())
     authors = as_list(fm.get("author"))
-    if who not in authors:
+    if not has_person(authors, who):
         authors.append(who)
     nl = frontmatter.newline_of(t_text)
     new = frontmatter.set_values(t_text, {"aliases": flow(aliases),
                                           "author": flow(authors) if len(authors) > 1 else authors[0]})
     body = demote(frontmatter.split(item.text)[1])
-    section = [f"## まとめたメモ({item.name}、{who}、{day})",
-               f"- [ ] {who}: 「{item.name}」のメモを上の本文に書き直して、この章を消す 📅 {due}"]
+    section = [f"## まとめたメモ({item.name}、{shown_who}、{day})",
+               f"- [ ] {shown_who}: 「{item.name}」のメモを上の本文に書き直して、この章を消す 📅 {due}"]
     if body:
         section += ["", body]
     new = new.rstrip("\r\n") + nl + nl + nl.join(section).replace("\n", nl) + nl
@@ -127,7 +128,7 @@ def merge_into(ctx: Context, item: Item, other: Item) -> bool:
 
     relinked = []
     for path, rel in iter_md(ctx.personal):
-        if rel.parts[0] == ARCHIVE or path == item.path or theirs_file(path, ctx.member):
+        if rel.parts[0] == ARCHIVE or path == item.path or theirs_file(path, ctx.me):
             continue
         text = read(path)
         changed = LINK.sub(repl, text)
