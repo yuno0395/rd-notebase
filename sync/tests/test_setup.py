@@ -77,7 +77,7 @@ def team(tmp_path):
         "",             # 共有 vault の場所(Box/チーム/開発ノート_共有)
         "", "",         # 開発データ・報告
         "9.9.20",       # 出す版
-        "1",            # 自分は 山田(001)
+        "1", "山田", "000001",  # メンバー.csv は空なので、自分を新しく登録する
         "adm",          # PC の記号
         "",             # 個人 vault の場所
         "",             # Enter で進む
@@ -106,10 +106,10 @@ def test_admin_first_time(team):
     assert (shared / st.DIST_DIR / "9.9.20" / st.CHANGES).is_file()
     assert (team["cloud"] / "チーム" / "開発データ").is_dir()
     personal = team["cloud"] / "個人" / "開発ノート_山田"
-    assert st.my_settings(personal) == ("山田", "")   # 3文字の古い記号は個人設定.md に書かない(メンバー.csv で読む)
-    assert (shared / ".obsidian-001_adm" / "hotkeys.json").is_file()
+    assert st.my_settings(personal) == ("山田", "000001")
+    assert (shared / ".obsidian-000001_adm" / "hotkeys.json").is_file()
     # 手で入れていた設定も bat で入る(貼ったファイルの置き場所・図・コアプラグイン)
-    for d in (shared / ".obsidian-001_adm", personal / ".obsidian"):
+    for d in (shared / ".obsidian-000001_adm", personal / ".obsidian"):
         cal = json.loads((d / "plugins/obsidian-custom-attachment-location/data.json").read_text(encoding="utf-8"))
         assert cal["attachmentFolderPath"] == "_仕組み/attachments/{{attachDir}}"
         assert cal["shouldFollowObsidianAttachmentLocation"] is False and "attachDir" in cal["customTokensStr"]
@@ -144,7 +144,7 @@ def test_pl_first_time_with_project_and_secret(team):
         "",              # 開発データ
         "", "",          # 週報を作る・報告フォルダ
         str(cloud / "個人" / "田中の添付"),  # 自分用の添付のフォルダ(名前は自由)
-        "y", "樹脂カバー量産", "1",  # プロジェクト(メンバーに 山田 も)
+        "y", "樹脂カバー量産", "1", "2",  # プロジェクト(メンバーに 山田 も、Internal use only)
         "y", str(cloud / "機密" / "顧客A"), "案件A",  # 機密フォルダ
         "",              # Enter で進む
     ]
@@ -163,10 +163,13 @@ def test_pl_first_time_with_project_and_secret(team):
     text = ledgers[0].read_text(encoding="utf-8")
     code36 = st.notesync().ids.code_of("123456")
     assert ledgers[0].name[6:10] == code36
-    # members は「番号_名前」。山田 は古い3文字の記号(001)なので名前だけ
-    assert "members: [123456_田中, 山田]" in text and "<%" not in text and 'aliases: ["樹脂カバー量産"]' in text
+    # members は「番号_名前」
+    assert "visibility: [Internal use only]" in text   # 作るときに選んだ範囲
+    assert "members: [123456_田中, 000001_山田]" in text and "<%" not in text and 'aliases: ["樹脂カバー量産"]' in text
     assert "| DR1 | 2026-12-08 | 2026-12-08 |" in text
     assert (shared / "樹脂カバー量産" / "03_イシュー").is_dir()
+    # 自分の台帳は同期で配られないので、PL の個人 vault にも置く(Ctrl+N の選択肢に出すため)
+    assert (personal / "樹脂カバー量産" / ledgers[0].name).read_text(encoding="utf-8") == ledgers[0].read_text(encoding="utf-8")
     # 機密フォルダと窓口
     secret = cloud / "機密" / "顧客A"
     assert (secret / "06_事実").is_dir() and st.read_version(secret) == "9.9.20"
@@ -298,18 +301,18 @@ def test_tells_when_obsidian_uses_other_config_dir(team):
     """「設定フォルダを上書き」に違う名前を打つと、Obsidian はその空のフォルダを読み、プラグインが入っていないように見える。"""
     shared, aenv = team["shared"], team["admin_env"]
     assert "設定フォルダを上書き" in "\n".join(team["ui"].out)
-    other = shared / ".obsidian-001_admpc"   # Obsidian が作った空の設定フォルダ
+    other = shared / ".obsidian-000001_admpc"   # Obsidian が作った空の設定フォルダ
     other.mkdir()
     (other / "app.json").write_text("{}", encoding="utf-8")
     code, s, ui = run("管理者", aenv, ["3", ""])
     out = "\n".join(ui.out)
     assert code == 0, out
-    assert "Obsidian が 共有 vault を .obsidian-001_admpc で開いています" in out, out
-    assert s.clip_text == ".obsidian-001_adm"
+    assert "Obsidian が 共有 vault を .obsidian-000001_admpc で開いています" in out, out
+    assert s.clip_text == ".obsidian-000001_adm"
     # bat が作ったフォルダ(知見同期の版.txt あり)は知らせない
-    assert st.stray_config_dirs(shared, "001", ".obsidian-001_adm") == [".obsidian-001_admpc"]
+    assert st.stray_config_dirs(shared, "000001", ".obsidian-000001_adm") == [".obsidian-000001_admpc"]
     (other / st.SEEN_VERSION).write_text("9.9.20\n", encoding="utf-8")
-    assert st.stray_config_dirs(shared, "001", ".obsidian-001_adm") == []
+    assert st.stray_config_dirs(shared, "000001", ".obsidian-000001_adm") == []
 
 
 def test_dry_run_changes_nothing(team):
@@ -321,7 +324,7 @@ def test_dry_run_changes_nothing(team):
     assert code == 0 and "試しなので、ここでやめます" in out, out
     assert not (cloud / "個人" / "試し").exists()
     assert not env.config.exists() and not env.app.exists()
-    assert not (shared / ".obsidian-001_m1").exists()
+    assert not (shared / ".obsidian-000001_m1").exists()
 
 
 def test_member_not_in_csv_stops(team):
@@ -490,7 +493,7 @@ def test_member_does_not_need_shared_vault(team):
                       dist=dist, hint=shared)
     out = "\n".join(ui.out)
     assert code == 0, out
-    assert (shared / ".obsidian-001_m1" / "hotkeys.json").is_file()
+    assert (shared / ".obsidian-000001_m1" / "hotkeys.json").is_file()
     assert "共有 vault を開き、設定 → ファイルとリンク" not in out
     assert "共有 vault は開かなくてかまいません" in out
     assert "Trigger Templater on new file creation" in out

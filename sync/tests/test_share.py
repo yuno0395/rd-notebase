@@ -134,6 +134,22 @@ def test_redistributes_to_members_only(cloud):
     assert not (cloud["yu"].personal / "90_共有").exists()
 
 
+def test_own_ledger_made_in_shared_comes_to_personal(cloud):
+    """共有 vault で作った自分の台帳は、個人 vault に一度だけ取り込む(Ctrl+N の選択肢に出すため)。ほかの自分のノートは取り込まない。"""
+    shared = cloud["shared"]
+    write(shared / "新PJ/0RA00D001_新PJ.md", "---\nid: 0RA00D001\ntype: プロジェクト\nauthor: [山田]\nmembers: [山田]\n---\n")
+    write(shared / "新PJ/03_イシュー/0RA00E001_共有で書いた.md",
+          "---\nid: 0RA00E001\ntype: イシュー\nauthor: [山田]\nproject: [新PJ]\n---\n")
+    run_once(cloud["yu"])
+    yu = cloud["yu"].personal
+    assert text(yu / "新PJ/0RA00D001_新PJ.md") == text(shared / "新PJ/0RA00D001_新PJ.md")
+    assert not (yu / "新PJ/03_イシュー/0RA00E001_共有で書いた.md").exists()
+    # 取り込んだあとは自分のノート。手元で消したら戻さない
+    (yu / "新PJ/0RA00D001_新PJ.md").unlink()
+    run_once(cloud["yu"])
+    assert not (yu / "新PJ/0RA00D001_新PJ.md").exists()
+
+
 def test_second_run_changes_nothing(cloud):
     for _ in range(2):
         run_once(cloud["yu"])
@@ -547,3 +563,20 @@ def test_weekly_follows_visibility(cloud):
     assert not (shared / "00_週報/山田/2026-W43.md").exists()
     assert not (shared / "00_週報/山田/2026-W42.md").exists()   # 00_PIP/ は絶対に写さない
     assert "週報 00_週報/2026-W43.md の visibility が決まりに合いません" in report(yu)
+
+
+def test_node_for_one_project_goes_to_project_folder(cloud):
+    """見せる範囲がプロジェクト1つだけのノードは <PJ>/02_ノード/ に置く。"""
+    yu, shared = cloud["yu"], cloud["shared"]
+    write(yu.personal / "共通/02_ノード/0RB221001_試しの寸法.md",
+          f"---\nid: 0RB221001\ntype: ノード\nvisibility: [{PJ}]\n---\n")
+    write(yu.personal / "共通/02_ノード/0RB222001_両方の寸法.md",
+          f"---\nid: 0RB222001\ntype: ノード\nvisibility: [{PJ}, 別PJ]\n---\n")
+    write(yu.personal / "共通/02_ノード/0RB223001_社内の寸法.md",
+          "---\nid: 0RB223001\ntype: ノード\nvisibility: [Internal use only]\n---\n")
+    run_once(yu)
+    got = files(shared)
+    assert f"{PJ}/02_ノード/0RB221001_試しの寸法.md" in got
+    assert (yu.personal / f"{PJ}/02_ノード/0RB221001_試しの寸法.md").exists()   # 手元も同じ場所へ移す(F-57)
+    assert "共通/02_ノード/0RB222001_両方の寸法.md" in got                      # 2つ以上は 共通
+    assert "共通/02_ノード/0RB223001_社内の寸法.md" in got

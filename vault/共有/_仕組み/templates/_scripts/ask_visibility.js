@@ -16,6 +16,7 @@ const PIP = "PIP";
 const INTERNAL = "Internal use only";
 const EXT_PREFIX = "EXT_";
 const PIP_DIR = "00_PIP/メモ";
+const NODE_DIR = "共通/02_ノード";
 const EXT_LIST = "_仕組み/EXT_一覧.csv";
 const OLD = { 個人: PIP, 社内: INTERNAL };
 const DONE = "__done__";
@@ -48,6 +49,44 @@ function placeOf(list, folder, common = "共通") {
   if (isPip(list)) return PIP_DIR;
   const ps = projectsOf(list);
   return ps.length === 1 ? `${ps[0]}/${folder}` : `${common}/${folder}`;
+}
+
+// 台帳の visibility が Internal use only のプロジェクト。
+// 台帳に書いていなければ、そのプロジェクトのメンバーだけ(いままでどおり)
+function internalProjects(app) {
+  const out = new Set();
+  for (const f of app.vault.getMarkdownFiles()) {
+    if (f.path.startsWith("99_archive/") || f.path.startsWith("_仕組み/")) continue;
+    const fm = app.metadataCache.getFileCache(f)?.frontmatter;
+    if (!fm || String(fm.type || "").trim() !== "プロジェクト") continue;
+    if (!(read(fm.visibility) || []).includes(INTERNAL)) continue;
+    const al = Array.isArray(fm.aliases) ? fm.aliases : fm.aliases ? [fm.aliases] : [];
+    out.add(String(al[0] || f.basename.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, "")).trim());
+  }
+  return out;
+}
+
+// 選んだ範囲を、属性欄に書く値にする。Internal use only のプロジェクトが入っていれば Internal use only にする
+// (置き場所はプロジェクトのフォルダのまま。Internal とプロジェクト名は一緒に書けないので、プロジェクト名は外す)
+function toScope(app, list) {
+  if (!list || isPip(list)) return list;
+  const ps = projectsOf(list);
+  if (!ps.length) return list;
+  const inner = internalProjects(app);
+  if (!ps.some((p) => inner.has(p))) return list;
+  return [INTERNAL, ...list.filter((v) => v.startsWith(EXT_PREFIX))];
+}
+
+// 台帳(プロジェクトのノート)を作るときに、プロジェクトそのものの範囲を選ぶ。Esc ならメンバーだけ
+async function ledger(tp) {
+  const file = tp.config.target_file;
+  if (file.path.startsWith("_仕組み/")) return "";
+  const name = file.basename.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, "");
+  const MEMBERS = "__members__";
+  const picked = await choose(tp.app, tp.obsidian, [MEMBERS, INTERNAL],
+    (x) => (x === MEMBERS ? `このプロジェクトのメンバーだけ(${name})` : "Internal use only(社内全般)"),
+    `「${name}」のノートをだれに見せますか(Esc でメンバーだけ)`);
+  return text([picked === INTERNAL ? INTERNAL : name]);
 }
 
 async function extNames(app) {
@@ -111,10 +150,13 @@ async function ask_visibility(tp) {
   const app = tp.app;
   const file = tp.config.target_file;
   if (file.path.startsWith("_仕組み/")) return "";   // テンプレートそのものを開いたとき
-  const inherited = typeof window !== "undefined" ? window.__notebaseVisibility : null;
-  if (inherited) return text(inherited);
-  if (!(await tp.user.make_id.isPersonal(app))) return text([INTERNAL]);
   const M = tp.user.make_note;
+  const inherited = typeof window !== "undefined" ? window.__notebaseVisibility : null;
+  if (inherited) {
+    await toProjectNodes(tp, inherited);
+    return text(inherited);
+  }
+  if (!(await tp.user.make_id.isPersonal(app))) return text([INTERNAL]);
   const picked = await pick(app, tp.obsidian, file.basename, M.projectNames(app));
   // place_note.js が、選んだ範囲から置き場所を決める(プロジェクトをもう一度聞かない)
   if (typeof window !== "undefined") window.__notebaseChosen = { file, value: picked };
@@ -122,8 +164,23 @@ async function ask_visibility(tp) {
     await M.ensureFolder(app, PIP_DIR);
     await tp.file.move(`${PIP_DIR}/${file.basename}`);
   }
-  return text(picked);
+  const scope = toScope(app, picked);   // 置き場所は選んだプロジェクト、書く値は台帳の範囲に合わせる
+  await toProjectNodes(tp, scope);
+  return text(scope);
+}
+
+// 共通/02_ノード/ に作ったノードで、見せる範囲がプロジェクト1つだけなら <プロジェクト>/02_ノード/ へ移す
+// 
+async function toProjectNodes(tp, list) {
+  const file = tp.config.target_file;
+  if (!list || isPip(list) || list.includes(INTERNAL)) return;
+  const ps = projectsOf(list);
+  if (ps.length !== 1 || file.parent?.path !== NODE_DIR) return;
+  const dest = `${ps[0]}/02_ノード`;
+  await tp.user.make_note.ensureFolder(tp.app, dest);
+  await tp.file.move(`${dest}/${file.basename}`);
 }
 
 module.exports = Object.assign(ask_visibility, { pick, read, text, isPip, projectsOf, placeOf, extNames,
+  internalProjects, toScope, ledger,
   PIP, INTERNAL, PIP_DIR });

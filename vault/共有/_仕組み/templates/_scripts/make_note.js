@@ -279,7 +279,7 @@ function initialValues(app, kind, note) {
 }
 
 // ---------- 置き場所(個人 vault も共有 vault と同じ並び。仕様書「フォルダ構成」v0.67) ----------
-// <プロジェクト>/01_目的/ などに置く。ノードは 共通/02_ノード/(project を書いた部品は <プロジェクト>/02_ノード/)。決め方は同期プログラムと同じ
+// <プロジェクト>/01_目的/ などに置く。ノードは 共通/02_ノード/(project を書いた部品と、見せる範囲がプロジェクト1つのノードは <プロジェクト>/02_ノード/)。決め方は同期プログラムと同じ
 // (要件書 F-06): project が書いてあればそれ(2つ以上か 共通 なら 共通)、なければ parent をたどる。
 
 const COMMON = "共通";
@@ -298,6 +298,14 @@ function projectOfList(list) {
   return ps[0] || null;
 }
 
+// 部品でないノードの置き場所。visibility がプロジェクト名1つだけ(Internal・PIP なし)ならそれ、ほかは 共通
+function nodeProject(value) {
+  const list = (Array.isArray(value) ? value : value == null ? [] : [value]).map((v) => String(v).trim()).filter((v) => v);
+  if (list.some((v) => v === "PIP" || v === "個人" || v === "Internal use only" || v === "社内")) return COMMON;
+  const ps = [...new Set(list.filter((v) => v !== "チーム" && !v.startsWith("EXT_")))];
+  return ps.length === 1 ? ps[0] : COMMON;
+}
+
 // ノートの振り分け先のプロジェクト。決まらなければ null
 function projectOf(app, file, seen = new Set()) {
   if (!file || seen.has(file.path)) return null;
@@ -306,7 +314,9 @@ function projectOf(app, file, seen = new Set()) {
   const t = String(fm.type || "").trim();
   // 部品(kind: 部品)だけは project のプロジェクトに置く。ほかのノードと project のない部品は 共通(v0.76)
   const part = t === "ノード" && String(fm.kind || "").trim() === "部品";
-  if (t === "窓口" || (t === "ノード" && !part)) return COMMON;
+  if (t === "窓口") return COMMON;
+  // 部品でないノードは、見せる範囲がプロジェクト1つだけならそのプロジェクト、ほかは 共通(v0.94)
+  if (t === "ノード" && !part) return nodeProject(fm.visibility);
   if (t === "プロジェクト") return nameOf(file);
   const own = projectOfList(fm.project);
   if (own) return own;
@@ -431,6 +441,8 @@ async function createNote(tp, kind, name, note) {
     const top = folderPath.split("/")[0];
     visibility = top === COMMON || top === "00_inbox" ? [V.INTERNAL] : [top];
   }
+  // Internal use only のプロジェクトに置いたら Internal use only にする(置き場所はそのプロジェクトのまま)
+  if (V && V.toScope) visibility = V.toScope(app, visibility);
   await ensureFolder(app, folderPath);
   const template = app.vault.getAbstractFileByPath(k.template);
   if (!template) throw new Error(`${k.template} がありません`);

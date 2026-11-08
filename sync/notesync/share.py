@@ -207,7 +207,13 @@ class Context:
             return None
         seen.add(item.id)
         t = item.type
-        if t == WINDOW or (t == "ノード" and not is_part(item.fm)):
+        if t == WINDOW:
+            return COMMON
+        if t == "ノード" and not is_part(item.fm):
+            # 見せる範囲がプロジェクト1つだけのノードはそのプロジェクト、ほかは 共通(v0.94)
+            s = vis.parse(item.fm)
+            if not (s.pip or s.internal) and len(set(s.projects)) == 1:
+                return s.projects[0]
             return COMMON
         if t == "プロジェクト":
             return item.name
@@ -766,7 +772,11 @@ def run_share(ctx: Context) -> None:
         key = f"note:{note_id}"
         rec = ctx.state.get(key)
         if item.author and same_person(item.author, ctx.me):
-            continue  # F-10: 自分が書いたノートは配らない
+            # F-10: 自分が書いたノートは配らない。ただし共有 vault で作った自分の台帳は、個人 vault に
+            # 一度も置いていなければ取り込む(個人 vault の Ctrl+N のプロジェクトの選択肢は台帳から作るため)
+            if item.type == "プロジェクト" and not rec and item.top != ARCHIVE and not (ctx.personal / item.rel).exists():
+                sync_pair(ctx, key, ctx.personal / item.rel, item.path, item.rel, item.rel, "both", item.rel)
+            continue
         if item.top == ARCHIVE:
             if not rec:
                 continue  # 配っていなかったものは、archive に入ってからは配らない

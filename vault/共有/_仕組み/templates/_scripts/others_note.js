@@ -7,7 +7,8 @@
 //
 //   others_note(tp, "watch"): Obsidian を開いたときに1回呼ぶ(QuickAdd のマクロ「起動時」、_quickadd/起動時.js)。
 //     他の人のノートを開くと読む画面にし、右上に「〇〇さんのノート(読むだけ)」と出す。うっかり書き換え防止。
-//     Ctrl+E で編集の画面に切り替えれば書けるが、書き換えた中身は次の同期で共有の中身に戻る(backup に残る)。
+//     Ctrl+E などで編集の画面に切り替えても、すぐ読む画面に戻す(書けないようにする。「読むだけのノートには
+//     実際に文字が記入できないようにしたい」)。それでも書き換えた中身は、次の同期で共有の中身に戻る(backup に残る)。
 //   others_note(tp, "join"): 右クリックの「自分も作成者に入れて書く」。author に自分を足して、編集の画面にする。
 //     以後は自分のノートとして扱われ、直した中身は共有へ出て、元の作成者にも届く。
 
@@ -78,6 +79,13 @@ async function watch(tp) {
   if (!(await app.vault.adapter.exists(MY_SETTINGS))) return; // 個人 vault だけ
   const me = await myName(app);
   if (!me) return;
+  // 知らせは数秒に1つだけ(画面の切り替えで layout-change が何度も来て、同じ知らせが3つ出ていた。PC 試験 2026-11-08)
+  const once = (msg, ms) => {
+    const now = Date.now();
+    if (window.__notebaseOthersNoticeAt && now - window.__notebaseOthersNoticeAt < 3000) return;
+    window.__notebaseOthersNoticeAt = now;
+    new Notice(msg, ms);
+  };
   if (window.__notebaseOthersRef) app.workspace.offref(window.__notebaseOthersRef); // 2回呼ばれても1つだけ
   window.__notebaseOthersRef = app.workspace.on("file-open", async (file) => {
     if (!isTheirs(app, file, me)) return;
@@ -86,7 +94,19 @@ async function watch(tp) {
       const st = leaf.getViewState();
       await leaf.setViewState({ ...st, state: { ...st.state, mode: "preview" } });
     }
-    new Notice(`${authorsOf(app, file).map(personName).join("・")}さんのノートです(読むだけ)。書き足すときは右クリックの「自分も作成者に入れて書く」`, 5000);
+    once(`${authorsOf(app, file).map(personName).join("・")}さんのノートです(読むだけ)。書き足すときは右クリックの「自分も作成者に入れて書く」`, 5000);
+  });
+  // 編集の画面に切り替えたら読む画面に戻す。「自分も作成者に入れて書く」の直後(属性欄の読み直し待ち)は戻さない
+  if (window.__notebaseOthersLayoutRef) app.workspace.offref(window.__notebaseOthersLayoutRef);
+  window.__notebaseOthersLayoutRef = app.workspace.on("layout-change", async () => {
+    for (const leaf of app.workspace.getLeavesOfType("markdown")) {
+      const v = leaf.view;
+      if (!(v instanceof MarkdownView) || v.getMode() !== "source" || !isTheirs(app, v.file, me)) continue;
+      if ((window.__notebaseJoining || new Set()).has(v.file.path)) continue;
+      const st = leaf.getViewState();
+      await leaf.setViewState({ ...st, state: { ...st.state, mode: "preview" } });
+      once("他の人のノートは書けません。書き足すときは右クリックの「自分も作成者に入れて書く」", 5000);
+    }
   });
 }
 
@@ -103,6 +123,9 @@ async function join(tp) {
     new Notice("自分のノートなので、そのまま書けます");
     return;
   }
+  window.__notebaseJoining = window.__notebaseJoining || new Set();
+  window.__notebaseJoining.add(file.path);   // 属性欄の読み直しまで、読む画面に戻さない
+  setTimeout(() => window.__notebaseJoining.delete(file.path), 5000);
   await app.fileManager.processFrontMatter(file, (fm) => {
     const list = fm.author === undefined || fm.author === null || fm.author === "" ? [] : Array.isArray(fm.author) ? fm.author : [fm.author];
     fm.author = [...list, me];

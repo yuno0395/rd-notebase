@@ -223,6 +223,30 @@ test("プロジェクト2つと社外(EXT)を選べる。2つなら 共通 に�
   keep(app, "プロジェクト2つと EXT");
 });
 
+test("Internal use only のプロジェクト: 選べば Internal use only、置き場所はそのプロジェクトのまま", async () => {
+  const pj = { [`試しPJ/${PJ}.md`]: `---\nid: 0RB0004XGV\ntype: プロジェクト\nauthor: ["229999_yu"]\nvisibility: [Internal use only]\n---\n` };
+  let app = personal(pj);
+  app.open("00_PIP/デイリー/2026-11-07.md", { line: 3, ch: 2 });
+  app.answers.push("試しPJ");
+  await app.templater.command("イシューにする");
+  let p = only(app.find(/^試しPJ\/03_イシュー\/[0-9A-Z]{10}_型の温度を上げる\.md$/), "イシュー");
+  assert.deepEqual(app.fm(p).visibility, ["Internal use only"]);
+  assert.deepEqual(app.fm(p).project, ["試しPJ"]);
+  app = personal(pj);
+  app.answers.push("試しPJ");
+  await app.quickAdd("タスク", "00_inbox", "見込みを出す");
+  p = only(app.find(/^試しPJ\/04_タスク\/[0-9A-Z]{10}_見込みを出す\.md$/), "タスク");
+  assert.deepEqual(app.fm(p).visibility, ["Internal use only"]);
+  // 範囲を書いていないイシューから Ctrl+T でも、置いたプロジェクトの範囲になる
+  app = personal(pj);
+  app.open("試しPJ/03_イシュー/0RB0044XGV_割れる.md", { line: 7, ch: 2 });
+  await app.templater.command("タスクにする");
+  p = only(app.find(/^試しPJ\/04_タスク\/[0-9A-Z]{10}_落下試験をする\.md$/), "タスク");
+  assert.deepEqual(app.fm(p).visibility, ["Internal use only"]);
+  keep(app, "Internal のプロジェクト");
+});
+
+
 // ---------- Ctrl+T・H・U ----------
 
 test("Ctrl+T: イシューの行で押すと parent にイシュー、<PJ>/04_タスク に作る", async () => {
@@ -346,6 +370,30 @@ test("共有 vault の Ctrl+N「イシュー」: だれに見せるかは聞か�
   await app.quickAdd("イシュー", "00_inbox", "あとで決める");
   const p = only(app.find(/^00_inbox\/[0-9A-Z]{10}_あとで決める\.md$/), "inbox のイシュー");
   assert.deepEqual(app.fm(p).visibility, ["Internal use only"]);
+});
+
+test("Ctrl+K: 見せる範囲をプロジェクト1つにしたノードは <PJ>/02_ノード に作ってつなぐ", async () => {
+  const app = personal();
+  const daily = "00_PIP/デイリー/2026-11-07.md";
+  app.open(daily, { line: 3, ch: 4, to: 6 }); // 「温度」
+  app.answers.push("試しPJ", "__done__");     // だれに見せるか → ほかのプロジェクトは足さない
+  await app.templater.command("ノードにする");
+  const p = only(app.find(/^試しPJ\/02_ノード\/[0-9A-Z]{10}_温度\.md$/), "温度のノード");
+  assert.deepEqual(app.fm(p).visibility, ["試しPJ"]);
+  assert.equal(app.find(/^共通\/02_ノード\/.*温度/).length, 0);
+  assert.match(app.text(daily), /\[\[[0-9A-Z]{10}_温度\|温度\]\]/);
+});
+
+test("Ctrl+N「ノード」: 見せる範囲がプロジェクト1つなら <PJ>/02_ノード、2つなら 共通/02_ノード", async () => {
+  let app = personal({ "別PJ/0RB0094XGV_別PJ.md": `---\nid: 0RB0094XGV\ntype: プロジェクト\n---\n` });
+  app.answers.push("試しPJ", "__done__");
+  await app.quickAdd("ノード", "共通/02_ノード", "樹脂");
+  only(app.find(/^試しPJ\/02_ノード\/[0-9A-Z]{10}_樹脂\.md$/), "PJ のノード");
+  app = personal({ "別PJ/0RB0094XGV_別PJ.md": `---\nid: 0RB0094XGV\ntype: プロジェクト\n---\n` });
+  app.answers.push("試しPJ", "別PJ");
+  await app.quickAdd("ノード", "共通/02_ノード", "樹脂");
+  const p = only(app.find(/^共通\/02_ノード\/[0-9A-Z]{10}_樹脂\.md$/), "2つの PJ のノード");
+  assert.deepEqual(app.fm(p).visibility, ["試しPJ", "別PJ"]);
 });
 
 test("Ctrl+N「ノード」: 共通/02_ノード に作り、だれに見せるかを聞く", async () => {

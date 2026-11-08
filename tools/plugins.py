@@ -230,7 +230,8 @@ def config_dirs(vault: Path) -> list[str]:
 
 # コアプラグイン(仕様書「コアプラグイン」)。ファイルに独自の書式を残すものは切り、一覧と見るだけのものは入れる。
 # ほかのコアプラグインは各自のまま(触らない)
-CORE_OFF = ("daily-notes", "templates", "canvas", "zk-prefixer")
+# sync・publish は Obsidian 社のサーバーへノートを送るので、どの vault でも切る
+CORE_OFF = ("daily-notes", "templates", "canvas", "zk-prefixer", "sync", "publish")
 CORE_ON = ("bases", "global-search", "backlink", "graph")
 # core-plugins.json がまだないとき(Obsidian で一度も開いていない)に使う、Obsidian の既定
 CORE_DEFAULT = {

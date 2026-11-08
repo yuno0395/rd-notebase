@@ -706,6 +706,9 @@ def render(template: str, note_id: str, alias: str, today: datetime, lists: dict
             line = f"aliases: [{json.dumps(alias, ensure_ascii=False)}]"
         elif line.startswith("author: [<%"):  # 作った人(Templater では tp.user.me が入れる)
             line = f"author: {yaml_list(lists.get('author', []))}"
+        elif line.startswith("visibility: <%"):  # 台帳の範囲(Templater では ask_visibility.ledger が聞く)
+            rest = line.split("%>", 1)[1] if "%>" in line else ""
+            line = f"visibility: {yaml_list(lists.get('visibility') or [alias])}{rest}"
         else:
             for key, items in lists.items():
                 m = re.match(rf"^{key}:\s*\[\]\s*(#.*)?$", line)
@@ -1087,6 +1090,9 @@ class Setup:
                     shutil.copy2(settings / "community-plugins.json", d / "community-plugins.json")
             if plugins.set_core_plugins(d):  # 本体がない版でも、個人 vault でも合わせる
                 self.log(f"{label}: コアプラグインを合わせた")
+            plain = vault / ".obsidian"  # 共有・機密を設定フォルダの上書きなしで開くと Obsidian が作る(Sync がオンのことがある)
+            if plain.is_dir() and plain.resolve() != d.resolve() and plugins.set_core_plugins(plain):
+                self.log(f"{label}: .obsidian のコアプラグインを合わせた(Sync・Publish を切る)")
             (d / SEEN_VERSION).write_text(read_version(self.dist / "共有") + "\n", encoding="utf-8")
         if not self.config_needs_update(vault, config):
             return
@@ -1188,9 +1194,20 @@ class Setup:
             self.ui.say(f"  {i}. {n}")
         a = self.ui.ask("番号")
         chosen = [self.me]
-        for x in re.split(r"[,、\s]+", a):
-            if x.isdigit() and 1 <= int(x) <= len(members) and members[int(x) - 1][0] not in chosen:
-                chosen.append(members[int(x) - 1][0])
+        by_number = {num: n for n, num in members}
+        for x in re.split(r"[,、\s]+", a.strip()):
+            if not x:
+                continue
+            if x.isdigit() and 1 <= int(x) <= len(members):
+                n = members[int(x) - 1][0]
+            elif x in by_number:  # 6桁の番号で入れても分かるように(PC 試験で 222222 と入れて無視された)
+                n = by_number[x]
+            else:
+                self.ui.say(f"「{x}」はメンバーの一覧にないので入れません(並びの番号か6桁の番号で)")
+                continue
+            if n not in chosen:
+                chosen.append(n)
+        internal = self.ui.choose(f"「{name}」のノートをだれに見せますか。", [f"このプロジェクトのメンバーだけ({name})", "Internal use only(社内全般)"], 0) == 1
         # 台帳の members は「番号_名前」(同姓同名を番号で見分ける。仕様書 v0.68)
         numbers = {n: num for n, num in members}
         numbers.setdefault(self.me, self.number)
@@ -1202,10 +1219,16 @@ class Setup:
             for sub in ("01_目的", "01_設計案", "03_イシュー", "04_タスク", "05_ナレッジ"):
                 (root / sub).mkdir(parents=True, exist_ok=True)
             nid = make_note_id(self.shared, self.number)
-            text = render(tmpl.read_text(encoding="utf-8"), nid, name, self.today, {"members": written, "author": [self.me]})
+            text = render(tmpl.read_text(encoding="utf-8"), nid, name, self.today, {"members": written, "author": [self.me],
+                                                                           "visibility": ["Internal use only" if internal else name]})
             (root / f"{nid}_{name}.md").write_text(text, encoding="utf-8")
+            # 自分が書いたノートは同期で配られない(F-10)ので、PL の個人 vault にも同じ台帳を置く。
+            # 置かないと PL の Ctrl+N・Ctrl+I のプロジェクトの選択肢にこのプロジェクトが出ない
+            if self.personal:
+                (self.personal / name).mkdir(parents=True, exist_ok=True)
+                (self.personal / name / f"{nid}_{name}.md").write_text(text, encoding="utf-8")
             self.log(f"プロジェクト {name} を作った")
-        self.add(f"共有 vault にプロジェクト「{name}」(メンバー {'、'.join(chosen)})のフォルダと台帳を作る", go)
+        self.add(f"共有 vault にプロジェクト「{name}」(メンバー {'、'.join(chosen)})のフォルダと台帳を作る(台帳は自分の個人 vault にも置く)", go)
         self.hand.append(f"共有 vault で「{name}」の台帳を開き、本文の節目の表を直して、目的から書き始める(マニュアル 03 の 2〜)")
 
     def ask_secret(self) -> None:

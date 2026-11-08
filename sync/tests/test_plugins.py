@@ -202,11 +202,13 @@ def test_set_core_plugins(tmp_path):
     core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
     assert core["daily-notes"] is False and core["templates"] is False and core["canvas"] is False
     assert core["bases"] is True and core["file-explorer"] is True
+    assert core["sync"] is False and core["publish"] is False
     assert not plugins.set_core_plugins(d)  # 2回目は何も変えない
-    (d / "core-plugins.json").write_text(json.dumps({"daily-notes": True, "word-count": False}), encoding="utf-8")
+    (d / "core-plugins.json").write_text(json.dumps({"daily-notes": True, "word-count": False, "sync": True, "publish": True}), encoding="utf-8")
     assert plugins.set_core_plugins(d)
     core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
     assert core["daily-notes"] is False and core["word-count"] is False  # 各自が切ったものは切ったまま
+    assert core["sync"] is False and core["publish"] is False  # 外へ送るものはオンにしてあっても切る
     (d / "core-plugins.json").write_text(json.dumps(["file-explorer", "templates"]), encoding="utf-8")
     assert plugins.set_core_plugins(d)
     core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
