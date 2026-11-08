@@ -1,0 +1,62 @@
+"""前回同期したときの内容(F-14)。
+
+個人 vault の _仕組み/記録/同期の記録.json に置く(どの PC からも同じ記録を使うため)。消えても、個人 vault と共有 vault を
+見比べて作り直せる(F-34): 中身が同じなら同期済み、違えば競合として扱い、上書きしない。
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from pathlib import Path
+
+from . import filecache
+
+
+def _digest(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()[:32]
+
+
+def digest(path: Path) -> str:
+    """中身のハッシュ。変わっていなければ前に取ったものを使う(filecache)。"""
+    return filecache.hash_of(path, _digest)
+
+
+def digest_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+
+
+class State:
+    def __init__(self, path: Path | None):
+        self.path = path
+        self.items: dict[str, dict] = {}
+        self.broken = False
+        if path and path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                self.items = dict(data.get("items") or {})
+            except (OSError, ValueError, AttributeError):
+                self.broken = True  # 作り直す(F-34)
+
+    def get(self, key: str) -> dict | None:
+        return self.items.get(key)
+
+    def set(self, key: str, value: dict) -> None:
+        self.items[key] = value
+
+    def starting(self, prefix: str) -> dict[str, dict]:
+        return {k: v for k, v in self.items.items() if k.startswith(prefix)}
+
+    def save(self) -> None:
+        if not self.path:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"version": 1, "items": self.items}, ensure_ascii=False, indent=1),
+                       encoding="utf-8")
+        os.replace(tmp, self.path)

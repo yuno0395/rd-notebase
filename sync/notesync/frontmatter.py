@@ -1,0 +1,96 @@
+"""属性欄(先頭の YAML)を、ほかの行を変えずに読み書きする(非機能要件「属性欄の保存」)。
+
+YAML として読み直して書き出すと、順番・コメント・書き方が変わってしまう。
+そこで、書き換えるのは必要な行だけにし、ほかは文字のまま残す。
+"""
+
+from __future__ import annotations
+
+import copy
+import re
+from functools import lru_cache
+
+import yaml
+
+# C で書かれた読み手(PyYAML に入っていれば)は、Python だけの読み手より10倍ほど速い。読める中身は同じ
+_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+
+# [[行き先]] と [[行き先|表示名]](# や ^ のつくもの・まだ閉じていないものは除く)
+LINK = re.compile(r"\[\[([^\[\]|#^\n]+)(\|[^\[\]\n]*)?\]\]")
+
+
+def as_list(value) -> list[str]:
+    """属性の値を文字の並びにする。空なら []、1つなら [値]。"""
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return [str(x) for x in value if x is not None and str(x).strip()]
+    return [str(value)]
+
+
+def link_targets(value) -> list[str]:
+    """属性の値から [[ ]] の行き先(| の左)を取り出す。リンクでなければ値そのもの。"""
+    out = []
+    for v in as_list(value):
+        found = [m.group(1).strip() for m in LINK.finditer(v)]
+        out += found or [v.strip()]
+    return out
+
+
+def split(text: str) -> tuple[str | None, str]:
+    """(属性欄の中身, 本文) に分ける。属性欄がなければ (None, text)。"""
+    if not text.startswith("---"):
+        return None, text
+    m = re.match(r"^---[ \t]*\r?\n(.*?)(?:\r?\n)?^---[ \t]*(?:\r?\n|$)", text, re.S | re.M)
+    if not m:
+        return None, text
+    return m.group(1), text[m.end():]
+
+
+@lru_cache(maxsize=50000)
+def _parse(fm: str) -> dict:
+    try:
+        data = yaml.load(fm, Loader=_LOADER)
+    except yaml.YAMLError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def load(text: str) -> dict:
+    """属性欄を dict にする。1回の同期で同じノートを何度も読むので、同じ中身の読み直しは覚えておいた結果を使う。"""
+    fm, _ = split(text)
+    if not fm:
+        return {}
+    return copy.deepcopy(_parse(fm))  # 呼んだ側が書き換えても、覚えておいた結果は変わらないように
+
+
+def newline_of(text: str) -> str:
+    return "\r\n" if "\r\n" in text else "\n"
+
+
+def set_values(text: str, values: dict[str, str]) -> str:
+    """属性欄の key の行を値に書き換える。なければ属性欄の先頭(id の行があればその下)に足す。属性欄がなければ作る。"""
+    nl = newline_of(text)
+    fm, body = split(text)
+    if fm is None:
+        lines = [f"{k}: {v}" for k, v in values.items()]
+        return "---" + nl + nl.join(lines) + nl + "---" + nl + text
+    lines = fm.splitlines()
+    head = []
+    for key, value in values.items():
+        pat = re.compile(rf"^{re.escape(key)}\s*:")
+        for i, line in enumerate(lines):
+            if pat.match(line):
+                # 次の行から続く値(`  - 水` のような並び)も置き換える
+                end = i + 1
+                while end < len(lines) and re.match(r"^(\s+\S|-\s)", lines[end]):
+                    end += 1
+                lines[i:end] = [f"{key}: {value}"]
+                break
+        else:
+            head.append(f"{key}: {value}")
+    # 新しい行は先頭に足す。id の行があれば、その下に足す
+    at = next((i + 1 for i, line in enumerate(lines) if re.match(r"^id\s*:", line)), 0)
+    lines = lines[:at] + head + lines[at:]
+    return "---" + nl + nl.join(lines) + nl + "---" + nl + body

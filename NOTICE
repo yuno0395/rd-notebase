@@ -1,0 +1,6 @@
+rd-notebase
+Copyright 2026 yuno0395
+
+コード(sync/・tools/・vault/ の中のスクリプトと設定)は Apache License 2.0(LICENSE)。
+文書(docs/・vault/ の中の説明とテンプレート)は CC BY 4.0(docs/LICENSE-docs.md)。
+配るコミュニティプラグインは含まない。各プラグインのライセンスに従う。

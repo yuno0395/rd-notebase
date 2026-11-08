@@ -1,0 +1,82 @@
+{
+  "editorMenu": [
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/ノードにする.md",
+      "icon": "link",
+      "name": "ノードにする(Ctrl+K)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/イシューにする.md",
+      "icon": "alert-triangle",
+      "name": "イシューにする(Ctrl+I)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/タスクにする.md",
+      "icon": "check-circle",
+      "name": "タスクにする(Ctrl+T)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/仮説にする.md",
+      "icon": "lightbulb",
+      "name": "仮説にする(Ctrl+H)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/設計案にする.md",
+      "icon": "puzzle",
+      "name": "設計案にする(Ctrl+U)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/目的にする.md",
+      "icon": "target",
+      "name": "目的にする",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/ナレッジにする.md",
+      "icon": "book-open",
+      "name": "ナレッジにする",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/関係としてつなぐ.md",
+      "icon": "arrow-left",
+      "name": "関係としてつなぐ(friend)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/反論としてつなぐ.md",
+      "icon": "swords",
+      "name": "反論としてつなぐ(challenger)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/図を開く.md",
+      "icon": "pencil",
+      "name": "図を開く(Ctrl+D)",
+      "mode": "any"
+    },
+    {
+      "id": "editor:toggle-checklist-status",
+      "icon": "check-square",
+      "name": "チェックボックスにする(Ctrl+L)",
+      "mode": "any"
+    },
+    {
+      "id": "k-plex:kplex-focus-active-note",
+      "icon": "network",
+      "name": "K-Plex で見る(Ctrl+G)",
+      "mode": "any"
+    },
+    {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/今の仕事を確かめる.md",
+      "icon": "compass",
+      "name": "今の仕事を確かめる(Ctrl+J)",
+      "mode": "any"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+# 今週のトピックを選ぶための一覧(仕様書「管理者向けの週報」)。
+# この7日に書き換えたノートを新しい順に並べる。台帳の「今週のトピック」に埋め込んで使う。
+filters:
+  and:
+    - file.ext == "md"
+    - file.mtime > now() - "7d"
+    - '!file.inFolder("_仕組み")'
+    - '!file.inFolder("99_archive")'
+    - '!file.inFolder("00_週報")'
+    - type != "プロジェクト"
+    - type != "週報"
+    - type != "デイリー"
+formulas:
+  # 名前の列: ファイル名(id_名前)の代わりに aliases の最初の名前を出す。押せばノートが開く。
+  # aliases が空なら、ファイル名から id を外した名前
+  alias: 'file.asLink(if(list(aliases).filter(value).length > 0, list(aliases).filter(value)[0], file.basename.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, "")))'
+properties:
+  formula.alias:
+    displayName: 別名
+views:
+  - type: table
+    name: 今週動いたノート
+    order:
+      - formula.alias
+      - id
+      - type
+      - status
+      - author
+      - file.mtime
+    sort:
+      - property: file.mtime
+        direction: DESC
+  - type: cards
+    name: カード(図)
+    image: note.image
+    imageFit: contain
+    imageAspectRatio: 0.5625
+    order:
+      - formula.alias
+      - id
+      - type
+      - status
+      - author
+    sort:
+      - property: file.mtime
+        direction: DESC

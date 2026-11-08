@@ -1,0 +1,50 @@
+filters:
+  and:
+    - '!file.inFolder("_仕組み/templates")'
+    - type == "ナレッジ"
+formulas:
+  # 名前の列: ファイル名(id_名前)の代わりに aliases の最初の名前を出す。押せばノートが開く。
+  # aliases が空なら、ファイル名から id を外した名前
+  alias: 'file.asLink(if(list(aliases).filter(value).length > 0, list(aliases).filter(value)[0], file.basename.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, "")))'
+properties:
+  formula.alias:
+    displayName: 別名
+views:
+  - type: cards
+    name: カード(図)
+    image: note.image
+    imageFit: contain
+    imageAspectRatio: 0.5625
+    order:
+      - formula.alias
+      - id
+      - usefulness
+      - parent
+      - author
+    sort:
+      - property: file.ctime
+        direction: DESC
+  - type: table
+    name: すべて
+    order:
+      - formula.alias
+      - id
+      - parent
+      - risk_reduction
+      - usefulness
+      - author
+      - reviewed_by
+    sort:
+      - property: file.ctime
+        direction: DESC
+  - type: table
+    name: 有用性ごと
+    groupBy:
+      property: usefulness
+      direction: ASC
+    order:
+      - formula.alias
+      - id
+      - parent
+      - risk_reduction
+      - author

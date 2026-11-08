@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520" font-family="'Yu Gothic UI','Meiryo','Hiragino Sans','Noto Sans JP',sans-serif" role="img" aria-label="上下左右の意味">
+<title>上下左右の意味</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f6fde"/></marker></defs>
+<rect x="0.5" y="0.5" width="899" height="519" rx="14" fill="#ffffff" stroke="#d6dae1"/>
+<rect x="353.0" y="231.0" width="194.0" height="58.0" rx="10" fill="#1f3a5f" stroke="#1f3a5f" stroke-width="2"/>
+<text x="450.0" y="261.0" font-size="22" fill="#ffffff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">見ているノート</text>
+<rect x="329.9" y="32.0" width="240.2" height="76.0" rx="12" fill="#eef3fb" stroke="#c9ced6" stroke-width="1.2"/>
+<text x="450.0" y="58.0" font-size="18" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">上 = 親</text>
+<text x="450.0" y="86.0" font-size="13" fill="#5b6472" text-anchor="middle" font-weight="normal" dominant-baseline="middle">parent(目的・上の案・上の仮説)</text>
+<rect x="309.1" y="412.0" width="281.8" height="76.0" rx="12" fill="#eef7f1" stroke="#c9ced6" stroke-width="1.2"/>
+<text x="450.0" y="438.0" font-size="18" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">下 = 子</text>
+<text x="450.0" y="466.0" font-size="13" fill="#5b6472" text-anchor="middle" font-weight="normal" dominant-baseline="middle">parent でこのノートを指すもの・parts</text>
+<rect x="32.5" y="222.0" width="235.0" height="76.0" rx="12" fill="#f1f7ec" stroke="#c9ced6" stroke-width="1.2"/>
+<text x="150.0" y="248.0" font-size="18" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">左 = 目論見・味方</text>
+<text x="150.0" y="276.0" font-size="13" fill="#5b6472" text-anchor="middle" font-weight="normal" dominant-baseline="middle">価値仮説 / friend / previous</text>
+<rect x="601.3" y="222.0" width="297.4" height="76.0" rx="12" fill="#fdf0ee" stroke="#c9ced6" stroke-width="1.2"/>
+<text x="750.0" y="248.0" font-size="18" fill="#1d2430" text-anchor="middle" font-weight="bold" dominant-baseline="middle">右 = 不安材料・反対</text>
+<text x="750.0" y="276.0" font-size="13" fill="#5b6472" text-anchor="middle" font-weight="normal" dominant-baseline="middle">脅かす / challenger / 次に生まれたもの</text>
+<line x1="450.0" y1="230.0" x2="450.0" y2="110.0" stroke="#2f6fde" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="450.0" y1="290.0" x2="450.0" y2="410.0" stroke="#2f6fde" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="355.0" y1="260.0" x2="300.0" y2="260.0" stroke="#2f6fde" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="545.0" y1="260.0" x2="600.0" y2="260.0" stroke="#2f6fde" stroke-width="2" marker-end="url(#arrow)"/>
+</svg>

@@ -1,0 +1,199 @@
+"""F-01〜04: id のないノートに id をつけ、名前とリンクを直す。同じ名前のノートを知らせる。"""
+
+from __future__ import annotations
+
+import os
+import re
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+from . import frontmatter, ids
+from .frontmatter import LINK
+from .report import Report
+from .safety import Backup
+from .vault import GUIDE_DIRS, NO_ID_DIRS, Note, is_root_doc, iter_md, needs_id, notes, read, theirs_file, write
+
+NO_LINK_FIX_DIRS = GUIDE_DIRS  # 配布物の案内は書き換えない(他の人のノートは member で見分けて書き換えない)
+
+
+@dataclass
+class Vault:
+    label: str   # レポートでの呼び名(個人・共有・機密)
+    root: Path
+    assign: bool  # id をつけるか(個人と機密だけ。共有は各自の PC からは触らない)
+
+
+def created_time(path: Path) -> datetime:
+    st = path.stat()
+    t = getattr(st, "st_birthtime", None)
+    if t is None:
+        t = st.st_ctime if os.name == "nt" else st.st_mtime
+    return datetime.fromtimestamp(t, tz=ids.JST)
+
+
+def collect_used(vaults: list[Vault]) -> set[str]:
+    used = set()
+    for v in vaults:
+        for n in notes(v.root):
+            for x in (n.file_id, n.fm_id):
+                if x:
+                    used.add(x)
+    return used
+
+
+def valid_id(text: str | None) -> bool:
+    return bool(text) and ids.ID_FILENAME.match(f"{text}_x") is not None
+
+
+def assign_ids(v: Vault, member: str, code: str, used: set[str], report: Report,
+               backup: Backup, dry_run: bool, now: float, idle_seconds: int,
+               fresh: set[str] = frozenset(), shared_stems: set[str] = frozenset()) -> dict[str, str]:
+    """id のないノートに id をつける。戻り値は {古いファイル名: 新しいファイル名}。
+    fresh(F-28: 作ったばかりでテンプレートのままのノートの id)には author も書かない。
+    shared_stems(共有 vault にあるファイル名)にも author を書かない。author のないまま配られた他の人のノートだから
+    (自分のノートは共有へ出す前に author を書いている)。"""
+    renamed: dict[str, str] = {}
+    for n in notes(v.root):
+        if not needs_id(n):
+            if has_id_without_author(n) and (n.file_id or "").upper() not in fresh and n.stem not in shared_stems:
+                fill_author(v, n, member, report, backup, dry_run, now, idle_seconds)
+            continue
+        if idle_seconds > 0 and now - n.path.stat().st_mtime < idle_seconds:
+            report.later(f"{v.label}: {n.rel} は書いている途中なので、次の同期で id をつけます")
+            continue
+        new_id = n.fm_id if valid_id(n.fm_id) else ids.make_id(created_time(n.path), code, used)
+        used.add(new_id)
+        new_stem = f"{new_id}_{n.name}"
+        new_path = n.path.with_name(new_stem + ".md")
+        if new_path.exists():
+            report.warn(f"{v.label}: {n.rel} を {new_stem}.md にできません(同じ名前のファイルがあります)")
+            continue
+        text = read(n.path)
+        values = {}
+        if n.fm_id != new_id:
+            values["id"] = new_id
+        if "author" not in frontmatter.load(text):
+            values["author"] = member
+        if not dry_run:
+            backup.save(v.root, n.path)
+            if values:
+                write(n.path, frontmatter.set_values(text, values))
+            n.path.rename(new_path)
+        renamed[n.stem] = new_stem
+        when = ids.decode_time(new_id).strftime("%Y-%m-%d %H:%M:%S")
+        report.record(f"{v.label}: id をつけた {n.rel} → {new_stem}.md({when} 作成)")
+    return renamed
+
+
+def has_id_without_author(n: Note) -> bool:
+    """テンプレートで作ったノートは id だけを持ち、author がない。"""
+    return bool(n.file_id) and n.top not in NO_ID_DIRS and not is_root_doc(n)
+
+
+def fill_author(v: Vault, n: Note, member: str, report: Report, backup: Backup,
+                dry_run: bool, now: float, idle_seconds: int) -> None:
+    """F-03: id はテンプレートが入れるので、author は同期プログラムが書く。"""
+    text = read(n.path)
+    if "author" in frontmatter.load(text):
+        return
+    if idle_seconds > 0 and now - n.path.stat().st_mtime < idle_seconds:
+        return
+    if not dry_run:
+        backup.save(v.root, n.path)
+        write(n.path, frontmatter.set_values(text, {"author": member}))
+    report.record(f"{v.label}: author を書いた {n.rel}")
+
+
+def name_index(vaults: list[Vault]) -> tuple[dict[str, set[str]], set[str]]:
+    """{名前または別名(小文字): {ファイル名}} と、すべてのファイル名(小文字)。"""
+    index: dict[str, set[str]] = defaultdict(set)
+    stems: set[str] = set()
+    for v in vaults:
+        for n in notes(v.root):
+            stems.add(n.stem.lower())
+            if n.file_id:
+                for name in [n.name, *n.aliases]:
+                    index[name.strip().lower()].add(n.stem)
+    return index, stems
+
+
+def report_same_names(vaults: list[Vault], report: Report) -> None:
+    """F-04: 同じ名前か別名を持つ、id の違うノートを知らせる(統合は人が行う)。"""
+    by_name: dict[str, set[str]] = defaultdict(set)
+    stems = {}
+    for v in vaults:
+        for n in notes(v.root):  # vault ごとに1回だけたどる
+            if not n.file_id:
+                continue
+            stems[n.file_id] = n.stem
+            if v.label == "機密":
+                continue
+            for name in {n.name, *n.aliases}:
+                by_name[name.strip().lower()].add(n.file_id)
+    for name, found in sorted(by_name.items()):
+        if len(found) > 1:
+            listed = "、".join(f"[[{stems[i]}]]" for i in sorted(found))
+            report.todo(f"同じ名前: 「{name}」のノートが {len(found)} つあります({listed})。同じものなら統合してください")
+
+
+def fix_links(v: Vault, index: dict[str, set[str]], stems: set[str], report: Report,
+              backup: Backup, dry_run: bool, member: str = "") -> int:
+    """名前だけのリンク [[水]] を、id つきの [[0RAYFN001_水|水]] に直す。
+
+    直すのは、そのファイル名のノートがなく、名前か別名で1つのノートに決まるときだけ。
+    名前を変えたあとの古いリンク [[0RAYFN001_お水|お水]] も、id が同じノートが1つなら
+    いまのファイル名に直す(Obsidian の外や別の PC で名前が変わったとき。id は変えない)。
+    """
+    # id → いまのファイル名。この vault にあればそれを使い(共有がまだ古い名前でも迷わない)、なければほかの vault から
+    by_id: dict[str, set[str]] = defaultdict(set)
+    for found in index.values():
+        for stem in found:
+            file_id, _ = ids.split_filename(stem)
+            if file_id:
+                by_id[file_id].add(stem)
+    local: dict[str, set[str]] = defaultdict(set)
+    for n in notes(v.root):
+        if n.file_id:
+            local[n.file_id].add(n.stem)
+    by_id.update(local)
+    changed_files = 0
+    for path, rel in iter_md(v.root):
+        if rel.parts[0] in NO_LINK_FIX_DIRS or theirs_file(path, member):
+            continue  # 配布物の案内と、他の人のノート(共有の中身に戻るので書き換えない)
+        if len(rel.parts) == 1 and rel.name.startswith("00_"):
+            continue  # 直下の案内ファイルと同期レポート
+        text = read(path)
+
+        def repl(m: re.Match) -> str:
+            target = m.group(1).strip()
+            alias = m.group(2)
+            key = target.lower()
+            if "/" in target:
+                return m.group(0)
+            file_id, old_name = ids.split_filename(target)
+            if file_id and file_id in by_id:
+                found = by_id[file_id]
+                if key in {x.lower() for x in found}:
+                    return m.group(0)
+            elif key in stems:
+                return m.group(0)
+            else:
+                found = index.get(key, set())
+            if len(found) != 1:
+                if len(found) > 1 and not file_id:
+                    report.todo(f"リンク `[[{target}]]`({v.label}: {rel.as_posix()})の行き先が {len(found)} つあり、直していません")
+                return m.group(0)
+            stem = next(iter(found))
+            shown = alias[1:] if alias else (old_name if file_id else target)
+            return f"[[{stem}|{shown}]]"
+
+        new = LINK.sub(repl, text)
+        if new != text:
+            changed_files += 1
+            report.record(f"{v.label}: リンクを id つきに直した {rel.as_posix()}")
+            if not dry_run:
+                backup.save(v.root, path)
+                write(path, new)
+    return changed_files

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="470" viewBox="0 0 960 470" font-family="'Yu Gothic UI','Meiryo','Hiragino Sans','Noto Sans JP',sans-serif" role="img" aria-label="Mind Map で多段に開く">
+<title>Mind Map で多段に開く</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f6fde"/></marker></defs>
+<rect x="0.5" y="0.5" width="959" height="469" rx="14" fill="#ffffff" stroke="#d6dae1"/>
+<text x="30.0" y="30.0" font-size="15" fill="#1d2430" text-anchor="start" font-weight="bold" dominant-baseline="middle">Mind Map: 子の木を、右へ何段でも開く</text>
+<rect x="30.0" y="218.0" width="174.0" height="44.0" rx="10" fill="#1f3a5f" stroke="#1f3a5f" stroke-width="1.2"/>
+<text x="117.0" y="240.0" font-size="15" fill="#fff" text-anchor="middle" font-weight="bold" dominant-baseline="middle">樹脂カバーを量産する</text>
+<text x="117.0" y="208.0" font-size="11" fill="#5b6472" text-anchor="middle" font-weight="normal" dominant-baseline="middle">目的(根)</text>
+<path d="M204,240 C237.0,240 237.0,110 270,110" fill="none" stroke="#b8bec8" stroke-width="1.5"/>
+<rect x="270.0" y="93.0" width="115.7" height="34.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<text x="327.9" y="110.0" font-size="14" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">電池が3年もつ</text>
+<circle cx="397.7" cy="110" r="9" fill="#ffffff" stroke="#2f6fde" stroke-width="1.6"/>
+<text x="397.7" y="110.5" font-size="14" fill="#2f6fde" text-anchor="middle" font-weight="bold" dominant-baseline="middle">−</text>
+<path d="M204,240 C237.0,240 237.0,240 270,240" fill="none" stroke="#b8bec8" stroke-width="1.5"/>
+<rect x="270.0" y="223.0" width="123.4" height="34.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<text x="331.7" y="240.0" font-size="14" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">A案 クランプ式</text>
+<circle cx="405.4" cy="240" r="9" fill="#ffffff" stroke="#2f6fde" stroke-width="1.6"/>
+<text x="405.4" y="240.5" font-size="14" fill="#2f6fde" text-anchor="middle" font-weight="bold" dominant-baseline="middle">−</text>
+<path d="M204,240 C237.0,240 237.0,380 270,380" fill="none" stroke="#b8bec8" stroke-width="1.5"/>
+<rect x="270.0" y="363.0" width="123.4" height="34.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<text x="331.7" y="380.0" font-size="14" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">B案 ねじ止め式</text>
+<circle cx="405.4" cy="380" r="9" fill="#ffffff" stroke="#2f6fde" stroke-width="1.6"/>
+<text x="405.4" y="380.5" font-size="14" fill="#2f6fde" text-anchor="middle" font-weight="bold" dominant-baseline="middle">+</text>
+<path d="M407.7,110 C453.85,110 453.85,70 500,70" fill="none" stroke="#b8bec8" stroke-width="1.5"/>
+<rect x="500.0" y="53.0" width="154.2" height="34.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<text x="577.1" y="70.0" font-size="14" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">待機電流 10µA 以下</text>
+<path d="M407.7,110 C453.85,110 453.85,150 500,150" fill="none" stroke="#b8bec8" stroke-width="1.5"/>
+<rect x="500.0" y="133.0" width="109.4" height="34.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<text x="554.7" y="150.0" font-size="14" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">送信は1日4回</text>
+<path d="M415.4,240 C457.7,240 457.7,210 500,210" fill="none" stroke="#b8bec8" stroke-width="1.5"/>
+<rect x="500.0" y="193.0" width="108.0" height="34.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<text x="554.0" y="210.0" font-size="14" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">電池ユニット</text>
+<circle cx="620" cy="210" r="9" fill="#ffffff" stroke="#2f6fde" stroke-width="1.6"/>
+<text x="620.0" y="210.5" font-size="14" fill="#2f6fde" text-anchor="middle" font-weight="bold" dominant-baseline="middle">−</text>
+<path d="M415.4,240 C457.7,240 457.7,290 500,290" fill="none" stroke="#b8bec8" stroke-width="1.5"/>
+<rect x="500.0" y="273.0" width="122.0" height="34.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<text x="561.0" y="290.0" font-size="14" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">マグネット取付</text>
+<circle cx="634" cy="290" r="9" fill="#ffffff" stroke="#2f6fde" stroke-width="1.6"/>
+<text x="634.0" y="290.5" font-size="14" fill="#2f6fde" text-anchor="middle" font-weight="bold" dominant-baseline="middle">+</text>
+<path d="M630,210 C675.0,210 675.0,185 720,185" fill="none" stroke="#b8bec8" stroke-width="1.5"/>
+<rect x="720.0" y="168.0" width="80.0" height="34.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<text x="760.0" y="185.0" font-size="14" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">セル選定</text>
+<path d="M630,210 C675.0,210 675.0,235 720,235" fill="none" stroke="#b8bec8" stroke-width="1.5"/>
+<rect x="720.0" y="218.0" width="80.0" height="34.0" rx="8" fill="#ffffff" stroke="#8f97a3" stroke-width="1.2"/>
+<text x="760.0" y="235.0" font-size="14" fill="#1d2430" text-anchor="middle" font-weight="normal" dominant-baseline="middle">ホルダー</text>
+<text x="300.0" y="440.0" font-size="13" fill="#2f6fde" text-anchor="middle" font-weight="bold" dominant-baseline="middle">＋ = まだ閉じている(押すと1段開く)   − = 開いている(押すと閉じる)</text>
+</svg>

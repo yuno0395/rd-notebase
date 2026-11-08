@@ -1,0 +1,79 @@
+filters:
+  and:
+    - '!file.inFolder("_仕組み/templates")'
+    - type == "設計案"
+formulas:
+  # 名前の列: ファイル名(id_名前)の代わりに aliases の最初の名前を出す。押せばノートが開く。
+  # aliases が空なら、ファイル名から id を外した名前
+  alias: 'file.asLink(if(list(aliases).filter(value).length > 0, list(aliases).filter(value)[0], file.basename.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, "")))'
+  # この候補を脅かすイシュー(parent などでこの候補にリンクしているイシュー)のうち、まだ対策が終わっていないもの。
+  # 少ないほど磨けている候補。同期プログラムがなくても数える。
+  open: 'file.backlinks.filter(value.asFile().properties.type == "イシュー" && (value.asFile().properties.status == "未着手" || value.asFile().properties.status == "進行中" || value.asFile().properties.status == "待ち" || value.asFile().properties.status == "確認待ち" || value.asFile().properties.status == "未対応" || value.asFile().properties.status == "対策中")).length'
+  # そのうち impact 大(方針・絞込・出荷)
+  open_big: 'file.backlinks.filter(value.asFile().properties.type == "イシュー" && (value.asFile().properties.status == "未着手" || value.asFile().properties.status == "進行中" || value.asFile().properties.status == "待ち" || value.asFile().properties.status == "確認待ち" || value.asFile().properties.status == "未対応" || value.asFile().properties.status == "対策中") && (value.asFile().properties.impact == "方針" || value.asFile().properties.impact == "絞込" || value.asFile().properties.impact == "出荷")).length'
+properties:
+  formula.alias:
+    displayName: 別名
+  価値仮説:
+    displayName: 実現する仮説・関係
+  formula.open:
+    displayName: 残りのイシュー
+  formula.open_big:
+    displayName: うち impact 大
+views:
+  - type: cards
+    name: カード(図)
+    image: note.image
+    imageFit: contain
+    imageAspectRatio: 0.5625
+    filters:
+      and:
+        - status != "不採用"
+    groupBy:
+      property: parent
+      direction: ASC
+    order:
+      - formula.alias
+      - id
+      - status
+      - formula.open
+      - drawing_no
+  - type: table
+    name: 候補の一組(目的・上の設計案ごと)
+    filters:
+      and:
+        - status != "不採用"
+    groupBy:
+      property: parent
+      direction: ASC
+    order:
+      - formula.alias
+      - id
+      - status
+      - formula.open_big
+      - formula.open
+      - 価値仮説
+      - drawing_no
+      - author
+    sort:
+      - property: status
+        direction: ASC
+      - property: formula.open_big
+        direction: ASC
+      - property: formula.open
+        direction: ASC
+  - type: table
+    name: すべて(不採用も)
+    groupBy:
+      property: parent
+      direction: ASC
+    order:
+      - formula.alias
+      - id
+      - status
+      - formula.open_big
+      - formula.open
+      - 価値仮説
+      - drawing_no
+      - parent
+      - author

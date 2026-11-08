@@ -1,0 +1,107 @@
+{
+  "quickadd:choice:350d6e6f-8a2c-5d01-88d8-832306a0cee4": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "N"
+    }
+  ],
+  "file-explorer:new-file": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/図を開く.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "D"
+    }
+  ],
+  "templater-obsidian:_仕組み/templates/_コマンド/ノードにする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "K"
+    }
+  ],
+  "editor:insert-link": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/保存.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "S"
+    }
+  ],
+  "editor:save-file": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/イシューにする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "I"
+    }
+  ],
+  "editor:toggle-italics": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/タスクにする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "T"
+    }
+  ],
+  "workspace:new-tab": [],
+  "templater-obsidian:_仕組み/templates/_コマンド/仮説にする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "H"
+    }
+  ],
+  "templater-obsidian:_仕組み/templates/_コマンド/設計案にする.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "U"
+    }
+  ],
+  "editor:open-search-replace": [],
+  "k-plex:kplex-focus-active-note": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "G"
+    }
+  ],
+  "graph:open": [],
+  "quickadd:choice:dee6ab7d-6a6e-5dc3-8f4b-6698ebf395fb": [
+    {
+      "modifiers": [
+        "Mod",
+        "Shift"
+      ],
+      "key": "N"
+    }
+  ],
+  "templater-obsidian:_仕組み/templates/_コマンド/今すぐ共有へ.md": [
+    {
+      "modifiers": [
+        "Mod",
+        "Shift"
+      ],
+      "key": "S"
+    }
+  ],
+  "templater-obsidian:_仕組み/templates/_コマンド/今の仕事を確かめる.md": [
+    {
+      "modifiers": [
+        "Mod"
+      ],
+      "key": "J"
+    }
+  ]
+}

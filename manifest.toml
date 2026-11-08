@@ -1,0 +1,122 @@
+# 配布の目録(仕様書「仕組みの正本と配布」)
+#
+# vault ごとに、配布物を何から組み立てるかと、ファイルの扱いを決める。
+#   system: 仕組みのファイル。版を当てるたびに上書きする
+#   seed:   最初だけのファイル。なければ置く。あれば触らない
+# どちらにも当てはまらないファイルがあると、tools/build.py は止まる。
+# パターンは vault の一番上からのパス。* は / をまたいで当てはまる。
+
+[[vault]]
+name = "共有"
+src = "vault/共有"
+include = [
+  { from = "docs/00_仕様書.md", to = "00_仕様書.md" },
+  { from = "docs/00_同期プログラム要件.md", to = "00_同期プログラム要件.md" },
+  { from = "docs/00_現場向け1枚.md", to = "00_現場向け1枚.md" },
+  { from = "docs/マニュアル", to = "00_マニュアル" },
+]
+system = [
+  "00_README.md",
+  "00_仕様書.md",
+  "00_同期プログラム要件.md",
+  "00_現場向け1枚.md",
+  "00_マニュアル/*",
+  "00_*.base",
+  "_仕組み/templates/*",
+  "_仕組み/設定/*",
+  "_仕組み/tools/準備/*",
+]
+seed = [
+  "_仕組み/同期設定.yaml",
+  "_仕組み/tools/同期プログラム/メンバー.csv",
+  "_仕組み/EXT_一覧.csv",   # 社外の相手の一覧(visibility の EXT_<相手>)。各自の登録を消さないよう最初だけ置く
+]
+
+[[vault]]
+name = "個人"
+src = "vault/個人"
+include = [
+  { from = "vault/共有/_仕組み/templates", to = "_仕組み/templates" },
+  { from = "vault/共有/00_イシュー一覧.base", to = "00_イシュー一覧.base" },
+  { from = "vault/共有/00_タスク一覧.base", to = "00_タスク一覧.base" },
+  { from = "vault/共有/00_設計案一覧.base", to = "00_設計案一覧.base" },
+  { from = "vault/共有/00_ノード一覧.base", to = "00_ノード一覧.base" },
+  { from = "vault/共有/00_部品一覧.base", to = "00_部品一覧.base" },
+  { from = "vault/共有/00_ナレッジ一覧.base", to = "00_ナレッジ一覧.base" },
+  # 共有と同じ中身のプラグイン設定は、共有の 配る設定 から写す
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/k-plex/data.json", to = ".obsidian/plugins/k-plex/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-excalidraw-plugin/data.json", to = ".obsidian/plugins/obsidian-excalidraw-plugin/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-custom-attachment-location/data.json", to = ".obsidian/plugins/obsidian-custom-attachment-location/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-front-matter-title-plugin/data.json", to = ".obsidian/plugins/obsidian-front-matter-title-plugin/data.json" },
+]
+system = [
+  "00_README.md",
+  "00_*.base",
+  "_仕組み/templates/*",
+  # 配る設定(キーと、配ったプラグインの設定)は版ごとに上書きする。
+  # ただし hotkeys.json・plugins/cmdr・plugins/quickadd の data.json・app.json は準備の bat が合わせる(配る分は入れ直し、各自で足した分は残す)
+  # community-plugins.json は各自のものとして最初だけ置く(要件書 F-46)
+  ".obsidian/hotkeys.json",
+  ".obsidian/plugins/*",
+  # コアの「デイリーノート」はオフのままだが、Day Planner などが Periodic Notes を読めないときの保存先の控え
+  ".obsidian/daily-notes.json",
+]
+seed = [
+  "_仕組み/同期レポート.md",
+  "_仕組み/個人設定.md",
+  ".obsidian/*",
+]
+
+[[vault]]
+name = "機密"
+src = "vault/機密"
+include = [
+  { from = "vault/共有/_仕組み/templates/図.excalidraw.md", to = "_仕組み/templates/図.excalidraw.md" },
+  { from = "vault/共有/_仕組み/templates/_scripts", to = "_仕組み/templates/_scripts" },
+  { from = "vault/共有/_仕組み/templates/_コマンド", to = "_仕組み/templates/_コマンド" },
+  { from = "vault/共有/_仕組み/tools/同期プログラム/メンバー.csv", to = "_仕組み/tools/メンバー.csv" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-excalidraw-plugin/data.json", to = "_仕組み/設定/.obsidian/plugins/obsidian-excalidraw-plugin/data.json" },
+  { from = "vault/共有/_仕組み/設定/.obsidian/plugins/obsidian-custom-attachment-location/data.json", to = "_仕組み/設定/.obsidian/plugins/obsidian-custom-attachment-location/data.json" },
+]
+system = [
+  "_仕組み/templates/*",
+  "_仕組み/設定/*",
+]
+seed = [
+  "00_README.md",
+  "_仕組み/tools/メンバー.csv",
+]
+
+# 版ごとの移し替え(仕様書「書きためたノートを壊さずに仕組みを直す」、要件書 F-46)。
+# 準備の bat は、vault の 版.txt より新しく、当てる版より古いか同じ version のものを、古い順に全部当てる。
+# 版.txt のない vault(bat より前に作ったもの)には、当てる版までのものを全部当てる。
+# script は `python <script> <vault> --run --backup <控えのフォルダ>` で動くこと。控えはそのフォルダに作り
+# (共有クラウドフォルダの中に作らない)、何度走らせても同じ結果になること。version は、その移し替えを初めて配る版。
+# if_exists(vault の中のパス)を書くと、版にかかわらず、それが残っている vault には当てる。
+
+[[migrate]]
+version = "0.2.0"
+script = "tools/migrate_v054.py"   # 仕様書 v0.54: ソリューション・設計記録 → 設計案(01_設計案/ へ)
+vaults = ["個人", "共有"]
+
+[[migrate]]
+version = "0.2.0"
+script = "tools/migrate_v055.py"   # 仕様書 v0.55: イシューの parent → 脅かす、設計案の friend の仮説 → 価値仮説
+vaults = ["個人", "共有"]
+
+[[migrate]]
+version = "0.2.1"
+script = "tools/migrate_v067.py"   # 仕様書 v0.67: 個人 vault の 90_共有/ をなくし、配られたノートを共有と同じ場所へ
+vaults = ["個人"]
+if_exists = "90_共有"   # 0.2.1 はこの変更より前に出ていたので、0.2.1 以上の vault にも 90_共有/ が残っていれば当てる
+
+[[migrate]]
+version = "0.2.4"   # 0.2.3 まではもう出ている。出した版の番号にすると当て済みとみなされて飛ばされる
+script = "tools/migrate_v069.py"   # 仕様書 v0.69: status の言い回しを10通りにそろえる
+vaults = ["個人", "共有"]
+
+[[migrate]]
+version = "0.2.9"   # 0.2.8 まではもう出ている(0.2.7 は PR #77、0.2.8 は Day Planner の直し)
+script = "tools/migrate_v091.py"   # 仕様書 v0.91: 00_日誌 → 00_PIP(週報は 00_週報)、visibility を PIP・Internal use only・プロジェクト名に
+vaults = ["個人"]
+if_exists = "00_日誌"   # 版にかかわらず、古いフォルダが残っていれば当てる

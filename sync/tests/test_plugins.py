@@ -1,0 +1,314 @@
+"""tools/plugins.py: プラグインを配布物にそろえる(pack)、vault に入れる(install)。"""
+
+import importlib.util
+import json
+from pathlib import Path
+
+import pytest
+
+SPEC = importlib.util.spec_from_file_location("plugins", Path(__file__).resolve().parents[2] / "tools" / "plugins.py")
+plugins = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(plugins)
+
+MIT = b"MIT License\n\nPermission is hereby granted, free of charge, ..."
+AGPL = b"GNU AFFERO GENERAL PUBLIC LICENSE\nVersion 3, 19 November 2007"
+
+
+def put_plugin(root: Path, pid: str, ver: str, extra: str = "") -> Path:
+    d = root / pid
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "main.js").write_text(f"// {pid} {ver}{extra}", encoding="utf-8")
+    (d / "manifest.json").write_text(json.dumps({"id": pid, "name": pid.upper(), "version": ver}), encoding="utf-8")
+    return d
+
+
+def source(tmp_path: Path, plist: dict[str, str]) -> Path:
+    s = tmp_path / "配布" / "プラグイン"
+    for pid, ver in plist.items():
+        put_plugin(s, pid, ver)
+        (s / pid / "LICENSE").write_bytes(MIT)
+    (s / plugins.CREDITS).write_text("# 出典\n", encoding="utf-8")
+    return s
+
+
+def test_license_kind():
+    assert plugins.license_kind(MIT.decode()) == "MIT"
+    assert plugins.license_kind(AGPL.decode()) == "AGPL-3.0"
+    assert plugins.license_kind("GNU GENERAL PUBLIC LICENSE\nVersion 3") == "GPL-3.0"
+    assert plugins.license_kind("MIT No Attribution") == "MIT-0"
+    assert plugins.license_kind("何か") == "要確認"
+    # GPL-3.0 の本文は後ろの方で「GNU Affero General Public License」に触れる
+    gpl = "GNU GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007\n" + "x" * 2000 + "13. Use with the GNU Affero General Public License."
+    assert plugins.license_kind(gpl) == "GPL-3.0"
+
+
+def test_install_shared_vault_copies_bodies_and_settings(tmp_path):
+    src = source(tmp_path, {"quickadd": "1.0.0", "templater-obsidian": "2.0.0", "k-plex": "0.5.0"})
+    vault = tmp_path / "共有"
+    st = vault / plugins.SHARED_SETTINGS
+    (st / "plugins/quickadd").mkdir(parents=True)
+    (st / "plugins/quickadd/data.json").write_text('{"x": 1}', encoding="utf-8")
+    (st / "hotkeys.json").write_text("{}", encoding="utf-8")
+    (st / "community-plugins.json").write_text('["quickadd", "templater-obsidian", "nowhere"]', encoding="utf-8")
+    cfg = ".obsidian-229999_aa11234567"
+    (vault / cfg).mkdir()
+    (vault / cfg / "community-plugins.json").write_text('["my-own"]', encoding="utf-8")
+
+    done = plugins.install(vault, cfg, src)
+    t = vault / cfg
+    assert (t / "plugins/quickadd/main.js").read_text(encoding="utf-8") == "// quickadd 1.0.0"
+    assert (t / "plugins/quickadd/LICENSE").is_file()
+    assert json.loads((t / "plugins/quickadd/data.json").read_text(encoding="utf-8"))["x"] == 1  # 配る設定(QuickAdd は合わせる)
+    assert (t / "hotkeys.json").is_file()
+    assert not (t / "plugins/k-plex").exists()  # この vault の一覧にないものは入れない
+    # 自分で足した my-own は残し、配布物にない nowhere は有効にしない
+    assert json.loads((t / "community-plugins.json").read_text(encoding="utf-8")) == ["my-own", "quickadd", "templater-obsidian"]
+    assert any("nowhere は配布物にない" in d for d in done)
+
+
+def test_install_personal_vault_uses_its_own_list_and_skips_same_version(tmp_path):
+    src = source(tmp_path, {"quickadd": "1.1.0", "periodic-notes": "0.9.0"})
+    vault = tmp_path / "個人"
+    ob = vault / ".obsidian"
+    ob.mkdir(parents=True)
+    (ob / "community-plugins.json").write_text('["quickadd", "periodic-notes"]', encoding="utf-8")
+    put_plugin(ob / "plugins", "periodic-notes", "0.9.0", extra=" 手元")
+    (ob / "plugins/periodic-notes/data.json").write_text('{"mine": true}', encoding="utf-8")
+    put_plugin(ob / "plugins", "quickadd", "1.0.0")
+
+    done = plugins.install(vault, ".obsidian", src)
+    assert (ob / "plugins/quickadd/main.js").read_text(encoding="utf-8") == "// quickadd 1.1.0"  # 版が違えば入れ替える
+    assert "手元" in (ob / "plugins/periodic-notes/main.js").read_text(encoding="utf-8")  # 同じ版は触らない
+    assert (ob / "plugins/periodic-notes/data.json").read_text(encoding="utf-8") == '{"mine": true}'
+    assert done[0] == "quickadd を入れた(1.0.0 → 1.1.0)" and "コアプラグイン" in done[1] and len(done) == 2
+
+
+def test_config_dirs(tmp_path):
+    for d in (".obsidian", ".obsidian-229999_pc1", ".trash", "02_ノード"):
+        (tmp_path / d).mkdir()
+    assert plugins.config_dirs(tmp_path) == [".obsidian", ".obsidian-229999_pc1"]
+
+
+def test_pack(tmp_path, monkeypatch):
+    lists = tmp_path / "root"
+    for rel, ids in [(plugins.DIST_LISTS[0], ["quickadd", "templater-obsidian"]), (plugins.DIST_LISTS[1], ["quickadd", "nowhere"])]:
+        (lists / rel).parent.mkdir(parents=True, exist_ok=True)
+        (lists / rel).write_text(json.dumps(ids), encoding="utf-8")
+    monkeypatch.setattr(plugins, "ROOT", lists)
+    installed = tmp_path / ".obsidian"
+    put_plugin(installed / "plugins", "quickadd", "1.0.0")
+    put_plugin(installed / "plugins", "templater-obsidian", "2.1.0")
+    (installed / "plugins/quickadd/data.json").write_text("{}", encoding="utf-8")
+    pages = {
+        plugins.REGISTRY: json.dumps([{"id": "quickadd", "repo": "a/quickadd"}, {"id": "templater-obsidian", "repo": "b/Templater"}]).encode(),
+        "https://raw.githubusercontent.com/a/quickadd/1.0.0/LICENSE": MIT,
+        "https://raw.githubusercontent.com/b/Templater/2.1.0/LICENSE": AGPL,
+        "https://github.com/b/Templater/archive/refs/tags/2.1.0.zip": b"PK zip",
+    }
+
+    def get(url):
+        if url in pages:
+            return pages[url]
+        raise OSError("404")
+
+    out = tmp_path / "dist"
+    errors = plugins.pack("0.2.0", installed, out, get=get)
+    p = out / plugins.PLUGIN_DIR
+    assert (p / "quickadd/main.js").is_file() and (p / "quickadd/LICENSE").read_bytes() == MIT
+    assert not (p / "quickadd/data.json").exists()  # 本体だけ。設定は配布物の別のところ
+    assert (p / "ソース/templater-obsidian-2.1.0.zip").read_bytes() == b"PK zip"
+    assert not (p / "ソース/quickadd-1.0.0.zip").exists()  # MIT はソース不要
+    credits = (p / plugins.CREDITS).read_text(encoding="utf-8")
+    assert "| TEMPLATER-OBSIDIAN | 2.1.0 | templater-obsidian | https://github.com/b/Templater | AGPL-3.0 |" in credits
+    assert errors == ["nowhere: " + str(installed / "plugins" / "nowhere") + " に本体がありません。Obsidian で入れてからやり直してください"]
+
+
+def test_pack_plugin_not_in_registry(tmp_path, monkeypatch):
+    """Obsidian の一覧に載っていないもの(Excalidraw Table)は EXTRA_REPOS の入手元から取る。"""
+    rel = plugins.DIST_LISTS[0]
+    (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / rel).write_text(json.dumps(["excalidraw-table"]), encoding="utf-8")
+    monkeypatch.setattr(plugins, "ROOT", tmp_path)
+    repo = plugins.EXTRA_REPOS["excalidraw-table"]
+    pages = {
+        plugins.REGISTRY: b"[]",
+        f"https://github.com/{repo}/releases/latest/download/main.js": b"// main",
+        f"https://github.com/{repo}/releases/latest/download/manifest.json":
+            json.dumps({"id": "excalidraw-table", "name": "Excalidraw Table", "version": "0.6.0"}).encode(),
+        f"https://raw.githubusercontent.com/{repo}/0.6.0/LICENSE": MIT,
+    }
+
+    def get(url):
+        if url in pages:
+            return pages[url]
+        raise OSError("404")
+
+    out = tmp_path / "dist"
+    errors = plugins.pack("0.2.5", None, out, get=get, allow_download=True)
+    p = out / plugins.PLUGIN_DIR
+    assert errors == []
+    assert (p / "excalidraw-table/main.js").read_bytes() == b"// main"
+    assert not (p / "excalidraw-table/styles.css").exists()  # リリースにないものは飛ばす
+    assert (p / "excalidraw-table/LICENSE").read_bytes() == MIT
+    assert f"| Excalidraw Table | 0.6.0 | excalidraw-table | https://github.com/{repo} | MIT |" in (p / plugins.CREDITS).read_text(encoding="utf-8")
+
+
+def test_dist_lists_have_excalidraw_table():
+    for rel in plugins.DIST_LISTS:
+        ids = plugins.read_list(plugins.ROOT / rel)
+        assert "excalidraw-table" in ids and "obsidian-excalidraw-plugin" in ids
+
+
+def test_pack_without_network(tmp_path, monkeypatch):
+    monkeypatch.setattr(plugins, "ROOT", tmp_path)
+
+    def get(url):
+        raise OSError("offline")
+
+    errors = plugins.pack("0.2.0", tmp_path, tmp_path / "dist", get=get)
+    assert errors and "ネット" in errors[0]
+
+
+def test_pack_license_from_api(tmp_path, monkeypatch):
+    """LICENSE のファイル名が一覧にないときは、GitHub のライセンス API から取る。"""
+    import base64
+    lists = tmp_path / "root"
+    (lists / plugins.DIST_LISTS[0]).parent.mkdir(parents=True, exist_ok=True)
+    (lists / plugins.DIST_LISTS[0]).write_text(json.dumps(["templater-obsidian"]), encoding="utf-8")
+    monkeypatch.setattr(plugins, "ROOT", lists)
+    installed = tmp_path / ".obsidian"
+    put_plugin(installed / "plugins", "templater-obsidian", "2.1.0")
+    pages = {
+        plugins.REGISTRY: json.dumps([{"id": "templater-obsidian", "repo": "b/Templater"}]).encode(),
+        "https://api.github.com/repos/b/Templater/license": json.dumps({"content": base64.b64encode(AGPL).decode()}).encode(),
+        "https://github.com/b/Templater/archive/refs/tags/2.1.0.zip": b"PK zip",
+    }
+
+    def get(url):
+        if url in pages:
+            return pages[url]
+        raise OSError("404")
+
+    errors = plugins.pack("0.2.0", installed, tmp_path / "dist", get=get)
+    p = tmp_path / "dist" / plugins.PLUGIN_DIR
+    assert (p / "templater-obsidian/LICENSE").read_bytes() == AGPL
+    assert errors == []
+
+
+def test_set_core_plugins(tmp_path):
+    """コアプラグインは決まりのものだけ変え、ほかは各自のまま。古い一覧の形も読む。"""
+    d = tmp_path / ".obsidian"
+    assert plugins.set_core_plugins(d)  # ないときは Obsidian の既定から作る
+    core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+    assert core["daily-notes"] is False and core["templates"] is False and core["canvas"] is False
+    assert core["bases"] is True and core["file-explorer"] is True
+    assert not plugins.set_core_plugins(d)  # 2回目は何も変えない
+    (d / "core-plugins.json").write_text(json.dumps({"daily-notes": True, "word-count": False}), encoding="utf-8")
+    assert plugins.set_core_plugins(d)
+    core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+    assert core["daily-notes"] is False and core["word-count"] is False  # 各自が切ったものは切ったまま
+    (d / "core-plugins.json").write_text(json.dumps(["file-explorer", "templates"]), encoding="utf-8")
+    assert plugins.set_core_plugins(d)
+    core = json.loads((d / "core-plugins.json").read_text(encoding="utf-8"))
+    assert core["file-explorer"] is True and core["templates"] is False and core["outline"] is False
+
+
+def test_merge_hotkeys():
+    """配るキーは入れ直し、各自で足したキーは残す。同じキーは配る側を優先する。"""
+    dist = {"a:new": [{"modifiers": ["Mod"], "key": "N"}], "file-explorer:new-file": []}
+    have = {
+        "a:new": [{"modifiers": ["Mod"], "key": "M"}],            # 配るコマンドを自分で変えた → 配る方に戻る
+        "mine:x": [{"modifiers": ["Mod", "Shift"], "key": "X"}],  # 自分で足した → 残る
+        "mine:y": [{"modifiers": ["Mod"], "key": "n"}],           # 配るキーと同じ → 外れる
+    }
+    out, notes = plugins.merge_hotkeys(have, dist)
+    assert out["a:new"] == dist["a:new"] and out["file-explorer:new-file"] == []
+    assert out["mine:x"] == have["mine:x"] and out["mine:y"] == []
+    assert any("ぶつかりました: Ctrl+N" in n and "「y」" in n for n in notes)  # ぶつかったら知らせる
+    assert any("戻しました" in n and "Ctrl+M" in n for n in notes)
+    # 前の版で配って、この版でなくしたコマンドは「自分で足したもの」として残さない
+    out, _ = plugins.merge_hotkeys({"old:cmd": [{"modifiers": ["Alt"], "key": "O"}]}, dist, sent=["old:cmd"])
+    assert "old:cmd" not in out
+
+
+def test_merge_menu_and_quickadd(tmp_path):
+    """右クリックメニュー(Commander)と QuickAdd も、自分で足した分を残す。"""
+    src, me = tmp_path / "配る", tmp_path / ".obsidian"
+    for d in (src / "plugins/cmdr", src / "plugins/quickadd", me / "plugins/cmdr", me / "plugins/quickadd"):
+        d.mkdir(parents=True)
+    w = lambda f, o: f.write_text(json.dumps(o, ensure_ascii=False), encoding="utf-8")
+    w(src / "plugins/cmdr/data.json", {"editorMenu": [{"id": "a", "name": "ノードにする"}], "pageHeader": []})
+    w(src / "plugins/quickadd/data.json", {"choices": [{"id": "n1", "name": "新しいノート"}], "version": "2", "migrations": {"m1": True}})
+    w(me / "plugins/cmdr/data.json", {"editorMenu": [{"id": "a", "name": "古い名前"}, {"id": "mine", "name": "自分の"}], "leftRibbon": [{"id": "r"}]})
+    w(me / "plugins/quickadd/data.json", {"choices": [{"id": "n1", "name": "古い"}, {"id": "q", "name": "自分の"}], "migrations": {"m2": True}})
+    changed, notes = plugins.merge_settings(src, me)
+    cmdr = json.loads((me / "plugins/cmdr/data.json").read_text(encoding="utf-8"))
+    assert [x["name"] for x in cmdr["editorMenu"]] == ["ノードにする", "自分の"] and cmdr["leftRibbon"] == [{"id": "r"}]
+    qa = json.loads((me / "plugins/quickadd/data.json").read_text(encoding="utf-8"))
+    assert [x["name"] for x in qa["choices"]] == ["新しいノート", "自分の"] and qa["migrations"] == {"m1": True, "m2": True}
+    # 次の版で配る項目をなくしたら、各自のほうからも消える(自分で足したものは残る)
+    w(src / "plugins/cmdr/data.json", {"editorMenu": [], "pageHeader": []})
+    plugins.merge_settings(src, me)
+    cmdr = json.loads((me / "plugins/cmdr/data.json").read_text(encoding="utf-8"))
+    assert [x["id"] for x in cmdr["editorMenu"]] == ["mine"]
+
+
+def test_install_keeps_own_hotkeys_in_shared(tmp_path):
+    vault = tmp_path / "共有"
+    settings = vault / plugins.SHARED_SETTINGS
+    settings.mkdir(parents=True)
+    (settings / "hotkeys.json").write_text(json.dumps({"a:new": [{"modifiers": ["Mod"], "key": "N"}]}), encoding="utf-8")
+    (settings / "community-plugins.json").write_text("[]", encoding="utf-8")
+    cfg = vault / ".obsidian-123456_pc1"
+    cfg.mkdir()
+    (cfg / "hotkeys.json").write_text(json.dumps({"mine:x": [{"modifiers": ["Alt"], "key": "X"}]}), encoding="utf-8")
+    src = tmp_path / "プラグイン"
+    src.mkdir()
+    plugins.install(vault, cfg.name, src)
+    keys = json.loads((cfg / "hotkeys.json").read_text(encoding="utf-8"))
+    assert "a:new" in keys and keys["mine:x"] == [{"modifiers": ["Alt"], "key": "X"}]
+
+
+def test_install_drops_discontinued_plugin(tmp_path):
+    """版でやめたプラグイン(omnisearch)は、各自の有効にする一覧からも外す。"""
+    vault = tmp_path / "v"
+    target = vault / ".obsidian"
+    target.mkdir(parents=True)
+    (target / "community-plugins.json").write_text('["quickadd", "omnisearch", "my-own"]', encoding="utf-8")
+    source = tmp_path / "src"
+    put_plugin(source, "quickadd", "1.0.0")
+    plugins.install(vault, ".obsidian", source)
+    assert plugins.read_list(target / "community-plugins.json") == ["quickadd", "my-own"]
+    for rel in plugins.DIST_LISTS:
+        assert "omnisearch" not in plugins.read_list(plugins.ROOT / rel)
+
+
+def test_merge_app_json_keeps_own_items():
+    """app.json は配る項目(すべての拡張子を表示 など)を配る値にし、各自で変えた項目は残す。"""
+    have = {"showUnsupportedFiles": False, "newFileFolderPath": "02_ノード", "spellcheck": True}
+    dist = {"showUnsupportedFiles": True, "newFileFolderPath": "共通/02_ノード"}
+    want, notes = plugins.merge_one("app.json", have, dist, {})
+    assert want == {"showUnsupportedFiles": True, "newFileFolderPath": "共通/02_ノード", "spellcheck": True}
+    assert notes == []
+
+
+def test_all_vaults_show_all_file_types():
+    """3つの vault とも「すべての拡張子のファイルを表示」をいつもオンで配る。"""
+    files = sorted((Path(__file__).resolve().parents[2] / "vault").glob("**/.obsidian/app.json"))
+    assert len(files) == 3
+    for f in files:
+        assert json.loads(f.read_text(encoding="utf-8")).get("showUnsupportedFiles") is True, f
+
+
+def test_startup_runs_from_quickadd_not_templater():
+    """起動時に動かすものは QuickAdd のマクロ(Run on startup)から。Templater の起動時テンプレートは
+    Templater 2.x から PC ごとの設定(最初はオフ)で、配る設定ではオンにできない。"""
+    root = Path(__file__).resolve().parents[2] / "vault"
+    for d in (root / "個人" / ".obsidian", root / "共有" / "_仕組み" / "設定" / ".obsidian", root / "機密" / "_仕組み" / "設定" / ".obsidian"):
+        tpl = json.loads((d / "plugins" / "templater-obsidian" / "data.json").read_text(encoding="utf-8"))
+        assert not [t for t in tpl.get("startup_templates", []) if t], f"{d}: Templater の起動時テンプレートは PC ごとにオフ"
+    qa = json.loads((root / "個人" / ".obsidian" / "plugins" / "quickadd" / "data.json").read_text(encoding="utf-8"))
+    startup = [c for c in qa["choices"] if c.get("type") == "Macro" and c.get("runOnStartup")]
+    assert [c["name"] for c in startup] == ["起動時"]
+    for cmd in startup[0]["macro"]["commands"]:
+        assert (root / "共有" / cmd["path"]).is_file(), cmd["path"]

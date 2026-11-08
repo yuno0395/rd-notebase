@@ -1,0 +1,157 @@
+"""F-50: vault の名前を変えても、同期が新しい場所を見つけて設定を直す。見つからなければ何も作らずに止まる。"""
+
+import shutil
+from pathlib import Path
+
+from notesync.config import load
+from notesync.relocate import VAULT_ID, record_path, rewrite_config
+from notesync.run import run_once
+
+from .conftest import SAMPLE
+
+
+def setup(tmp_path: Path, dry: bool = False) -> tuple[Path, Path]:
+    cloud = tmp_path / "Box"
+    shutil.copytree(SAMPLE, cloud)
+    (cloud / "共有/_仕組み/同期設定.yaml").write_text("{}\n", encoding="utf-8")
+    appdata = tmp_path / "appdata"
+    appdata.mkdir()
+    conf = appdata / "config.yaml"
+    conf.write_text(
+        "member: 山田   # 名前\n"
+        f"personal: {(cloud / '個人').as_posix()}\n"
+        f"shared: \"{(cloud / '共有').as_posix()}\"   # 共有\n"
+        "secret:\n"
+        f"  - {(cloud / '機密').as_posix()}\n"
+        f"dry_run: {'true' if dry else 'false'}\n"
+        "idle_seconds: 0\n"
+        f"backup_dir: {(tmp_path / 'backup').as_posix()}\n",
+        encoding="utf-8")
+    return cloud, conf
+
+
+def test_ids_are_placed_and_remembered(tmp_path):
+    cloud, conf = setup(tmp_path)
+    load(conf)
+    for name in ("個人", "共有", "機密"):
+        assert (cloud / name / VAULT_ID).read_text(encoding="utf-8").strip()
+    assert record_path(conf).exists()
+
+
+def test_renamed_vaults_are_followed(tmp_path):
+    cloud, conf = setup(tmp_path)
+    load(conf)                                   # 名前を変える前に1回動いている
+    (cloud / "個人").rename(cloud / "開発ノート_山田")
+    (cloud / "共有").rename(cloud / "開発ノート_共有")
+    (cloud / "機密").rename(cloud / "顧客A")
+    cfg = load(conf)
+    assert cfg.personal == cloud / "開発ノート_山田"
+    assert cfg.shared == cloud / "開発ノート_共有"
+    assert cfg.secret == [cloud / "顧客A"]
+    text = conf.read_text(encoding="utf-8")
+    assert "開発ノート_山田" in text and "# 共有" in text and "# 名前" in text  # コメントは残す
+    assert f"\"{(cloud / '開発ノート_共有').as_posix()}\"" in text               # 引用符もそのまま
+    assert list(conf.parent.glob("config.yaml.*.bak"))                      # 直す前の控え
+    report = run_once(cfg)
+    assert not report.stopped
+    assert any("設定を直した" in r for r in (cloud / "開発ノート_山田/_仕組み/同期レポート.md").read_text(encoding="utf-8").splitlines())
+    assert not (cloud / "個人").exists()                                      # 古い名前のフォルダは作らない
+
+
+def test_renamed_while_watching(tmp_path):
+    cloud, conf = setup(tmp_path)
+    cfg = load(conf)
+    (cloud / "個人").rename(cloud / "個人2")
+    report = run_once(cfg)                        # watch 中に名前が変わった
+    assert not report.stopped and cfg.personal == cloud / "個人2"
+    assert not (cloud / "個人").exists()
+
+
+def test_found_by_content_without_record(tmp_path):
+    cloud, conf = setup(tmp_path)
+    (cloud / "個人/_仕組み/個人設定.md").write_text('---\nname: 山田\n---\n', encoding="utf-8")
+    (cloud / "共有").rename(cloud / "共有_新")       # この PC ではまだ1回も動いていない
+    (cloud / "個人").rename(cloud / "個人_新")
+    cfg = load(conf)
+    assert cfg.shared == cloud / "共有_新"
+    assert cfg.personal == cloud / "個人_新"
+
+
+def test_parent_renamed_too(tmp_path):
+    cloud, conf = setup(tmp_path)
+    load(conf)
+    (cloud / "顧客").mkdir()
+    (cloud / "機密").rename(cloud / "顧客/顧客A")
+    cfg = load(conf)
+    assert cfg.secret == [cloud / "顧客/顧客A"]
+
+
+def test_two_candidates_are_not_chosen(tmp_path):
+    cloud, conf = setup(tmp_path)
+    for d in ("個人_a", "個人_b"):
+        (cloud / d / "_仕組み").mkdir(parents=True)
+        (cloud / d / "_仕組み/個人設定.md").write_text("---\nname: 山田\n---\n", encoding="utf-8")
+    shutil.rmtree(cloud / "個人")
+    cfg = load(conf)
+    assert cfg.personal == cloud / "個人"
+    assert any("選べません" in w for w in cfg.move_warnings)
+    report = run_once(cfg)
+    assert report.stopped and "個人 vault が見つかりません" in report.stopped
+    assert not (cloud / "個人").exists()
+
+
+def test_missing_secret_stops_before_sharing(tmp_path):
+    cloud, conf = setup(tmp_path)
+    shutil.rmtree(cloud / "機密")                  # 権限が外れた・消えた
+    cfg = load(conf)
+    before = sorted(p.relative_to(cloud / "共有").as_posix() for p in (cloud / "共有").rglob("*"))
+    report = run_once(cfg)
+    assert "機密フォルダが見つかりません" in report.stopped
+    after = sorted(p.relative_to(cloud / "共有").as_posix() for p in (cloud / "共有").rglob("*"))
+    assert before == after                         # 共有へは何も送らない
+    assert "機密フォルダが見つかりません" in (cloud / "個人/_仕組み/同期レポート.md").read_text(encoding="utf-8")
+
+
+def test_dry_run_does_not_rewrite_config(tmp_path):
+    cloud, conf = setup(tmp_path, dry=True)
+    load(conf)
+    before = conf.read_text(encoding="utf-8")
+    (cloud / "個人").rename(cloud / "個人2")
+    cfg = load(conf)
+    assert cfg.personal == cloud / "個人2"
+    assert conf.read_text(encoding="utf-8") == before
+    report = run_once(cfg)
+    assert any("設定を" in r and "直す" in r for r in report.records)
+
+
+def test_rewrite_keeps_backslashes(tmp_path):
+    conf = tmp_path / "config.yaml"
+    conf.write_text("personal: C:\\Users\\a\\Box\\個人   # 個人\n", encoding="utf-8")
+    old = Path(str(tmp_path / "x"))  # 形だけ確かめる(Windows の区切りは Linux では1つの名前になる)
+    assert not rewrite_config(conf, old, tmp_path / "y")
+    conf.write_text(f"personal: {old}   # 個人\n", encoding="utf-8")
+    assert rewrite_config(conf, old, tmp_path / "y")
+    assert conf.read_text(encoding="utf-8") == f"personal: {tmp_path / 'y'}   # 個人\n"
+
+
+def test_moved_to_sibling_folder(tmp_path):
+    cloud, conf = setup(tmp_path)
+    (cloud / "個人_親").mkdir()
+    (cloud / "個人").rename(cloud / "個人_親/開発ノート_山田")
+    conf.write_text(conf.read_text(encoding="utf-8").replace((cloud / "個人").as_posix(), (cloud / "個人_親/開発ノート_山田").as_posix()), encoding="utf-8")
+    load(conf)
+    (cloud / "チーム").mkdir()
+    (cloud / "個人_親/開発ノート_山田").rename(cloud / "チーム/開発ノート_山田")   # 親の隣のフォルダへ動かした
+    cfg = load(conf)
+    assert cfg.personal == cloud / "チーム/開発ノート_山田"
+
+
+def test_backup_copy_is_not_taken_for_the_real_vault(tmp_path):
+    """元の場所が見えないとき、同じ印を持つ控え(丸ごとの写し)を本物として選ばない(F-55)。"""
+    cloud, conf = setup(tmp_path)
+    load(conf)
+    shutil.copytree(cloud / "共有", cloud / "共有の控え")
+    shutil.rmtree(cloud / "共有")
+    cfg = load(conf)
+    assert cfg.shared == cloud / "共有"                                       # 控えへは切り替えない
+    assert "共有の控え" not in conf.read_text(encoding="utf-8")

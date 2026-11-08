@@ -1,0 +1,79 @@
+filters:
+  and:
+    - '!file.inFolder("_仕組み/templates")'
+    - type == "タスク"
+formulas:
+  # 名前の列: ファイル名(id_名前)の代わりに aliases の最初の名前を出す。押せばノートが開く。
+  # aliases が空なら、ファイル名から id を外した名前
+  alias: 'file.asLink(if(list(aliases).filter(value).length > 0, list(aliases).filter(value)[0], file.basename.replace(/^[0-9A-Z]{6}[0-9A-Z]+_/, "")))'
+properties:
+  formula.alias:
+    displayName: 別名
+views:
+  - type: table
+    name: 進行中・待ち・確認待ち
+    filters:
+      or:
+        - status == "進行中"
+        - status == "待ち"
+        - status == "確認待ち"
+    order:
+      - formula.alias
+      - id
+      - status
+      - due
+      - review_request
+      - owner
+      - author
+      - parent
+    sort:
+      - property: due
+        direction: ASC
+  - type: table
+    name: 確認待ち(確認する人ごと)
+    filters:
+      and:
+        - status == "確認待ち"
+    groupBy:
+      property: review_request
+      direction: ASC
+    order:
+      - formula.alias
+      - id
+      - review_request
+      - owner
+      - author
+      - parent
+  - type: table
+    name: 未着手(期限順)
+    filters:
+      and:
+        - status == "未着手"
+    order:
+      - formula.alias
+      - id
+      - due
+      - owner
+      - parent
+    sort:
+      - property: due
+        direction: ASC
+  - type: cards
+    name: カード(図)
+    image: note.image
+    imageFit: contain
+    imageAspectRatio: 0.5625
+    filters:
+      and:
+        - status != "完了"
+        - status != "中止"
+    order:
+      - formula.alias
+      - id
+      - status
+      - due
+      - owner
+      - parent
+    sort:
+      - property: due
+        direction: ASC
