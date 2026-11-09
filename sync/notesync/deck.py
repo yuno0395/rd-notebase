@@ -1,11 +1,14 @@
 """F-59: 説明資料(仕様書「説明資料(ノートから組み立てる)」)。
 
 Obsidian の右クリック「説明資料を作る」で、押したノートと筋書き(聞く人にしてほしいこと)が
-「今すぐ共有へ」と同じ合図で届く(now.py)。1回同期したあと、共有 vault のノートだけで組み立てる。
-個人のノート・機密 vault は読まない。資料は直さず、ノートを直して作り直す。
+「今すぐ共有へ」と同じ合図で届く(now.py)。1回同期したあと、共有 vault のノートだけで組み立てる
+(押したノートが PIP なら個人 vault のノートで。v0.100)。機密 vault は読まない。
+中身はノートで直して作り直し、体裁は Excalidraw の図の上で直す。
 
 筋書きは5つ。どれも 表紙 → 要点 → (筋書きごとの章) → 足りないところ の順。1ノート1枚で、
-見出しはノートの名前、絵は図の SVG、文は筋書きか種類ごとに決まった欄。HTML にするのは deck_html.py。
+見出しはノートの名前、絵は図の SVG、文は筋書きか種類ごとに決まった欄。
+載せるのは押したノートの範囲(visibility)で見せてよいノートだけで、機密区分も押したノートから決める。
+Excalidraw の図にするのは deck_draw.py。
 """
 
 from __future__ import annotations
@@ -64,6 +67,8 @@ class Slide:
     rows: list[list[str]] = field(default_factory=list)
     svg: str = ""             # 全体の形・工程表の図
     big: str = ""             # 大きく出す1行(聞きたいこと・決めてほしいこと)
+    refs: list[tuple[str, str]] = field(default_factory=list)   # 引用: もとのノートの (id, 名前)
+    image_path: Path | None = None   # 図の SVG のファイル(資料に絵として貼る)
 
 
 @dataclass
@@ -75,6 +80,12 @@ class Deck:
     maker: str
     slides: list[Slide] = field(default_factory=list)
     gaps: list[list[str]] = field(default_factory=list)   # [ノートの名前, 足りないもの]
+    label: str = ""           # 機密区分(押したノートの visibility から)
+    hide_ids: bool = False    # 社外のもの: 引用に id を出さない
+    source: str = ""          # 押したノートの id
+    pip: bool = False         # 押したノートが PIP(個人 vault で作った)
+    affiliation: str = ""     # 作った人の所属(個人設定.md の affiliation)
+    company: str = ""         # チーム設定の 会社名
 
     @property
     def count(self) -> int:
@@ -126,30 +137,52 @@ def plain_links(text: str) -> str:
 class Notes:
     """共有 vault のノートを、資料に載せる形で読む。"""
 
-    def __init__(self, shared: Path, today: date, project: str | None = None):
+    def __init__(self, shared: Path, today: date, project: str | None = None, history: list[dict] | None = None):
         self.shared = shared
-        self.b = Builder(shared, today, all_history(shared))
+        self.b = Builder(shared, today, all_history(shared) if history is None else history)
         self.today = today
-        self.project = project  # 資料のもとのノートのプロジェクト。visibility がほかのプロジェクトだけのノートは載せない
+        self.project = project  # 資料のもとのノートのプロジェクト
+        self.scope: vis.Scope | None = None   # 押したノートの範囲。None なら PIP 以外は全部載せる
+        self.allow_all = False                 # 押したノートが PIP(個人 vault で作る)なら全部
+        self.hidden: dict[str, str] = {}       # 範囲が狭いので載せなかったノート id → 名前
         self._tpl: dict[str, dict[str, set[str]]] = {}
+
+    # --- 載せてよいか ---
+
+    def ok(self, d: Doc) -> bool:
+        """押したノートの範囲で見せてよいか(仕様書「機密区分の決め方」)。だめなら hidden に覚える。"""
+        if self.allow_all:
+            return True
+        s = vis.parse(d.fm)
+        good = not s.pip and (self.scope is None or covers(effective(d), self.scope))
+        if not good and not s.pip:
+            self.hidden.setdefault(d.id, self.title(d))
+        return good
 
     # --- つながり ---
 
     def docs(self) -> list[Doc]:
-        return [d for d in self.b.docs if vis.visible_in(d.fm, self.project)]
+        return [d for d in self.b.docs if self.ok(d)]
 
     def get(self, note_id: str) -> Doc | None:
         d = self.b.index.by_id.get(note_id.upper())
-        return d if d and vis.visible_in(d.fm, self.project) else None
+        return d if d and self.ok(d) else None
+
+    def resolve(self, target: str) -> Doc | None:
+        d = self.b.index.resolve(target)
+        return d if d and self.ok(d) else None
+
+    def parents(self, d: Doc) -> list[Doc]:
+        return [p for p in self.b.parents(d) if self.ok(p)]
 
     def kids(self, d: Doc, *types: str) -> list[Doc]:
-        return [k for k in self.b.children.get(d.id, []) if not types or k.type in types]
+        return [k for k in self.b.children.get(d.id, []) if (not types or k.type in types) and self.ok(k)]
 
     def threats(self, *ds: Doc) -> list[Doc]:
         """ds を 脅かす(か parent の)イシュー。中止を除き、閉じていないもの・impact の大きい順。"""
         want = {d.id for d in ds}
         out = [i for i in self.docs() if i.type == "イシュー" and status(i) != "中止"
-               and any(p.id in want for p in self.b.parents(i))]
+               and any(p.id in want for p in self.parents(i))]
         return sorted(out, key=lambda i: (status(i) in SOLVED, not is_policy_risk(i), prio(i) or 9, i.name))
 
     def ups(self, d: Doc) -> list[Doc]:
@@ -158,7 +191,7 @@ class Notes:
         while cur:
             nxt = []
             for c in cur:
-                for p in self.b.parents(c):
+                for p in self.parents(c):
                     if p.id not in seen:
                         seen.add(p.id)
                         out.append(p)
@@ -168,7 +201,7 @@ class Notes:
         return out
 
     def values(self, d: Doc) -> list[Doc]:
-        return self.b.values(d)
+        return [h for h in self.b.values(d) if self.ok(h)]
 
     def knowledge_for(self, *ds: Doc) -> list[Doc]:
         """ds を risk_reduction に書いたか、parent にしたナレッジ。"""
@@ -178,7 +211,7 @@ class Notes:
             if k.type != "ナレッジ":
                 continue
             refs = [self.b.index.resolve(t) for t in targets(k.fm.get("risk_reduction"))]
-            if any(r and r.id in want for r in refs) or any(p.id in want for p in self.b.parents(k)):
+            if any(r and r.id in want for r in refs) or any(p.id in want for p in self.parents(k)):
                 out.append(k)
         return sorted(out, key=lambda k: k.name)
 
@@ -224,6 +257,16 @@ class Notes:
         return plain_links("\n".join(lines))
 
     def image(self, d: Doc) -> str:
+        """図の SVG の中身。"""
+        p = self.image_path(d)
+        if not p:
+            return ""
+        try:
+            return p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return ""
+
+    def image_path(self, d: Doc) -> Path | None:
         """図の SVG(属性 image。なければ添付の fig_*.svg)。"""
         cands = []
         for t in targets(d.fm.get("image")):
@@ -233,11 +276,8 @@ class Notes:
             cands += sorted(folder.glob("fig_*.svg"))
         for p in cands:
             if p.suffix.lower() == ".svg" and p.is_file():
-                try:
-                    return p.read_text(encoding="utf-8")
-                except (OSError, UnicodeDecodeError):
-                    continue
-        return ""
+                return p
+        return None
 
     def foot(self, d: Doc) -> str:
         bits = [d.type]
@@ -278,7 +318,7 @@ class Composer:
 
     def note(self, d: Doc, chapter: str, fields: list[str] | None = None, faded: bool = False) -> bool:
         """1ノート1枚。20枚を超えたら False(呼んだ側が表にまとめる)。"""
-        if d.id in self.seen:
+        if d.id in self.seen or not self.n.ok(d):
             return True
         if self.used >= MAX_NOTES:
             return False
@@ -295,6 +335,7 @@ class Composer:
             secs.append((h, v))
             if not v.strip() and self.story != OUTSIDE:
                 self.deck.gaps.append([self.n.title(d), f"「{h}」が空"])
+        img_path = self.n.image_path(d)
         img = self.n.image(d)
         if self.story != OUTSIDE:
             if not img:
@@ -306,7 +347,8 @@ class Composer:
                 if rr:
                     secs.append(("下がったリスク", "\n".join(f"- {plain_links(r)}" for r in rr)))
         foot = "" if self.story == OUTSIDE else self.n.foot(d)
-        self.add(Slide("note", self.n.title(d), chapter, secs, img, foot, faded))
+        self.add(Slide("note", self.n.title(d), chapter, secs, img, foot, faded,
+                       refs=[(d.id, self.n.title(d))], image_path=img_path if img else None))
         return True
 
     def notes(self, ds: list[Doc], chapter: str, fields: list[str] | None = None) -> None:
@@ -316,7 +358,8 @@ class Composer:
                 rest.append(d)
         if rest:
             self.add(Slide("table", f"{chapter}: ほかに {len(rest)} 件", chapter, headers=["名前", "種類", "status"],
-                           rows=[[self.n.title(d), d.type, status(d)] for d in rest]))
+                           rows=[[self.n.title(d), d.type, status(d)] for d in rest],
+                           refs=[(d.id, self.n.title(d)) for d in rest]))
 
     def table(self, title: str, chapter: str, headers: list[str], rows: list[list[str]], faded=False) -> None:
         self.add(Slide("table", title, chapter, headers=headers, rows=rows or [], faded=faded))
@@ -338,6 +381,8 @@ class Composer:
         {"知ってもらう": self.inform, "意見をもらう": self.opinion, "決めてもらう": self.decide,
          "予定を確かめる": self.schedule, OUTSIDE: self.outside}[self.story]()
         if self.story != OUTSIDE:
+            for name in self.n.hidden.values():
+                self.deck.gaps.append([name, "範囲が狭いので載せていません"])
             gaps = self.deck.gaps
             self.add(Slide("gaps", "足りないところ", "", headers=["ノート", "足りないもの"], rows=gaps))
         return self.deck
@@ -399,8 +444,8 @@ class Composer:
     def result(self, k: Doc) -> None:
         """ナレッジで押したとき: 結果の報告(結論 → 下がったリスク → 確かめたこと → 次に気をつけること)。"""
         n = self.n
-        issues = [i for i in (n.b.index.resolve(t) for t in targets(k.fm.get("risk_reduction"))) if i]
-        tasks = [p for p in n.b.parents(k) if p.type in ("タスク", "実験・試作記録")]
+        issues = [i for i in (n.resolve(t) for t in targets(k.fm.get("risk_reduction"))) if i]
+        tasks = [p for p in n.parents(k) if p.type in ("タスク", "実験・試作記録")]
         self.summary([("結論", cut(n.field(k, "結論"), 120)),
                       ("下がったリスク", "、".join(n.title(i) for i in issues)),
                       ("確かめたこと", "、".join(n.title(t) for t in tasks))])
@@ -414,7 +459,7 @@ class Composer:
     def opinion(self) -> None:
         c, n = self.start, self.n
         if c.type in ("タスク", "実験・試作記録"):
-            c = next((p for p in n.b.parents(c) if p.type == "イシュー"), None) or c
+            c = next((p for p in n.parents(c) if p.type == "イシュー"), None) or c
         if c.type == "イシュー":
             return self.consult(c)
         if c.type == "設計案":
@@ -423,12 +468,12 @@ class Composer:
 
     def consult(self, i: Doc) -> None:
         n = self.n
-        back = [p for p in n.b.parents(i) if p.type in ("設計案", "仮説")][:2]
+        back = [p for p in n.parents(i) if p.type in ("設計案", "仮説")][:2]
         tried = [t for t in n.kids(i, "タスク", "実験・試作記録") if status(t) != "中止"]
         know = n.knowledge_for(i, *tried)
         nodes = []
         for m in LINK.finditer(frontmatter.split(i.text)[1]):
-            d = n.b.index.resolve(m.group(1).strip())
+            d = n.resolve(m.group(1).strip())
             if d and d.type == "ノード" and d not in nodes:
                 nodes.append(d)
         self.summary([("聞きたいこと", self.ask or "(書いていません)"),
@@ -471,7 +516,7 @@ class Composer:
         self.add(Slide("text", title, title, big=self.ask or "(聞きたいことを書いていません)"))
 
     def siblings(self, d: Doc) -> list[Doc]:
-        ps = self.n.b.parents(d)
+        ps = self.n.parents(d)
         out = [d]
         for p in ps:
             out += [k for k in self.n.kids(p, "設計案") if k.id not in {x.id for x in out}]
@@ -505,7 +550,7 @@ class Composer:
         elif c.type == "議事録":
             cands = []
             for m in LINK.finditer(sections_text(c, "議題")):
-                d = n.b.index.resolve(m.group(1).strip())
+                d = n.resolve(m.group(1).strip())
                 if d and d.type == "設計案" and d not in cands:
                     cands.append(d)
             ask = ask or cut(n.field(c, "議題"), 120)
@@ -560,7 +605,7 @@ class Composer:
         stones = n.b.milestones(proj)
         late = [r for r in stones if r[3].startswith("+") and r[3] != "+0 日"]
         nxt = next((r for r in stones if (to_date(r[2]) or to_date(r[1]) or date.max) >= today), None)
-        docs = n.b.in_project(proj.name)
+        docs = [d for d in n.b.in_project(proj.name) if n.ok(d)]
         tasks = [t for t in docs if t.type == "タスク" and status(t) in OPEN_TASK]
         overdue = [t for t in tasks if (to_date(t.fm.get("due")) or date.max) < today]
         req = str(proj.fm.get("request_to_manager") or "").strip()
@@ -575,7 +620,7 @@ class Composer:
             self.add(Slide("figure", "工程表", "工程表", svg=gantt_svg(plan, today)))
 
         def parent_name(t):
-            p = next((p for p in n.b.parents(t)), None)
+            p = next((p for p in n.parents(t)), None)
             return n.title(p) if p else ""
         self.table("遅れ・期限切れのタスク", "遅れ", ["タスク", "担当", "期限", "status", "減らすイシュー"],
                    [[n.title(t), owner(t), str(t.fm.get("due") or ""), status(t), parent_name(t)] for t in overdue])
@@ -658,6 +703,92 @@ def outside_text(text: str) -> str:
     return "\n".join(out)
 
 
+# ---------- 範囲と機密区分 ----------
+
+def top_of(d: Doc) -> str:
+    return d.rel.split("/", 1)[0]
+
+
+def effective(d: Doc) -> vis.Scope:
+    """visibility を書いていない古いノートは、置き場所のプロジェクト(共通なら Internal use only)とみなす。"""
+    s = vis.parse(d.fm)
+    if s.open:
+        top = top_of(d)
+        if top in (COMMON, "99_archive") or "/" not in d.rel:
+            s.internal = True
+        else:
+            s.projects = [top]
+    return s
+
+
+def covers(doc: vis.Scope, want: vis.Scope) -> bool:
+    """doc のノートを、want の範囲の人に見せてよいか。"""
+    if want.ext:
+        return set(want.ext) <= set(doc.ext)
+    if want.internal:
+        return doc.internal
+    if want.projects:
+        return doc.internal or set(want.projects) <= set(doc.projects)
+    return True
+
+
+def label_of(scope: vis.Scope, company: str, pip: bool) -> str:
+    """機密区分。"""
+    if pip or scope.pip:
+        return "Confidential"
+    if scope.ext:
+        names = [e[len(vis.EXT_PREFIX):] for e in scope.ext] + ([company] if company else [])
+        return "+".join(names) + "/Confidential"
+    if scope.internal:
+        return vis.INTERNAL
+    if scope.projects:
+        return "+".join(scope.projects) + "/Confidential"
+    return vis.INTERNAL
+
+
+def settings_value(personal: Path | None, key: str) -> str:
+    """個人設定.md の属性(affiliation など)。"""
+    if not personal:
+        return ""
+    try:
+        fm = frontmatter.load((personal / "_仕組み" / "個人設定.md").read_text(encoding="utf-8"))
+    except OSError:
+        return ""
+    return str(fm.get(key) or "").strip()
+
+
+AFFILIATION_LINE = 'affiliation: "" # 自分の所属。例: 開発部 第2グループ(説明資料の {所属} に入る)'
+
+
+def add_affiliation(personal: Path | None) -> bool:
+    """個人設定.md の属性欄に affiliation がなければ空の行を足す(前の版で作った vault のため)。"""
+    if not personal:
+        return False
+    f = personal / "_仕組み" / "個人設定.md"
+    try:
+        text = f.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    m = re.match(r"\A---\r?\n(.*?)(\r?\n)---", text, re.S)
+    if not m or re.search(r"^affiliation\s*:", m.group(1), re.M):
+        return False
+    nl = m.group(2)
+    f.write_text(text[: m.end(1)] + nl + AFFILIATION_LINE + text[m.end(1):], encoding="utf-8")
+    return True
+
+
+def company_name(shared: Path | None) -> str:
+    """チーム設定(_仕組み/同期設定.yaml)の 会社名。"""
+    if not shared:
+        return ""
+    import yaml
+    try:
+        data = yaml.safe_load((shared / "_仕組み" / "同期設定.yaml").read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return ""
+    return str(data.get("会社名") or "").strip() if isinstance(data, dict) else ""
+
+
 # ---------- 入口 ----------
 
 def note_id(personal_note: Path) -> str:
@@ -667,41 +798,118 @@ def note_id(personal_note: Path) -> str:
     return fid.upper()
 
 
-def build(shared: Path, personal_note: Path, story: str, ask: str, maker: str, today: date) -> Deck:
+def build(shared: Path, personal_note: Path, story: str, ask: str, maker: str, today: date,
+          personal: Path | None = None) -> Deck:
+    """personal(個人 vault)を渡すと、押したノートが PIP のときに個人 vault のノートで作る。"""
     if story not in STORIES:
         raise DeckError(f"知らない筋書きです: {story}")
     try:
         fm = frontmatter.load(personal_note.read_text(encoding="utf-8"))
     except OSError:
         fm = {}
-    if vis.is_pip(fm):
-        raise DeckError("共有していないノート(PIP)からは作れません")
-    n = Notes(shared, today)
-    start = n.get(note_id(personal_note))
-    if not start:
-        raise DeckError("共有していないノートからは作れません(まだ共有に出ていないか、visibility が PIP)")
-    top = start.rel.split("/", 1)[0]
-    n.project = top if top not in (COMMON, "99_archive") else None
-    return Composer(n, story, start, ask, maker).build()
+    pip = vis.is_pip(fm)
+    fid = note_id(personal_note)
+    if pip:
+        if not personal:
+            raise DeckError("共有していないノート(PIP)からは作れません")
+        n = Notes(personal, today, history=all_history(shared) if shared else [])
+        n.allow_all = True
+        start = n.get(fid)
+        if not start:
+            raise DeckError("このノートを読めませんでした。保存してからもう一度押してください")
+        scope = vis.Scope(pip=True)
+    else:
+        n = Notes(shared, today)
+        start = n.get(fid)
+        if not start:
+            raise DeckError("共有していないノートからは作れません(まだ共有に出ていないか、visibility が PIP)")
+        top = top_of(start)
+        n.project = top if top not in (COMMON, "99_archive") else None
+        scope = effective(start)
+        n.scope = scope
+    company = company_name(shared)
+    d = Composer(n, story, start, ask, maker).build()
+    d.source = start.id
+    d.pip = pip
+    d.label = label_of(scope, company, pip)
+    if story == OUTSIDE and not scope.ext and not pip:
+        # 社外へ仕様を伝える資料はプロジェクト名を出さない(相手を EXT_ で決めていなければ会社名だけ)
+        d.label = f"{company}/Confidential" if company else "Confidential"
+    d.hide_ids = story == OUTSIDE or bool(scope.ext)
+    d.company = company
+    d.affiliation = settings_value(personal, "affiliation")
+    return d
 
 
-SAFE = re.compile(r'[\\/:*?"<>|\r\n\t]+')
+SAFE = re.compile(r'[\\/:*?"<>|\r\n\t#^\[\]]+')
+DECK_DIR = Path(vis.PIP_TOP) / OUT_DIR    # 個人 vault の 00_PIP/説明資料/
 
 
-def out_path(deck: Deck, report_dir: Path | None, local_dir: Path) -> Path:
-    name = SAFE.sub("_", f"{deck.story}_{deck.title}_{deck.made_on.isoformat()}.html")
-    if deck.story == OUTSIDE or not report_dir:
-        return local_dir / name
-    return report_dir / SAFE.sub("_", deck.project or "共通") / OUT_DIR / name
+def free_name(folder: Path, base: str) -> str:
+    """同じ名前の資料があれば _2・_3 を付ける(手直しを消さないよう、上書きしない)。"""
+    name, k = base, 1
+    while (folder / f"{name}.excalidraw.md").exists() or (folder / f"{name}_共通.excalidraw.md").exists():
+        k += 1
+        name = f"{base}_{k}"
+    return name
 
 
-def make(shared: Path, personal: Path, rel_or_path: str, story: str, ask: str, maker: str, today: date,
-         report_dir: Path | None, local_dir: Path) -> tuple[Path, Deck]:
-    from .deck_html import write
+def base_name(deck: Deck) -> str:
+    return SAFE.sub("_", f"{deck.story}_{deck.title}_{deck.made_on.isoformat()}")
+
+
+def make(shared: Path, personal: Path, rel_or_path: str, story: str, ask: str, maker: str, today: date) -> tuple[Path, Deck]:
+    """資料の図を個人 vault の 00_PIP/説明資料/ に作る。戻り値は資料の図のファイル。"""
+    from . import deck_draw
     p = Path(rel_or_path)
     if not p.is_absolute():
         p = personal / p
-    deck = build(shared, p, story, ask, maker, today)
-    path = out_path(deck, report_dir, local_dir)
-    write(path, deck)
+    add_affiliation(personal)
+    deck = build(shared, p, story, ask, maker, today, personal)
+    folder = personal / DECK_DIR
+    name = free_name(folder, base_name(deck))
+    path = deck_draw.write_deck(deck, folder, name, shared, personal)
     return path, deck
+
+
+def deck_of_pdf(pdf: Path) -> Path | None:
+    """PDF の名前から資料の図を探す(<資料>.pdf・<資料>.excalidraw.pdf・<資料>.excalidraw-pages.pdf)。"""
+    stem = pdf.stem
+    for tail in ("-pages", ".excalidraw"):
+        if stem.endswith(tail):
+            stem = stem[: -len(tail)]
+    if stem.endswith(".excalidraw"):
+        stem = stem[: -len(".excalidraw")]
+    p = pdf.with_name(f"{stem}.excalidraw.md")
+    return p if p.is_file() else None
+
+
+def copy_pdfs(personal: Path | None, report_dir: Path | None, dry: bool = False) -> list[Path]:
+    """00_PIP/説明資料/ の PDF のうち、共有に出ているノートの社内向けの資料のものを、
+    報告フォルダの <プロジェクト>/説明資料/ に写す(要件書 F-59b)。新しいか更新されたものだけ。"""
+    if not personal or not report_dir:
+        return []
+    folder = personal / DECK_DIR
+    if not folder.is_dir():
+        return []
+    out = []
+    for pdf in sorted(folder.glob("*.pdf")):
+        src = deck_of_pdf(pdf)
+        if not src:
+            continue
+        try:
+            fm = frontmatter.load(src.read_text(encoding="utf-8"))
+        except OSError:
+            continue
+        pj = str(fm.get("deck_report") or "").strip()
+        if not pj or fm.get("deck_outside") or fm.get("deck_pip"):
+            continue
+        dest = report_dir / SAFE.sub("_", pj) / OUT_DIR / pdf.name
+        if dest.exists() and dest.stat().st_mtime >= pdf.stat().st_mtime:
+            continue
+        out.append(dest)
+        if not dry:
+            import shutil
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(pdf, dest)
+    return out

@@ -409,7 +409,8 @@ async function ensureFolder(app, path) {
 // プロジェクトをもう一度聞かない(Esc で 00_inbox に作ったときに2回聞いていた)。
 // K-Plex の QuickAdd は make_note.js を別に読み込むので、印は window に置く
 const PLACING = "__notebasePlacing";
-// 共有する範囲(visibility)は、押したノートから引き継ぐ。
+// 共有する範囲(visibility)は、押したノートから引き継ぐ(選択「親から引き継ぐ」。
+// Ctrl+K(link_node.js)も同じ。「Internal use only を2回選択する必要がある」)。
 // テンプレートの ask_visibility.js がこれを見て、あれば聞かずに使う
 const INHERIT = "__notebaseVisibility";
 // 種類のないノート(デイリーなど)・メモ・週報から作るときは引き継がない(窓で聞く)
@@ -608,5 +609,5 @@ async function fromNote(tp, kind, note, rawName) {
 
 // ほかのスクリプト(link_node.js・link_relation.js・K-Plex の QuickAdd)も、tp.user.make_note から使う
 Object.assign(make_note, { fromNote, inProperties, typeOf, nameOf, linkOf, asList, resolve, flow, placeLink, setKey,
-  chooseProject, projectNames, ensureFolder, nameOk, TYPE_FOLDERS, COMMON, PLACING, INHERIT });
+  chooseProject, projectNames, ensureFolder, nameOk, visibilityFrom, TYPE_FOLDERS, COMMON, PLACING, INHERIT });
 module.exports = make_note;

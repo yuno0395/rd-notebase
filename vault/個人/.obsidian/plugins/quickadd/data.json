@@ -457,6 +457,46 @@
           }
         ]
       }
+    },
+    {
+      "id": "7783c01b-5a3a-5375-8513-d6944bc66f11",
+      "name": "説明資料を PDF にする",
+      "type": "Macro",
+      "command": true,
+      "runOnStartup": false,
+      "macro": {
+        "id": "d8d532ec-6f37-5aac-9d40-8827b9aeff5a",
+        "name": "説明資料を PDF にする",
+        "commands": [
+          {
+            "name": "説明資料を PDF にする",
+            "type": "UserScript",
+            "id": "8f1d844e-30e6-5e21-89db-1c56042a05e7",
+            "path": "_仕組み/templates/_quickadd/説明資料をPDFにする.js",
+            "settings": {}
+          }
+        ]
+      }
+    },
+    {
+      "id": "971f1905-92fe-5ec3-966e-88628f251bee",
+      "name": "説明資料をつなぐ",
+      "type": "Macro",
+      "command": true,
+      "runOnStartup": false,
+      "macro": {
+        "id": "58c708c7-f0d1-50db-958e-9666db06aae7",
+        "name": "説明資料をつなぐ",
+        "commands": [
+          {
+            "name": "説明資料をつなぐ",
+            "type": "UserScript",
+            "id": "e28f4bee-0c19-5f0a-bb72-fe16ee19000a",
+            "path": "_仕組み/templates/_quickadd/説明資料をつなぐ.js",
+            "settings": {}
+          }
+        ]
+      }
     }
   ],
   "inputPrompt": "single-line",
