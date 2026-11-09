@@ -6,6 +6,8 @@
   created がなければファイルの作成日時。2026年より前は 2026-01-01 00:00 から古い順に1秒ずつ詰める。
 - 元の属性: created はそのまま残す。この仕組みが使う名前(RESERVED)と入れ子は本文の末尾「## 取り込む前の属性」へ。
 - リンクは [[<id>_名前|表示]]、添付は _仕組み/attachments/<id>/(重いものは private_data/<id>/)へコピー。
+- 図(.excalidraw.md)は使っているノートの添付としてコピーし、図の中のリンク(文字・要素のリンク・貼った画像)も同じように直す。
+  圧縮された図の中身(compressed-json)はほどいて json で書く(Excalidraw はそのまま開け、次に保存するときまた圧縮する)。
 - id と新しい名前は先に全部決め、書くのは1ノートずつ。書き終えるたびに1秒休む。
 - 今あるファイルは書き換えない。取り込み記録.csv にある元のファイルは飛ばすので、何度動かしても同じ結果になる。
 """
@@ -314,7 +316,7 @@ class Resolver:
 
     def file(self, target: str, here: str) -> str | None:
         t = target.strip().replace("\\", "/").lstrip("/")
-        for cand in (t, t + ".md"):
+        for cand in (t, t + ".md", t + ".excalidraw.md"):
             key = cand.lower()
             for k in ((f"{here}/{key}".lower() if here else key), key):
                 if k in self.files:
@@ -328,10 +330,10 @@ class Resolver:
 class Writer:
     """1ノート分の添付のコピーを覚える(書くのは write のとき)。"""
 
-    def __init__(self, plan: Plan, item: Item, private_data: Path | None, rules: dict):
+    def __init__(self, plan: Plan, item: Item, private_data: Path | None, rules: dict, res: "Resolver"):
         self.plan, self.item = plan, item
-        self.private_data, self.rules = private_data, rules
-        self.copies: list[tuple[Path, Path]] = []
+        self.private_data, self.rules, self.res = private_data, rules, res
+        self.copies: list[tuple[Path, Path, str | None]] = []  # (元, 先, 書く中身。None ならそのままコピー)
         self.names: dict[str, str] = {}   # 元のパス → 置いた名前
         self.heavy_left = False
 
@@ -352,17 +354,26 @@ class Writer:
                 name = f"{stem}_{n}.{ext}" if dot else f"{src.name}_{n}"
                 n += 1
             self.names[rel] = name
-            self.copies.append((src, base / name))
             self.plan.used_files.add(rel)
+            text = None
+            if rel.lower().endswith(".excalidraw.md"):  # 図の中のリンクも直す(中で使う画像も同じフォルダへ)
+                text = rewrite_drawing(read_text(src), self.item, self.res, self, self.plan, rel)
+            self.copies.append((src, base / name, text))
         dest = base / self.names[rel]
         if heavy and self.private_data:
             return file_url(dest), True
         return dest.relative_to(self.plan.personal).as_posix(), False
 
 
-def rewrite(text: str, item: Item, res: Resolver, w: Writer, plan: Plan) -> str:
-    here = Path(item.rel).parent.as_posix()
-    here = "" if here == "." else here
+def folder_of(rel: str) -> str:
+    here = Path(rel).parent.as_posix()
+    return "" if here == "." else here
+
+
+def rewrite(text: str, item: Item, res: Resolver, w: Writer, plan: Plan, where: str = "") -> str:
+    """リンクを直す。where は図の中を直すときの図のパス(リンクの行き先を図のフォルダから探す)。"""
+    here = folder_of(where or item.rel)
+    label = where or item.rel
 
     def note_link(target: Item, shown: str, sub: str = "") -> str:
         return f"[[{target.stem}{sub}|{shown}]]"
@@ -371,7 +382,7 @@ def rewrite(text: str, item: Item, res: Resolver, w: Writer, plan: Plan) -> str:
         bang, target, sub, alias = m.group(1), m.group(2), m.group(3) or "", m.group(4)
         hit = res.note(target, here)
         if hit == "?":
-            plan.unresolved.append(f"{item.rel}: [[{target}]](同じ名前が2つ以上)")
+            plan.unresolved.append(f"{label}: [[{target}]](同じ名前が2つ以上)")
             return m.group(0)
         if isinstance(hit, Item):
             shown = alias[1:] if alias else Path(target.replace("\\", "/")).name.removesuffix(".md")
@@ -383,7 +394,7 @@ def rewrite(text: str, item: Item, res: Resolver, w: Writer, plan: Plan) -> str:
             if heavy:
                 return f"[{shown}]({dest})"
             return f"{bang}[[{dest}{'|' + alias[1:] if alias else ''}]]"
-        plan.unresolved.append(f"{item.rel}: [[{target}]]")
+        plan.unresolved.append(f"{label}: [[{target}]]")
         return m.group(0)
 
     def md(m: re.Match) -> str:
@@ -401,11 +412,100 @@ def rewrite(text: str, item: Item, res: Resolver, w: Writer, plan: Plan) -> str:
             if heavy:
                 return f"[{shown or Path(f).name}]({target})"
             return f"{bang}[[{target}{'|' + shown if shown and not bang else ''}]]"
-        plan.unresolved.append(f"{item.rel}: ({inner})")
+        plan.unresolved.append(f"{label}: ({inner})")
         return m.group(0)
 
     # ノートの埋め込み ![[ノート]] は note_link がふつうのリンクにする
     return MDLINK.sub(md, WIKI.sub(wiki, text))
+
+
+DRAWING = re.compile(r"```(compressed-json|json)[ \t]*\r?\n(.*?)\r?\n```", re.S)
+DRAWING_KEYS = ("link", "text", "rawText", "originalText")
+
+
+def rewrite_drawing(text: str, item: Item, res: Resolver, w: Writer, plan: Plan, rel: str) -> str:
+    """図(.excalidraw.md)の中のリンクを直す。文字の欄・要素のリンク・貼ったファイルの欄と、図の中身(json)の文字。"""
+    def fix(t: str) -> str:
+        return rewrite(t, item, res, w, plan, where=rel)
+
+    m = DRAWING.search(text)
+    if not m:
+        return fix(text)
+    kind, data = m.group(1), m.group(2)
+    raw = data if kind == "json" else lz_decompress_b64(re.sub(r"\s", "", data))
+    try:
+        doc = json.loads(raw or "")
+    except ValueError:
+        plan.unresolved.append(f"{rel}: 図の中身を読めないので、図の中のリンクは直していません")
+        return fix(text[:m.start()]) + m.group(0) + fix(text[m.end():])
+    for el in doc.get("elements") or []:
+        for key in DRAWING_KEYS:
+            if isinstance(el, dict) and isinstance(el.get(key), str):
+                el[key] = fix(el[key])
+    body = json.dumps(doc, ensure_ascii=False, indent="\t")
+    return fix(text[:m.start()]) + f"```json\n{body}\n```" + fix(text[m.end():])
+
+
+_B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+
+
+def lz_decompress_b64(s: str) -> str | None:
+    """LZString.decompressFromBase64(Excalidraw の compressed-json)。読めなければ None。"""
+    if not s:
+        return ""
+    idx = {c: i for i, c in enumerate(_B64)}
+    try:
+        vals = [idx[c] for c in s]
+    except KeyError:
+        return None
+    length, reset = len(vals), 32
+    st = {"val": vals[0], "pos": reset, "index": 1}
+
+    def bits(n: int) -> int:
+        out, p = 0, 1
+        for _ in range(n):
+            b = st["val"] & st["pos"]
+            st["pos"] >>= 1
+            if st["pos"] == 0:
+                st["pos"] = reset
+                st["val"] = vals[st["index"]] if st["index"] < length else 0
+                st["index"] += 1
+            if b:
+                out |= p
+            p <<= 1
+        return out
+
+    d: dict[int, str] = {}
+    enlarge, size, nbits = 4, 4, 3
+    first = bits(2)
+    if first == 2:
+        return ""
+    c = chr(bits(8 if first == 0 else 16))
+    d[3] = w = c
+    out = [c]
+    while True:
+        if st["index"] > length:
+            return ""
+        code = bits(nbits)
+        if code in (0, 1):
+            d[size] = chr(bits(8 if code == 0 else 16))
+            code, size, enlarge = size, size + 1, enlarge - 1
+        elif code == 2:
+            return "".join(out)
+        if enlarge == 0:
+            enlarge, nbits = 2 ** nbits, nbits + 1
+        if code in d:
+            entry = d[code]
+        elif code == size:
+            entry = w + w[0]
+        else:
+            return None
+        out.append(entry)
+        d[size] = w + entry[0]
+        size, enlarge = size + 1, enlarge - 1
+        w = entry
+        if enlarge == 0:
+            enlarge, nbits = 2 ** nbits, nbits + 1
 
 
 # ---------- 1ノートを組み立てる ----------
@@ -462,7 +562,7 @@ def run(plan: Plan, me: str, private_data: Path | None, shared: Path | None, dry
     todo = [i for i in plan.items if not i.done]
     written, heavy_left = [], 0
     for n, item in enumerate(todo, 1):
-        w = Writer(plan, item, private_data, rules)
+        w = Writer(plan, item, private_data, rules, res)
         text = build(item, res, w, plan, me)
         plan.attachments += len(w.copies)
         heavy_left += w.heavy_left
@@ -474,10 +574,7 @@ def run(plan: Plan, me: str, private_data: Path | None, shared: Path | None, dry
         old_id = next((str(v) for k, v in frontmatter.load(read_text(item.src)).items() if str(k).lower() == "id"), "")
         if not item.recorded:
             append_record(plan, item, old_id)
-        for src, dest in w.copies:
-            if not dest.exists():
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dest)
+        put_copies(w)
         item.dest.parent.mkdir(parents=True, exist_ok=True)
         with item.dest.open("w", encoding="utf-8", newline="\n") as f:
             f.write(text)
@@ -487,9 +584,46 @@ def run(plan: Plan, me: str, private_data: Path | None, shared: Path | None, dry
         say(f"{len(todo)} 件中 {n} 件目: {item.rel}")
         if pause and n < len(todo):
             time.sleep(pause)
+    if not dry:
+        fixed = repair_drawings(plan, me, private_data, rules, res)
+        if fixed:
+            say(f"前に取り込んだ図 {fixed} 個の中のリンクを直しました")
     if heavy_left:
         plan.unresolved.append(f"重い添付のあるノートが {heavy_left} つあります。private_data が設定にないので vault に入れました(次の同期で移します)")
     return written
+
+
+def put_copies(w: Writer) -> None:
+    """添付を置く。もうあるものは書き換えない。"""
+    for src, dest, body in w.copies:
+        if dest.exists():
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if body is None:
+            shutil.copy2(src, dest)
+        else:
+            with dest.open("w", encoding="utf-8", newline="\n") as f:
+                f.write(body)
+
+
+def repair_drawings(plan: Plan, me: str, private_data: Path | None, rules: dict, res: Resolver) -> int:
+    """前の版(図の中のリンクを直さなかった版)で取り込んだ図を直す。
+    直すのは、元の図のまま(手を入れていない)の写しだけ。図の中で使う画像がまだなければ置く。"""
+    fixed = 0
+    for item in plan.items:
+        if not item.done:
+            continue
+        w = Writer(plan, item, private_data, rules, res)
+        build(item, res, w, plan, me)
+        for src, dest, body in w.copies:
+            if body is None or not dest.exists() or dest.read_bytes() != src.read_bytes():
+                continue
+            with dest.open("w", encoding="utf-8", newline="\n") as f:
+                f.write(body)
+            fixed += 1
+        if any(b is not None for _, _, b in w.copies):
+            put_copies(w)
+    return fixed
 
 
 def result_text(plan: Plan, written: int, dry: bool) -> str:
