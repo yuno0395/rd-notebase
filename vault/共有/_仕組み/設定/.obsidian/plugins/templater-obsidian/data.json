@@ -97,6 +97,11 @@
       "create_enabled": false
     },
     {
+      "template": "_仕組み/templates/_コマンド/このノートをリンク先の親にする.md",
+      "insert_enabled": true,
+      "create_enabled": false
+    },
+    {
       "template": "_仕組み/templates/_コマンド/今の仕事を確かめる.md",
       "insert_enabled": true,
       "create_enabled": false

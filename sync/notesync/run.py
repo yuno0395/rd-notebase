@@ -65,6 +65,15 @@ def notice_new_version(personal, shared, report: Report) -> None:
                     "bat(PL はプロジェクトリーダー.bat、ほかはチームメンバー.bat)を押してください")
 
 
+def copy_deck_pdfs(cfg: Config, report, dry: bool) -> None:
+    from .deck import copy_pdfs
+    try:
+        for p in copy_pdfs(cfg.personal, cfg.report_dir, dry):
+            report.record(f"説明資料の PDF を報告フォルダに写しました: {p.parent.parent.name}/{p.name}")
+    except OSError as e:
+        report.warn(f"説明資料の PDF を写せませんでした: {e}")
+
+
 def run_once(cfg: Config, dry_run: bool | None = None, now: float | None = None) -> Report:
     """1回分の同期。同じ個人 vault を別の PC が同期している間は見送る(複数の PC で使う)。"""
     dry = cfg.dry_run if dry_run is None else dry_run
@@ -199,6 +208,7 @@ def _run(cfg: Config, dry: bool, now: float, moved: list[str] = (), move_warning
         update_schedules(cfg.personal, cfg.shared, cfg.me, report, backup, dry, now, cfg.idle_seconds)  # F-53
         update_candidates(cfg.personal, cfg.shared, report, dry)  # F-58
         maybe_weekly(cfg.shared, cfg.report_dir, now, report, dry)  # F-29(誰の PC でも作る)
+        copy_deck_pdfs(cfg, report, dry)  # F-59b(説明資料の PDF を報告フォルダへ)
         report_pending(cfg.shared, cfg.shared_data, report)  # F-35
         if not dry:
             state.save()

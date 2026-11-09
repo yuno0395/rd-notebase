@@ -73,15 +73,26 @@ function pick(tp, items, initial) {
   });
 }
 
-async function createNode(tp, name) {
+async function createNode(tp, name, note) {
   const app = tp.app;
-  // ノードはいつも 共通/02_ノード(個人 vault も共有 vault と同じ並び。仕様書「ノートを作るときの置き場所」)
-  const folder = "共通/02_ノード";
+  // だれに見せるかは、押したノートから聞かずに引き継ぐ(Ctrl+I などと同じ。「Internal use only を
+  // 2回選択する必要がある」)。デイリー・メモ・週報と、範囲を書いていないノートで押したときは、テンプレートの窓で聞く
+  const V = tp.user.ask_visibility;
+  const from = V && V.read ? M.visibilityFrom(app, note, V) : null;
+  const visibility = Array.isArray(from) ? from : null;
+  // ノードは 共通/02_ノード(個人 vault も共有 vault と同じ並び。仕様書「ノートを作るときの置き場所」)。
+  // プロジェクト1つだけなら、テンプレートの ask_visibility.js が <プロジェクト>/02_ノード へ移す。PIP は 00_PIP/メモ
+  const folder = visibility && V.isPip(visibility) ? V.PIP_DIR : "共通/02_ノード";
   await M.ensureFolder(app, folder);
   const template = app.vault.getAbstractFileByPath(NODE_TEMPLATE);
   if (!template) throw new Error(`${NODE_TEMPLATE} がありません`);
   // テンプレートの中で id がつき、ファイル名が id_名前 に変わる
-  return await tp.file.create_new(template, name, false, app.vault.getAbstractFileByPath(folder));
+  window[M.INHERIT] = visibility;
+  try {
+    return await tp.file.create_new(template, name, false, app.vault.getAbstractFileByPath(folder));
+  } finally {
+    window[M.INHERIT] = null;
+  }
 }
 
 async function link_node(tp) {
@@ -157,7 +168,7 @@ async function link_node(tp) {
   const orig = ed.getRange(from, to);
   let file;
   if (newName) {
-    file = await createNode(tp, newName);
+    file = await createNode(tp, newName, note);
     if (!file) return;
     new Notice(`ノード「${newName}」を作りました`);
   } else {

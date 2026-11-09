@@ -55,6 +55,12 @@
       "mode": "any"
     },
     {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/このノートをリンク先の親にする.md",
+      "icon": "arrow-up-from-line",
+      "name": "このノートをリンク先の親にする(parent)",
+      "mode": "any"
+    },
+    {
       "id": "templater-obsidian:_仕組み/templates/_コマンド/図を開く.md",
       "icon": "pencil",
       "name": "図を開く(Ctrl+D)",

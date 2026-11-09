@@ -8,7 +8,8 @@
 // スマホなど、ファイルを外に書けない端末では何もせずに知らせる。
 //
 // 説明資料(make_deck.js、要件書 F-59)も同じ合図を使う。そのときは opts に
-// { 資料: {...}, waiting: "…", wait: 秒 } を渡す。結果に html があればブラウザで開く。
+// { 資料: {...}, waiting: "…", wait: 秒 } を渡す(説明資料をつなぐときは { つなぐ: {...} })。
+// 結果に open(個人 vault の中のパス)があれば、Obsidian でそのファイルを開く(資料の図。F-59b)。
 
 const WAIT_SECONDS = 30;
 
@@ -24,7 +25,8 @@ async function send_now(tp, opts = {}) {
   const req = typeof require === "function" ? require : window.require;
   const adapter = app.vault.adapter;
   if (!Platform.isDesktopApp || !req || typeof adapter.getBasePath !== "function") {
-    new Notice(`この端末では「${opts.資料 ? "説明資料を作る" : "今すぐ共有へ"}」は使えません。PC の Obsidian で押してください`, 6000);
+    const what = opts.資料 ? "説明資料を作る" : opts.つなぐ ? "説明資料をつなぐ" : "今すぐ共有へ";
+    new Notice(`この端末では「${what}」は使えません。PC の Obsidian で押してください`, 6000);
     return;
   }
   const fs = req("fs");
@@ -58,6 +60,7 @@ async function send_now(tp, opts = {}) {
     const tmp = signal + ".tmp";
     const body = { vault: adapter.getBasePath() };
     if (opts.資料) body.資料 = opts.資料;
+    if (opts.つなぐ) body.つなぐ = opts.つなぐ;
     fs.writeFileSync(tmp, JSON.stringify(body), "utf8");
     fs.renameSync(tmp, signal);
   } catch (e) {
@@ -76,9 +79,9 @@ async function send_now(tp, opts = {}) {
       try {
         const res = JSON.parse(fs.readFileSync(done, "utf8"));
         new Notice(res.message || "共有へ送りました", res.ok ? 5000 : 10000);
-        if (res.ok && res.html) {
-          try { req("electron").shell.openPath(res.html); }
-          catch (e) { new Notice(`ブラウザで開けませんでした。ここにあります: ${res.html}`, 15000); }
+        if (res.ok && res.open) {
+          try { await app.workspace.openLinkText(res.open, "", true); }
+          catch (e) { new Notice(`開けませんでした。ここにあります: ${res.open}`, 15000); }
         }
       } catch (e) {
         new Notice("同期しました。同期レポートを見てください", 5000);

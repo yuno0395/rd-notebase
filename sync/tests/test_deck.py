@@ -1,4 +1,5 @@
-"""F-59: 説明資料。筋書きごとに、載せるノート・並び・足りないところ・社外向けの絞り込みを確かめる。"""
+"""F-59・F-59b: 説明資料。筋書きごとに、載せるノート・並び・足りないところ・社外向けの絞り込みと、
+Excalidraw の図(共通の図・ひな形・機密区分・引用)・つなぐ・PDF の写しを確かめる。"""
 
 import json
 from datetime import date
@@ -6,8 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from notesync import deck
-from notesync.deck_html import render
+from notesync import deck, deck_draw
 from notesync.now import run_now, take_signals
 
 PJ = "試しPJ"
@@ -86,6 +86,20 @@ def make(tmp_path, shared, rel, story, ask=""):
     return deck.build(shared, personal_note(tmp_path, shared, rel), story, ask, "山田", TODAY)
 
 
+def drawn(tmp_path, shared, rel, story, ask=""):
+    """個人 vault に資料の図を作り、(資料の図の中身, 共通の図の中身, 資料の図のパス) を返す。"""
+    personal_note(tmp_path, shared, rel)
+    path, d = deck.make(shared, tmp_path / "個人", rel, story, ask, "山田", TODAY)
+    common = path.with_name(path.name.replace(".excalidraw.md", "_共通.excalidraw.md"))
+    return path.read_text(encoding="utf-8"), common.read_text(encoding="utf-8"), path
+
+
+def texts(drawing: str) -> str:
+    """図のページに出る文字だけ。"""
+    _, els, _ = deck_draw.load_text(drawing)
+    return "\n".join(e.get("originalText", "") for e in els if e["type"] == "text")
+
+
 def titles(d):
     return [s.title for s in d.slides]
 
@@ -105,7 +119,7 @@ def test_inform_from_design(tmp_path, shared):
     assert "Ctrl+D" not in body            # テンプレートの説明の行は出さない
     assert "PA66" in body and "0RB0094XGV" not in body   # リンクは名前だけ
     assert s.image == SVG
-    assert "0RB0034XGV" not in render(d).replace("fig_0RB0034XGV", "")  # id は見せない
+    assert s.refs == [("0RB0034XGV", "樹脂の筐体")]       # 引用はもとのノートの id と名前
     assert "作成 山田" in s.foot
 
 
@@ -179,20 +193,20 @@ def test_schedule(tmp_path, shared):
 
 
 def test_outside_experiment_hides_results(tmp_path, shared):
-    d = make(tmp_path, shared, f"{PJ}/04_タスク/0RB00B4XGV_試験片を作る.md", "社外へ仕様を伝える")
-    html = render(d)
+    html, _, _ = drawn(tmp_path, shared, f"{PJ}/04_タスク/0RB00B4XGV_試験片を作る.md", "社外へ仕様を伝える")
     assert "80 ℃" in html and "強度を確かめる" in html
     assert "52 MPa" not in html and "合格" not in html          # 結果は出さない
     assert PJ not in html and "割れる" not in html               # プロジェクト名・ほかのノートの名前
     assert "足りないところ" not in html and "山田" in html          # 問い合わせ先は名前だけ
     assert "229999" not in html
+    page = texts(html)                                  # ページに出る文字(customData の控えは PDF に出ない)
+    assert "引用: 試験片を作る" in page and "0RB00B4XGV" not in page   # 社外向けは id を伏せる
 
 
 def test_outside_part_hides_price(tmp_path, shared):
-    d = make(tmp_path, shared, "共通/02_ノード/0RB00C4XGV_ねじ.md", "社外へ仕様を伝える")
-    html = render(d)
+    html, _, _ = drawn(tmp_path, shared, "共通/02_ノード/0RB00C4XGV_ねじ.md", "社外へ仕様を伝える")
     assert "M3" in html and "個数" in html
-    assert "単価" not in html and "A社" not in html and ">10<" not in html
+    assert "単価" not in html and "A社" not in html and "｜ 10" not in html
 
 
 def test_outside_refuses_secret_and_wrong_type(tmp_path, shared):
@@ -203,12 +217,21 @@ def test_outside_refuses_secret_and_wrong_type(tmp_path, shared):
 
 
 def test_not_shared(tmp_path, shared):
-    p = write(tmp_path / "個人/共通/02_ノード/0RB00F4XGV_売上.md", "---\nid: 0RB00F4XGV\ntype: ノード\nvisibility: 個人\n---\n")
-    with pytest.raises(deck.DeckError, match="共有していない"):
-        deck.build(shared, p, "知ってもらう", "", "山田", TODAY)
     p2 = write(tmp_path / "個人/共通/02_ノード/0RB00G4XGV_まだ.md", "---\nid: 0RB00G4XGV\ntype: ノード\n---\n")
     with pytest.raises(deck.DeckError, match="共有していない"):
         deck.build(shared, p2, "知ってもらう", "", "山田", TODAY)
+
+
+def test_pip_note_is_confidential(tmp_path, shared):
+    """PIP のノートからも作れる(個人 vault の中身で)。機密区分は Confidential、報告フォルダには写さない。"""
+    p = write(tmp_path / "個人/00_PIP/メモ/0RB00F4XGV_売上.md",
+              "---\nid: 0RB00F4XGV\ntype: ノード\nvisibility: PIP\n---\n## これは何か\n売上の見込み\n")
+    with pytest.raises(deck.DeckError, match="PIP"):
+        deck.build(shared, p, "知ってもらう", "", "山田", TODAY)          # 個人 vault を渡さなければ作らない
+    d = deck.build(shared, p, "知ってもらう", "", "山田", TODAY, tmp_path / "個人")
+    assert d.label == "Confidential" and d.pip and d.title == "売上"
+    path, _ = deck.make(shared, tmp_path / "個人", "00_PIP/メモ/0RB00F4XGV_売上.md", "知ってもらう", "", "山田", TODAY)
+    assert "deck_report: \"\"" in path.read_text(encoding="utf-8")
 
 
 def test_note_limit(tmp_path, shared):
@@ -221,12 +244,14 @@ def test_note_limit(tmp_path, shared):
     assert any(s.title.startswith("何が不安か: ほかに") for s in d.slides)
 
 
-def test_out_path(tmp_path, shared):
-    d = make(tmp_path, shared, DESIGN, "知ってもらう")
-    assert deck.out_path(d, tmp_path / "報告", tmp_path / "PC") == \
-        tmp_path / "報告" / PJ / "説明資料" / "知ってもらう_樹脂の筐体_2026-11-08.html"
-    d5 = make(tmp_path, shared, f"{PJ}/04_タスク/0RB00B4XGV_試験片を作る.md", "社外へ仕様を伝える")
-    assert deck.out_path(d5, tmp_path / "報告", tmp_path / "PC").parent == tmp_path / "PC"   # 社外向けは自分の PC
+def test_out_path_never_overwrites(tmp_path, shared):
+    """資料の図は 00_PIP/説明資料/ に置き、同じ名前があれば _2 を付ける(手直しを消さない)。"""
+    _, _, p1 = drawn(tmp_path, shared, DESIGN, "知ってもらう")
+    _, _, p2 = drawn(tmp_path, shared, DESIGN, "知ってもらう")
+    assert p1.parent == tmp_path / "個人" / "00_PIP" / "説明資料"
+    assert p1.name == "知ってもらう_樹脂の筐体_2026-11-08.excalidraw.md"
+    assert p2.name == "知ってもらう_樹脂の筐体_2026-11-08_2.excalidraw.md"
+    assert p1.with_name("知ってもらう_樹脂の筐体_2026-11-08_共通.excalidraw.md").is_file()
 
 
 def test_default_story():
@@ -252,9 +277,8 @@ def test_signal_makes_deck(tmp_path, shared, cfg, monkeypatch):
     run_now(cfg, results, lambda c: Report(), decks)
     res = json.loads((sig / "1.done.json").read_text(encoding="utf-8"))
     assert res["ok"] and "説明資料を作りました" in res["message"], res
-    html = Path(res["html"])
-    assert html.is_file() and html.parent == tmp_path / "報告" / PJ / "説明資料"
-    assert "<section" in html.read_text(encoding="utf-8")
+    assert res["open"].startswith("00_PIP/説明資料/知ってもらう_樹脂の筐体_")
+    assert (cfg.personal / res["open"]).is_file()
 
 
 def test_signal_error_is_reported(tmp_path, shared, cfg):
@@ -268,3 +292,160 @@ def test_signal_error_is_reported(tmp_path, shared, cfg):
     run_now(cfg, take_signals(sig, cfg.personal, decks=decks), lambda c: Report(), decks)
     res = json.loads((sig / "1.done.json").read_text(encoding="utf-8"))
     assert not res["ok"] and "id のない" in res["message"]
+
+
+# ---------- F-59b: 機密区分・範囲・Excalidraw の図 ----------
+
+def scope(**kw):
+    from notesync.visibility import Scope
+    return Scope(**kw)
+
+
+def test_label_from_visibility():
+    """EXT は <相手>+<会社名>/Confidential、Internal はそのまま、PJ は <PJ>/Confidential、PIP は Confidential。"""
+    assert deck.label_of(scope(ext=["EXT_A社"], projects=["ABC"]), "〇〇株式会社", False) == "A社+〇〇株式会社/Confidential"
+    assert deck.label_of(scope(ext=["EXT_A社", "EXT_B社"]), "", False) == "A社+B社/Confidential"
+    assert deck.label_of(scope(internal=True), "〇〇株式会社", False) == "Internal use only"
+    assert deck.label_of(scope(projects=["ABC", "DEF"]), "〇〇株式会社", False) == "ABC+DEF/Confidential"
+    assert deck.label_of(scope(), "", True) == "Confidential"
+
+
+def test_only_notes_in_range(tmp_path, shared):
+    """Internal use only のノートから作った資料には、プロジェクト名だけのノートは載せない。"""
+    note(shared, "共通/02_ノード/0RB00H4XGV_樹脂の知識.md", "0RB00H4XGV", "ノード", "## これは何か\nPA66 は吸水する\n",
+         visibility="Internal use only", parent=[L("0RB0034XGV", "樹脂化")])
+    d = make(tmp_path, shared, "共通/02_ノード/0RB00H4XGV_樹脂の知識.md", "知ってもらう")
+    assert d.label == "Internal use only"
+    assert "樹脂の筐体" not in [s.title for s in d.slides if s.kind == "note"]
+    assert ["樹脂の筐体", "範囲が狭いので載せていません"] in d.gaps
+    d2 = make(tmp_path, shared, DESIGN, "知ってもらう")
+    assert d2.label == f"{PJ}/Confidential"
+
+
+def test_ext_note_hides_ids_and_names_partner(tmp_path, shared):
+    write(shared / "_仕組み/同期設定.yaml", "会社名: 〇〇株式会社\n")
+    note(shared, f"{PJ}/04_タスク/0RB00J4XGV_外注試験.md", "0RB00J4XGV", "タスク", "## やること\n引張試験\n",
+         visibility=[PJ, "EXT_A社"])
+    d = make(tmp_path, shared, f"{PJ}/04_タスク/0RB00J4XGV_外注試験.md", "知ってもらう")
+    assert d.label == "A社+〇〇株式会社/Confidential" and d.hide_ids
+    html, common, _ = drawn(tmp_path, shared, f"{PJ}/04_タスク/0RB00J4XGV_外注試験.md", "知ってもらう")
+    assert "0RB00J4XGV" not in texts(html) and "引用: 外注試験" in texts(html)
+    assert "A社+〇〇株式会社/Confidential" in texts(common) and "〇〇株式会社" in texts(common)
+
+
+def test_drawing_pages_and_common(tmp_path, shared):
+    """1ページ = 16:9 のフレーム。共通の図を各ページに絵で貼って固定し、番号・章・引用はページごとの文字。"""
+    write(tmp_path / "個人/_仕組み/個人設定.md", '---\nname: "山田"\naffiliation: "開発部 第2グループ"\n---\n')
+    html, common, path = drawn(tmp_path, shared, DESIGN, "知ってもらう")
+    _, els, files = deck_draw.load(path)
+    frames = deck_draw.frames_of(els)
+    assert frames[0]["name"] == "01 樹脂の筐体" and frames[1]["name"] == "02 要点"
+    assert all(f["width"] == 1600 and f["height"] == 900 for f in frames)
+    n = len(frames)
+    for f in frames:
+        kids = [e for e in els if e.get("frameId") == f["id"]]
+        base = [e for e in kids if (e.get("customData") or {}).get("deck_common")]
+        assert len(base) == 1 and base[0]["locked"] and base[0]["width"] == 1600
+        link = files[base[0]["fileId"]]
+        assert link.endswith("_共通.excalidraw#^clippedframe=" + ("deck_cover" if f is frames[0] else "deck_page"))
+    t = texts(html)
+    assert f"2 / {n}" in t and f"{n} / {n}" in t                    # ページの番号
+    assert "引用: 0RB0034XGV 樹脂の筐体" in t                          # 引用は id と名前
+    assert "■ この案の中身" in t
+    c = texts(common)
+    assert "樹脂の筐体" in c and f"{PJ}/Confidential" in c and "開発部 第2グループ 山田" in c
+    assert "文書番号: " in c and "{文書番号}" not in c                 # 文書番号は空(あとで書き込む)
+    assert "{ページ}" not in c                                        # ページの番号は共通に入れない
+    links = [files[e["fileId"]] for e in els if e["type"] == "image" and not (e.get("customData") or {}).get("deck_common")]
+    assert any(v.endswith("fig_0RB0034XGV_樹脂化.excalidraw.svg") for v in links)   # 図の SVG を貼る
+    kplex = next(v for v in links if v.endswith("全体の形.svg"))
+    assert "<style>" in (tmp_path / "個人" / kplex).read_text(encoding="utf-8")   # K-Plex の形は色の決まりを入れて置く
+    assert '"deck_report": ' not in html and f'deck_report: "{PJ}"' in html
+
+
+def test_custom_template(tmp_path, shared):
+    """ひな形: 枠の中の線・文字・ロゴを写し、言葉を置き換え、「本文」の四角に中身、色の四角でテーマカラー。"""
+    sc = deck_draw.Scene()
+    sc.frame(0, 0, "ページ", fid="fr")
+    sc.text(100, 20, "{会社名} 社外秘", 20, "#000000", "fr")
+    sc.text(1500, 860, "p.{ページ}", 16, "#000000", "fr", align="right")
+    sc.box(200, 100, 1200, 700, "本文", 20, "#000000", "fr", stroke="#000000")
+    sc.box(1700, 0, 200, 80, "メイン色", 20, "#ffffff", None, bg="#aa0000")
+    logo = write(shared / "_仕組み/説明資料のひな形/logo.png", "png")
+    sc.image(20, 10, 60, 40, "logo.png", "fr")
+    write(shared / deck_draw.TEMPLATE_DIR / "ページ.excalidraw.md", deck_draw.dump(sc.els, sc.files))
+    write(shared / "_仕組み/同期設定.yaml", "会社名: 〇〇株式会社\n")
+    html, common, path = drawn(tmp_path, shared, DESIGN, "知ってもらう")
+    c = texts(common)
+    assert "〇〇株式会社 社外秘" in c and "本文" not in c and "メイン色" not in c
+    assert "p.2" in texts(html)
+    _, els, files = deck_draw.load(path)
+    title = next(e for e in els if e["type"] == "text" and e.get("originalText") == "要点")
+    assert title["strokeColor"] == "#aa0000"                          # メイン色
+    assert 200 <= title["x"] and 100 <= title["y"] - 1100              # 本文の四角の中(2ページ目)
+    assert any(v.endswith("logo.png") for v in deck_draw.load(path.with_name(path.name.replace(".excalidraw.md", "_共通.excalidraw.md")))[2].values())
+    assert logo.is_file()
+
+
+def test_broken_template_falls_back(tmp_path, shared):
+    write(shared / deck_draw.TEMPLATE_DIR / "ページ.excalidraw.md", "---\nexcalidraw-plugin: parsed\n---\n```compressed-json\nxx\n```\n")
+    personal_note(tmp_path, shared, DESIGN)
+    path, d = deck.make(shared, tmp_path / "個人", DESIGN, "知ってもらう", "", "山田", TODAY)
+    assert ["(ひな形)", "ひな形を読めませんでした"] in d.gaps and path.is_file()
+
+
+def test_distributed_templates_are_valid(tmp_path):
+    """配るひな形は読めて、本文の範囲と色がある。"""
+    root = Path(__file__).resolve().parents[2] / "vault/共有" / deck_draw.TEMPLATE_DIR
+    for kind in ("ページ", "表紙"):
+        t = deck_draw.read_template(root / f"{kind}.excalidraw.md", None)
+        assert t.colors == {"main": deck_draw.MAIN, "accent": deck_draw.ACCENT}
+        assert t.has("{機密区分}") and t.has("{文書番号}")
+    assert deck_draw.read_template(root / "ページ.excalidraw.md", None).has("{引用}")
+
+
+def test_join_decks(tmp_path, shared):
+    """つなぐ: 表紙は1つ目だけ、2つ目からは区切りのページ、番号は通し、機密区分は選んだもの。"""
+    _, _, p1 = drawn(tmp_path, shared, DESIGN, "知ってもらう")
+    _, _, p2 = drawn(tmp_path, shared, f"{PJ}/04_タスク/0RB00B4XGV_試験片を作る.md", "社外へ仕様を伝える")
+    per = tmp_path / "個人"
+    out = deck_draw.join_decks([p1, p2], per, "Internal use only", True, TODAY)
+    assert out.name == "つないだ資料_樹脂の筐体_2026-11-08.excalidraw.md"
+    fm, els, files = deck_draw.load(out)
+    frames = deck_draw.frames_of(els)
+    kinds = [(f.get("customData") or {}).get("deck_kind") for f in frames]
+    assert kinds.count("cover") == 1 and "divider" in kinds and kinds.count("gaps") == 1 and kinds[-1] == "gaps"
+    assert [f["name"][:2] for f in frames] == [f"{i:02d}" for i in range(1, len(frames) + 1)]
+    t = texts(out.read_text(encoding="utf-8"))
+    assert f"{len(frames)} / {len(frames)}" in t
+    assert "引用: 0RB00B4XGV 試験片を作る" in t                       # 社内向けにすると社外向けのページにも id
+    common = out.with_name(out.name.replace(".excalidraw.md", "_共通.excalidraw.md"))
+    assert "Internal use only" in texts(common.read_text(encoding="utf-8"))
+    assert all(v.startswith("00_PIP/説明資料/つないだ資料_") for k, v in files.items() if "clippedframe" in v)
+    assert fm["deck_report"] == PJ and p1.is_file() and p2.is_file()
+    out2 = deck_draw.join_decks([p2], per, "Confidential", False, TODAY)
+    assert "0RB00B4XGV" not in texts(out2.read_text(encoding="utf-8"))
+    assert deck_draw.load(out2)[0]["deck_report"] == ""
+
+
+def test_copy_pdfs(tmp_path, shared):
+    """00_PIP/説明資料/ の PDF のうち、共有に出ているノートの社内向けの資料のものだけを報告フォルダへ写す。"""
+    _, _, p1 = drawn(tmp_path, shared, DESIGN, "知ってもらう")
+    _, _, p2 = drawn(tmp_path, shared, f"{PJ}/04_タスク/0RB00B4XGV_試験片を作る.md", "社外へ仕様を伝える")
+    write(p1.with_name(p1.name.replace(".excalidraw.md", ".pdf")), "%PDF")
+    write(p2.with_name(p2.name.replace(".excalidraw.md", "-pages.pdf")), "%PDF")
+    rep = tmp_path / "報告"
+    got = deck.copy_pdfs(tmp_path / "個人", rep)
+    assert got == [rep / PJ / "説明資料" / "知ってもらう_樹脂の筐体_2026-11-08.pdf"] and got[0].is_file()
+    assert deck.copy_pdfs(tmp_path / "個人", rep) == []                 # 新しくなければ写さない
+    assert deck.copy_pdfs(tmp_path / "個人", None) == []
+
+
+def test_affiliation_line_added(tmp_path):
+    f = write(tmp_path / "個人/_仕組み/個人設定.md", '---\nname: "山田"\nnumber: "229999"\n---\n# 個人設定\n')
+    assert deck.add_affiliation(tmp_path / "個人")
+    text = f.read_text(encoding="utf-8")
+    assert 'number: "229999"\naffiliation: ""' in text and text.endswith("# 個人設定\n")
+    assert not deck.add_affiliation(tmp_path / "個人")                  # 何度でも同じ
+    from notesync import frontmatter
+    assert frontmatter.load(text)["affiliation"] == ""

@@ -55,6 +55,12 @@
       "mode": "any"
     },
     {
+      "id": "templater-obsidian:_仕組み/templates/_コマンド/このノートをリンク先の親にする.md",
+      "icon": "arrow-up-from-line",
+      "name": "このノートをリンク先の親にする(parent)",
+      "mode": "any"
+    },
+    {
       "id": "templater-obsidian:_仕組み/templates/_コマンド/図を開く.md",
       "icon": "pencil",
       "name": "図を開く(Ctrl+D)",
@@ -153,6 +159,18 @@
       "icon": "lock",
       "name": "共有をやめる",
       "mode": "any"
+    },
+    {
+      "id": "quickadd:choice:7783c01b-5a3a-5375-8513-d6944bc66f11",
+      "icon": "file-down",
+      "name": "説明資料を PDF にする",
+      "mode": "desktop"
+    },
+    {
+      "id": "quickadd:choice:971f1905-92fe-5ec3-966e-88628f251bee",
+      "icon": "combine",
+      "name": "説明資料をつなぐ",
+      "mode": "desktop"
     }
   ]
 }

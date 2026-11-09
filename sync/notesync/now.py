@@ -38,7 +38,8 @@ def take_signals(folder: Path, personal: Path, now: float | None = None,
                  decks: dict[Path, dict] | None = None) -> list[Path]:
     """自分の個人 vault あての合図を拾って消す。返すのは結果を書く場所。
 
-    合図に "資料"(説明資料の依頼。F-59)があれば、decks に 結果を書く場所 → 依頼 を入れる。"""
+    合図に "資料"(説明資料の依頼。F-59)か "つなぐ"(説明資料をつなぐ依頼。F-59b)があれば、
+    decks に 結果を書く場所 → 依頼 を入れる(つなぐは {"つなぐ": {...}} の形で)。"""
     now = time.time() if now is None else now
     out = []
     if not folder.is_dir():
@@ -63,14 +64,17 @@ def take_signals(folder: Path, personal: Path, now: float | None = None,
         done = p.with_name(p.stem + DONE)
         if decks is not None and isinstance(data.get("資料"), dict):
             decks[done] = data["資料"]
+        elif decks is not None and isinstance(data.get("つなぐ"), dict):
+            decks[done] = {"つなぐ": data["つなぐ"]}
         out.append(done)
     return out
 
 
-def write_result(path: Path, ok: bool, message: str, report=None, html: Path | None = None) -> None:
+def write_result(path: Path, ok: bool, message: str, report=None, open_: str | None = None) -> None:
+    """open_ は Obsidian で開くファイル(個人 vault の中のパス)。"""
     data = {"ok": ok, "message": message}
-    if html is not None:
-        data["html"] = str(html)
+    if open_ is not None:
+        data["open"] = open_
     if report is not None:
         data.update(records=len(report.records), todos=len(report.todos), warnings=len(report.warnings))
     tmp = path.with_suffix(".tmp")
@@ -110,7 +114,9 @@ def run_now(cfg: Config, results: list[Path], run_once, decks: dict[Path, dict] 
     else:
         msg = "共有へ送りました"
     for r in results:
-        if r in decks:
+        if r in decks and "つなぐ" in decks[r]:
+            join_deck(cfg, r, decks[r]["つなぐ"], report)
+        elif r in decks:
             make_deck(cfg, r, decks[r], report)
         else:
             write_result(r, True, msg, report)
@@ -118,7 +124,7 @@ def run_now(cfg: Config, results: list[Path], run_once, decks: dict[Path, dict] 
 
 
 def make_deck(cfg: Config, result: Path, req: dict, report) -> None:
-    """説明資料を作り、結果に HTML の場所を書く(要件書 F-59)。作れなくても同期の結果はそのまま。"""
+    """説明資料の図を作り、結果に開くファイルを書く(要件書 F-59・F-59b)。作れなくても同期の結果はそのまま。"""
     from datetime import datetime
 
     from . import deck
@@ -128,8 +134,7 @@ def make_deck(cfg: Config, result: Path, req: dict, report) -> None:
         return
     try:
         path, d = deck.make(cfg.shared, cfg.personal, str(req.get("note", "")), str(req.get("筋書き", "")),
-                            str(req.get("ひとこと", "")), cfg.member, datetime.now(JST).date(),
-                            cfg.report_dir, config.default_config_path().parent / deck.OUT_DIR)
+                            str(req.get("ひとこと", "")), cfg.member, datetime.now(JST).date())
     except deck.DeckError as e:
         write_result(result, False, str(e), report)
         return
@@ -137,10 +142,36 @@ def make_deck(cfg: Config, result: Path, req: dict, report) -> None:
         write_result(result, False, f"説明資料を作れませんでした({type(e).__name__}: {e})", report)
         return
     msg = f"説明資料を作りました({d.count}枚。足りないところ {len(d.gaps)})"
+    if any(g[0] == "(ひな形)" for g in d.gaps):
+        msg += "。ひな形を読めませんでした"
     if d.story == deck.OUTSIDE:
         msg += "。社外に出す前に中身を確かめてください"
-    write_result(result, True, msg, report, html=path)
+    write_result(result, True, msg, report, open_=path.relative_to(cfg.personal).as_posix())
     print(f"説明資料: {path}")
+
+
+def join_deck(cfg: Config, result: Path, req: dict, report) -> None:
+    """選んだ説明資料をつなぐ(要件書 F-59b)。"""
+    from datetime import datetime
+
+    from .deck_draw import TemplateError, join_decks
+    from .ids import JST
+    paths = [cfg.personal / str(p) for p in req.get("資料") or []]
+    if len(paths) < 1 or not all(p.is_file() for p in paths):
+        write_result(result, False, "つなぐ資料が見つかりません", report)
+        return
+    try:
+        path = join_decks(paths, cfg.personal, str(req.get("機密区分") or ""), req.get("向け") != "社外",
+                          datetime.now(JST).date())
+    except TemplateError as e:
+        write_result(result, False, str(e), report)
+        return
+    except Exception as e:  # 止まっても watch は続ける
+        write_result(result, False, f"説明資料をつなげませんでした({type(e).__name__}: {e})", report)
+        return
+    write_result(result, True, f"説明資料をつなぎました({len(paths)} つ)", report,
+                 open_=path.relative_to(cfg.personal).as_posix())
+    print(f"説明資料をつなぎました: {path}")
 
 
 RETRY_SECONDS = 30  # 書いている途中で見送ったものを、やり直すまでの最短の間

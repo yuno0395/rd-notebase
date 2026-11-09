@@ -345,6 +345,57 @@ test("関係としてつなぐ: 設計案で仮説のリンクの上なら 価�
   results["関係としてつなぐ"] = app.text(p);
 });
 
+test("このノートをリンク先の親にする: 仮説の本文の [[指標]] の上で使うと、指標のノードの parent に仮説を足す", async () => {
+  const node = "共通/02_ノード/0RB0084XGV_片手で持てる.md";
+  const theirs = "共通/02_ノード/0RB0094XGV_落としても割れない.md";
+  const app = personal({
+    "試しPJ/01_目的/0RB0024XGV_持ち運べる.md": `---\nid: 0RB0024XGV\ntype: 仮説\nauthor: ["229999_yu"]\nparent: ["[[0RB0014XGV_軽くする|軽くする]]"]\n---\n- [[0RB0084XGV_片手で持てる|片手で持てる]]\n- [[0RB0094XGV_落としても割れない|落としても割れない]]\n`,
+    [node]: `---\nid: 0RB0084XGV\ntype: ノード\nauthor: ["229999_yu"]\naliases: ["片手で持てる"]\nparent: ["[[0RB0014XGV_軽くする|軽くする]]"]\n---\n`,
+    [theirs]: `---\nid: 0RB0094XGV\ntype: ノード\nauthor: ["111111_kato"]\naliases: ["落としても割れない"]\n---\n`,
+  });
+  const src = "試しPJ/01_目的/0RB0024XGV_持ち運べる.md";
+  const before = app.text(src);
+  app.open(src, { line: 6, ch: 5 });
+  await app.templater.command("このノートをリンク先の親にする");
+  assert.deepEqual(app.fm(node).parent, ["[[0RB0014XGV_軽くする|軽くする]]", "[[0RB0024XGV_持ち運べる|持ち運べる]]"]);
+  app.open(src, { line: 6, ch: 5 });
+  await app.templater.command("このノートをリンク先の親にする");   // 2回押しても1つだけ
+  assert.equal(app.fm(node).parent.length, 2);
+  assert.ok(app.notices.some((n) => n.includes("もう")), app.notices.join(" / "));
+  app.open(src, { line: 7, ch: 5 });
+  const theirsBefore = app.text(theirs);
+  await app.templater.command("このノートをリンク先の親にする");   // 他の人のノートは書き換えない(R-14)
+  assert.equal(app.text(theirs), theirsBefore);
+  assert.ok(app.notices.some((n) => n.includes("他の人のノート")), app.notices.join(" / "));
+  assert.equal(app.text(src), before);   // 今のノートは変えない
+  assert.equal(app.prompts.length, 0);
+  results["このノートをリンク先の親にする"] = app.text(node);
+});
+
+test("Ctrl+K: 押したノートの visibility を聞かずに引き継ぐ", async () => {
+  const hyp = (v) => `---\nid: 0RB0024XGV\ntype: 仮説\nauthor: ["229999_yu"]\nvisibility: [${v}]\nparent: ["[[0RB0014XGV_軽くする|軽くする]]"]\n---\n- 片手で持てる\n`;
+  const src = "試しPJ/01_目的/0RB0024XGV_持ち運べる.md";
+  let app = personal({ [src]: hyp("Internal use only") });
+  app.open(src, { line: 7, ch: 2, to: 8 });
+  await app.templater.command("ノードにする");
+  let p = only(app.find(/^共通\/02_ノード\/[0-9A-Z]{10}_片手で持てる\.md$/), "Internal のノード");
+  assert.deepEqual(app.fm(p).visibility, ["Internal use only"]);
+  assert.equal(app.prompts.length, 0, `窓が ${app.prompts.length} 回出た`);
+  keep(app, "Ctrl+K 引き継ぐ");
+  app = personal({ [src]: hyp("試しPJ") });
+  app.open(src, { line: 7, ch: 2, to: 8 });
+  await app.templater.command("ノードにする");
+  p = only(app.find(/^試しPJ\/02_ノード\/[0-9A-Z]{10}_片手で持てる\.md$/), "プロジェクトのノード");
+  assert.deepEqual(app.fm(p).visibility, ["試しPJ"]);
+  assert.equal(app.prompts.length, 0);
+  app = personal({ "00_PIP/メモ/0RB0024XGV_持ち運べる.md": hyp("PIP") });
+  app.open("00_PIP/メモ/0RB0024XGV_持ち運べる.md", { line: 7, ch: 2, to: 8 });
+  await app.templater.command("ノードにする");
+  p = only(app.find(/^00_PIP\/メモ\/[0-9A-Z]{10}_片手で持てる\.md$/), "PIP のノード");
+  assert.deepEqual(app.fm(p).visibility, ["PIP"]);
+  assert.equal(app.prompts.length, 0);
+});
+
 // ---------- Ctrl+N(QuickAdd は 00_inbox に作り、テンプレートが移す) ----------
 
 for (const [tpl, folder] of [["イシュー", "03_イシュー"], ["タスク", "04_タスク"], ["目的", "01_目的"],

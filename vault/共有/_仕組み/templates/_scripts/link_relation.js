@@ -6,6 +6,10 @@
 //   - 文字を選んで使う: 同じ名前か別名のノートがあれば、そのノートを足す。
 // 本文のリンクはそのまま残す。属性欄の値は "[[id_名前|名前]]" の形で、引用符をつけて並べる。
 // すでに入っているノートは二度足さない。まだファイルのないリンクは足さない(先に Ctrl+K などで作る)。
+//
+// このノートをリンク先の親にする(link_relation.asParent。): 向きが逆で、今のノートを
+// リンク先のノートの parent に足す。価値の仮説の本文に書いた具体指標のノード [[ ]] の上で使うと、
+// ノードの parent に仮説が入る。書き換えるのはリンク先なので、自分のノートのときだけ(他の人のノートは書き換えない)。
 
 const T = "_仕組み/templates/";
 const LABEL = { friend: "関係(friend)", challenger: "反論(challenger)", 価値仮説: "価値仮説" };
@@ -40,17 +44,17 @@ function targetOf(app, ed, note) {
   return { error: `「${key}」というノートがありません` };
 }
 
-async function link_relation(tp, role) {
+// 開いているノートと、リンク先のノート。使えないときは知らせて null
+function notes(tp) {
   const app = tp.app;
   const { Notice } = tp.obsidian;
   M = tp.user.make_note;
-  if (!LABEL[role]) throw new Error(`知らないつなぎ方です: ${role}`);
   const view = app.workspace.activeEditor;
   if (!view?.editor || !view.file) {
     new Notice("ノートを開いてから使ってください");
-    return;
+    return null;
   }
-  if (M.inProperties(Notice, view)) return;
+  if (M.inProperties(Notice, view)) return null;
   const ed = view.editor;
   const note = view.file;
   // Templater はこのあと選んでいる文字を空の文字で置き換えるので、先に読んで選択を外しておく
@@ -58,28 +62,53 @@ async function link_relation(tp, role) {
   ed.setCursor(ed.getCursor("to"));
   if (found.error) {
     new Notice(found.error, 6000);
-    return;
+    return null;
   }
-  const file = found.file;
-  if (file.path === note.path) {
+  if (found.file.path === note.path) {
     new Notice("自分自身にはつなげません");
-    return;
+    return null;
   }
-  const fm = app.metadataCache.getFileCache(note)?.frontmatter || {};
-  if (role === "friend" && M.typeOf(app, note) === "設計案" && M.typeOf(app, file) === "仮説") role = "価値仮説";
-  const values = M.asList(fm[role]);
-  const already = values.some((v) => {
-    const t = (v.match(/\[\[([^\]]+)\]\]/) || [])[1];
-    return t && M.resolve(app, t, note.path)?.path === file.path;
-  });
-  if (already) {
-    new Notice(`「${M.nameOf(file)}」はもう${LABEL[role]}に入っています`);
-    return;
-  }
-  // 入っていた値はそのまま残し、後ろに足す
-  const next = values.concat([M.linkOf(file)]);
-  await app.vault.process(note, (text) => M.setKey(text, role, M.flow(next)));
-  new Notice(`「${M.nameOf(file)}」を${LABEL[role]}につなぎました`);
+  return { note, file: found.file };
 }
 
-module.exports = link_relation;
+// owner の属性 key に target を足す。入っていた値はそのまま残し、後ろに足す。もう入っていれば足さない
+async function add(tp, owner, key, target, label) {
+  const app = tp.app;
+  const { Notice } = tp.obsidian;
+  const values = M.asList(app.metadataCache.getFileCache(owner)?.frontmatter?.[key]);
+  const already = values.some((v) => {
+    const t = (v.match(/\[\[([^\]]+)\]\]/) || [])[1];
+    return t && M.resolve(app, t, owner.path)?.path === target.path;
+  });
+  if (already) {
+    new Notice(`「${M.nameOf(target)}」はもう${label}に入っています`);
+    return;
+  }
+  await app.vault.process(owner, (text) => M.setKey(text, key, M.flow(values.concat([M.linkOf(target)]))));
+  new Notice(`「${M.nameOf(target)}」を${label}につなぎました`);
+}
+
+async function link_relation(tp, role) {
+  if (!LABEL[role]) throw new Error(`知らないつなぎ方です: ${role}`);
+  const got = notes(tp);
+  if (!got) return;
+  const { note, file } = got;
+  if (role === "friend" && M.typeOf(tp.app, note) === "設計案" && M.typeOf(tp.app, file) === "仮説") role = "価値仮説";
+  await add(tp, note, role, file, LABEL[role]);
+}
+
+// このノートをリンク先の親にする: 今のノートを、リンク先のノートの parent に足す
+async function asParent(tp) {
+  const got = notes(tp);
+  if (!got) return;
+  const { note, file } = got;
+  const O = tp.user.others_note;
+  if (O && O.isTheirs(tp.app, file, await O.myName(tp.app))) {
+    new tp.obsidian.Notice(`「${M.nameOf(file)}」は他の人のノートなので書き換えません。`
+      + "書き足すときは、そのノートを開いて右クリック →「自分も作成者に入れて書く」のあとに使ってください", 8000);
+    return;
+  }
+  await add(tp, file, "parent", note, `「${M.nameOf(file)}」の親(parent)`);
+}
+
+module.exports = Object.assign(link_relation, { asParent });
