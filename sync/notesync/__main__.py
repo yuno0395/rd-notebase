@@ -4,9 +4,12 @@
     python -m notesync watch [--config 個人設定.yaml] [--interval 1]
     python -m notesync weekly [--config 個人設定.yaml]
     python -m notesync recover [--config 個人設定.yaml] [--run]
+    python -m notesync import [<元の vault のフォルダ>] [--config 個人設定.yaml] [--run]
 
 once は1回だけ同期する。watch は interval 分ごとに繰り返し、合間に Obsidian の「今すぐ共有へ」(Ctrl+Shift+S)を受けるとすぐ同期する(F-48)。weekly は今週の週報を今すぐ作り直す(F-29)。--hide / --only で今回だけ載せる節を変えられる。
 recover は共有 vault に直接書かれたノートに id をつけ、たまった重い添付を移す(F-35)。--run がなければ試し運転。
+import は別の Obsidian の vault のノートと添付を個人 vault の 00_PIP/メモ/取り込み_<名前>/ へ取り込む(F-62)。
+試し実行で数を見せ、y を押したら取り込む。--run なら聞かずに取り込む。
 --dry-run は書き込まず、やる予定だけを _仕組み/同期レポート.md に書く(F-23)。
 """
 
@@ -23,7 +26,8 @@ from .run import run_once
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="notesync", description="知見同期プログラム")
-    ap.add_argument("command", choices=["once", "watch", "weekly", "recover"])
+    ap.add_argument("command", choices=["once", "watch", "weekly", "recover", "import"])
+    ap.add_argument("source", nargs="?", default="", help="import で取り込む元の vault のフォルダ")
     ap.add_argument("--config", type=Path, default=config.default_config_path())
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--run", action="store_true", help="recover を試し運転でなく実行する")
@@ -37,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"止めました: {e}", file=sys.stderr)
         return 2
     dry = True if args.dry_run else None
+    if args.command == "import":
+        return import_command(cfg, args.source, args.run and not args.dry_run, args.dry_run)
     if args.command == "recover":
         import time as _t
 
@@ -96,6 +102,29 @@ def main(argv: list[str] | None = None) -> int:
         # 1分待つ合間に「今すぐ共有へ」の合図を見る(F-48)
         from .now import next_wait, wait
         wait(cfg, next_wait(args.interval * 60, report, cfg.idle_seconds), lambda c: run_once(c, dry_run=dry))
+
+def import_command(cfg, source: str, go: bool, dry_only: bool) -> int:
+    """F-62: 別の vault から取り込む。まず試し実行、y で取り込む。"""
+    from .importer import import_vault
+    src = source.strip().strip('"') or input("取り込む元の vault のフォルダをこの画面にドラッグして Enter: ").strip().strip('"')
+    if not src:
+        print("フォルダが入っていないので、やめました")
+        return 2
+    args = dict(src=Path(src), personal=cfg.personal, shared=cfg.shared, private_data=cfg.private_data,
+                code=cfg.code, me=cfg.me, lock_path=cfg.lock_path)
+    try:
+        if not go:
+            import_vault(dry=True, **args)
+            if dry_only or input("\n取り込みますか (y/n): ").strip().lower() not in ("y", "yes"):
+                print("取り込みませんでした")
+                return 0
+        out = import_vault(dry=False, **args)
+    except ValueError as e:
+        print(f"止めました: {e}", file=sys.stderr)
+        return 2
+    print(f"取り込みました。結果は {out} にあります")
+    return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
