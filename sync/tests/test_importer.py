@@ -160,3 +160,66 @@ def test_reserved_covers_templates():
                 names.add(m.group(1).strip().lower())
     missing = names - importer.RESERVED - importer.KEEP - importer.ALIASES
     assert not missing, f"importer.RESERVED に足してください: {sorted(missing)}"
+
+
+# 圧縮した図の中身(lz-string 1.5.0 の compressToBase64 で作ったもの)。
+# {"type":"excalidraw","elements":[{"id":"a","type":"text","text":"[[水]] と [[写真.png]]","rawText":"[[水]]",
+#   "originalText":"[[水]]","link":"[[水]]"},{"id":"b","type":"rectangle","link":"[[b]]"}]}
+COMPRESSED = ("N4IgLgngDgpiBcIYA8DGBDANgSwCYCd0B3EAGiUxgFsYA7MAZwQG1Q8ER0zxo5EwUYbgORDEzZoBYbALrSABIAsGORMCZioHx3AHRRaAc1ndCRACqCOEmdO4B7fNh3ZaWE6LNT95HLQDWriyAC+pGy4HABGwrwc+DCoYOi6lNyePuLMofr+0v5AA")
+
+
+def drawing(kind: str, data: str, links: str) -> str:
+    return (f"---\nexcalidraw-plugin: parsed\n---\n# Excalidraw Data\n\n## Text Elements\n{links} ^a\n\n"
+            f"## Embedded Files\nabc123: [[写真.png]]\n\n%%\n## Drawing\n```{kind}\n{data}\n```\n%%\n")
+
+
+def test_lz_decompress():
+    raw = importer.lz_decompress_b64(COMPRESSED)
+    assert '"rawText":"[[水]]"' in raw and '"link":"[[b]]"' in raw
+
+
+@pytest.mark.parametrize("kind", ["json", "compressed-json"])
+def test_links_in_drawing(env, kind):
+    """図(Excalidraw)の中のリンクも直す。"""
+    src, personal, _ = env
+    put(src / "水.md", "---\ncreated: 2026-04-01\n---\n水\n")
+    put(src / "写真.png", b"\x89PNG")
+    data = COMPRESSED if kind == "compressed-json" else (
+        '{"type":"excalidraw","elements":[{"id":"a","type":"text","text":"[[水]] と [[写真.png]]",'
+        '"rawText":"[[水]]","originalText":"[[水]]","link":"[[水]]"},{"id":"b","type":"rectangle","link":"[[b]]"}]}')
+    put(src / "図/絵.excalidraw.md", drawing(kind, data, "[[水]]"))
+    put(src / "e.md", "---\ncreated: 2026-04-02\n---\n![[絵.excalidraw]]\n")
+    go(env)
+    got = imported(personal)
+    e_id = ids.split_filename(got["e"].stem)[0]
+    w, b = got["水"].stem, got["b"].stem
+    assert f"![[_仕組み/attachments/{e_id}/絵.excalidraw.md]]" in got["e"].read_text(encoding="utf-8")
+    pic = (personal / "_仕組み/attachments" / e_id / "絵.excalidraw.md").read_text(encoding="utf-8")
+    assert f"[[{w}|水]] ^a" in pic                                        # 文字の欄
+    assert f"abc123: [[_仕組み/attachments/{e_id}/写真.png]]" in pic        # 貼った画像
+    assert (personal / "_仕組み/attachments" / e_id / "写真.png").exists()
+    body = re.search(r"```json\n(.*?)\n```", pic, re.S)
+    assert body, "図の中身は json で書く"
+    doc = __import__("json").loads(body.group(1))
+    a, r = doc["elements"]
+    assert a["link"] == f"[[{w}|水]]" and a["rawText"] == f"[[{w}|水]]"
+    assert a["text"] == f"[[{w}|水]] と [[_仕組み/attachments/{e_id}/写真.png]]"
+    assert r["link"] == f"[[{b}|b]]"
+
+
+def test_repair_old_drawing(env):
+    """前の版で取り込んだ図(元のままの写し)は、もう一度押すと中のリンクが直る。手を入れた図は触らない。"""
+    src, personal, _ = env
+    put(src / "水.md", "---\ncreated: 2026-04-01\n---\n水\n")
+    put(src / "絵.excalidraw.md", drawing("json", '{"type":"excalidraw","elements":[]}', "[[水]]"))
+    put(src / "e.md", "---\ncreated: 2026-04-02\n---\n![[絵.excalidraw]]\n")
+    go(env)
+    got = imported(personal)
+    e_id = ids.split_filename(got["e"].stem)[0]
+    pic = personal / "_仕組み/attachments" / e_id / "絵.excalidraw.md"
+    pic.write_bytes((src / "絵.excalidraw.md").read_bytes())   # 前の版はそのままコピーしていた
+    go(env)
+    assert f"[[{got['水'].stem}|水]] ^a" in pic.read_text(encoding="utf-8")
+    pic.write_text("手で直した図", encoding="utf-8")
+    go(env)
+    assert pic.read_text(encoding="utf-8") == "手で直した図"
